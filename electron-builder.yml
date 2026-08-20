@@ -1,0 +1,62 @@
+appId: com.chapterflow.app
+productName: ChapterFlow
+directories:
+  buildResources: build
+  output: dist
+
+# electron-builder includes the whole project directory by default and works
+# by exclusion, so anything new that lands here ships unless it is named. These
+# globs are deliberately broader than the template's: an audit of the first
+# build found a Claude Code lock file and TypeScript build caches inside
+# app.asar, neither of which the application reads.
+files:
+  - '!**/.vscode/*'
+  - '!src/**'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!tsconfig*'
+  - '!**/*.tsbuildinfo'
+  # Local tooling state — editor, agent, and VCS working files.
+  - '!.claude/**'
+  - '!.git/**'
+  - '!.github/**'
+  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!**/*.log'
+
+# Where electron-updater looks for new versions. GitHub Releases needs no
+# infrastructure of its own: publishing a release with the installer and the
+# generated latest.yml attached is the whole deployment step.
+publish:
+  provider: github
+  owner: jackjmoore
+  repo: chapterflow-app
+
+win:
+  target: nsis
+  executableName: chapterflow-app
+
+nsis:
+  # A real installer wizard rather than electron-builder's default one-click
+  # flow, so there is a visible install step, a chosen location, and a normal
+  # entry in Apps & Features.
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  # Per-user rather than per-machine, deliberately. Two reasons: an unsigned
+  # build triggering a UAC elevation prompt on top of the SmartScreen warning
+  # is a worse first run, and auto-update can replace a per-user install
+  # without needing elevation every time.
+  perMachine: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: ChapterFlow
+  uninstallDisplayName: ChapterFlow
+  artifactName: ${name}-${version}-setup.${ext}
+  # Explicit, not merely the default: uninstalling must never remove
+  # %APPDATA%/ChapterFlow, which holds preferences and the app-managed backup
+  # history. Manuscripts live outside it entirely, in the user's own folder.
+  deleteAppDataOnUninstall: false
+
+mac:
+  target: dmg
+linux:
+  target: AppImage
