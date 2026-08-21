@@ -227,6 +227,27 @@ function buildMentionCandidates(items: StoryBibleItem[]): MentionCandidate[] {
  */
 const OPEN_EDITOR_ON_LOAD = 'chf-open-editor-on-load'
 
+/**
+ * Read once per page load, at module scope, rather than inside the effect that
+ * uses it.
+ *
+ * Reading it is what destroys it, and StrictMode mounts every effect twice in
+ * development: the first run consumed the flag and opened the editor, the
+ * second found it gone and fell back to the launch preference — which showed
+ * the dashboard again. That was the flash-then-nothing when opening a recent
+ * project. Module scope runs once per page load and a reload makes a new
+ * context, so both effect runs now see the same answer.
+ */
+const openEditorOnLoad = ((): boolean => {
+  try {
+    const present = sessionStorage.getItem(OPEN_EDITOR_ON_LOAD) !== null
+    sessionStorage.removeItem(OPEN_EDITOR_ON_LOAD)
+    return present
+  } catch {
+    return false
+  }
+})()
+
 /** Long enough to cross the 6px gap between a name and its card without the
  *  card vanishing, short enough that leaving feels immediate. */
 const HOVER_DISMISS_MS = 150
@@ -275,9 +296,7 @@ function App(): JSX.Element {
   const [showDashboard, setShowDashboard] = useState<boolean | null>(null)
 
   useEffect(() => {
-    const chosen = sessionStorage.getItem(OPEN_EDITOR_ON_LOAD)
-    sessionStorage.removeItem(OPEN_EDITOR_ON_LOAD)
-    if (chosen) {
+    if (openEditorOnLoad) {
       setShowDashboard(false)
       return
     }

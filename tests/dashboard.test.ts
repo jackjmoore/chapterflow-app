@@ -419,6 +419,17 @@ async function main(): Promise<void> {
       await cdp.evaluate<boolean>(`!!document.querySelector('.app-shell')`),
       'clicking it leaves the dashboard for the editor'
     )
+    // It must still be there a moment later. The bug this guards against
+    // reached the editor and then reverted to the dashboard a beat afterwards,
+    // so an assertion taken the instant the reload finishes would have passed
+    // while the writer watched it bounce back.
+    await sleep(3000)
+    assert(
+      report,
+      await cdp.evaluate<boolean>(`!!document.querySelector('.app-shell')`),
+      'and is still there a few seconds later, not bounced back to the dashboard'
+    )
+
     const nowOpen = JSON.parse(await readFile(join(userDataDir, 'preferences.json'), 'utf-8')) as {
       projectRoot: string
     }
