@@ -220,6 +220,13 @@ function buildMentionCandidates(items: StoryBibleItem[]): MentionCandidate[] {
   return candidates
 }
 
+/**
+ * Set for exactly one reload, when the writer has just chosen a project and
+ * the window is reloading to resync every store to the new root. Without it
+ * that reload would land back on the dashboard they just left.
+ */
+const OPEN_EDITOR_ON_LOAD = 'chf-open-editor-on-load'
+
 /** Long enough to cross the 6px gap between a name and its card without the
  *  card vanishing, short enough that leaving feels immediate. */
 const HOVER_DISMISS_MS = 150
@@ -261,6 +268,21 @@ function App(): JSX.Element {
   const [revealRequest, setRevealRequest] = useState<{ id: string; token: number } | null>(null)
   const [theme, setTheme] = useState<Theme>('dark')
   const [findFocusRequest, setFindFocusRequest] = useState<FindFocusRequest | null>(null)
+  /**
+   * The dashboard is where a launch lands, not only a first launch. Null until
+   * the preference has been read, so the editor never flashes up behind it.
+   */
+  const [showDashboard, setShowDashboard] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    const chosen = sessionStorage.getItem(OPEN_EDITOR_ON_LOAD)
+    sessionStorage.removeItem(OPEN_EDITOR_ON_LOAD)
+    if (chosen) {
+      setShowDashboard(false)
+      return
+    }
+    void window.api.getSkipDashboardOnLaunch().then((skip) => setShowDashboard(!skip))
+  }, [])
   const [backupsModalOpen, setBackupsModalOpen] = useState(false)
   const [snapshotsModalOpen, setSnapshotsModalOpen] = useState(false)
   const [spanTagRollup, setSpanTagRollup] = useState<Record<string, string[]>>({})
@@ -748,6 +770,9 @@ function App(): JSX.Element {
   async function handleOpenProject(): Promise<void> {
     const result = await window.api.openProjectFolder()
     if (!result.opened) return
+    // Chosen deliberately, so the reload below should land in the editor even
+    // when the dashboard is what the app normally opens on.
+    sessionStorage.setItem(OPEN_EDITOR_ON_LOAD, '1')
     // The project root changed in the main process — every store there reads
     // it fresh, but the simplest correct way to resync all the renderer's
     // own state (tree, editor content, every preference) is the same full
@@ -805,6 +830,33 @@ function App(): JSX.Element {
   async function flushPendingSave(): Promise<void> {
     if (!editor) return
     await performSave(editor.getHTML())
+  }
+
+  /**
+   * Everything that owes the disk something, flushed together.
+   *
+   * The one save path for leaving a project — used both when the window is
+   * closing and when returning to the dashboard, so the two can never drift
+   * into saving different things. Returning to the dashboard additionally
+   * *closes* the writing session rather than merely checkpointing it, since
+   * the writer has genuinely stopped; that seal is also what moves the
+   * lifetime word total.
+   */
+  function flushAll(): Promise<unknown> {
+    return Promise.all([
+      flushPendingSave(),
+      splitPaneRef.current?.flushPendingSave(),
+      storyBibleRef.current?.flushPendingSave(),
+      sessionRef.current?.flush()
+    ])
+  }
+
+  async function returnToDashboard(): Promise<void> {
+    // flushAll's session step seals the in-progress session rather than
+    // checkpointing it, which is both correct (the writer has stopped) and
+    // what moves the lifetime word total on the dashboard being returned to.
+    await flushAll()
+    setShowDashboard(true)
   }
 
   async function handleCreateSnapshot(name: string | null): Promise<SnapshotMeta> {
@@ -1149,12 +1201,7 @@ function App(): JSX.Element {
   // if one's open — before the app is actually allowed to quit.
   useEffect(() => {
     return window.api.onBeforeQuit(() => {
-      Promise.all([
-        flushPendingSave(),
-        splitPaneRef.current?.flushPendingSave(),
-        storyBibleRef.current?.flushPendingSave(),
-        sessionRef.current?.flush()
-      ]).finally(() => window.api.notifyFlushComplete())
+      void flushAll().finally(() => window.api.notifyFlushComplete())
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor])
@@ -2522,6 +2569,10 @@ function App(): JSX.Element {
       setTemplateModalOpen(true)
       return
     }
+    if (action === 'returnToDashboard') {
+      void returnToDashboard()
+      return
+    }
     if (action === 'openProject') {
       void handleOpenProject()
       return
@@ -2695,14 +2746,33 @@ function App(): JSX.Element {
     return <div className="app-shell" />
   }
 
-  if (projectReady === false) {
+  if (showDashboard === null) return <div className="welcome-screen" />
+
+  // Either there is no project yet, or the writer has come back here on
+  // purpose. Both land on the same surface.
+  if (showDashboard || projectReady === false) {
     return (
       <WelcomeScreen
         onNewProject={() => {
+          setShowDashboard(false)
           setProjectReady(true)
           setTemplateModalOpen(true)
         }}
         onOpenProject={() => void handleOpenProject()}
+        onImport={() => {
+          setShowDashboard(false)
+          // Import into the project root, the same target the menu uses when
+          // nothing in the binder is selected.
+          void handleImportFiles(null)
+        }}
+        onOpenProjectAt={async (path) => {
+          const opened = await window.api.openProjectAt(path)
+          if (opened) {
+            sessionStorage.setItem(OPEN_EDITOR_ON_LOAD, '1')
+            window.location.reload()
+          }
+          return opened
+        }}
       />
     )
   }

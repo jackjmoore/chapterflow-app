@@ -18,6 +18,7 @@ import type { SnapshotMeta } from '../shared/snapshot'
 import type { SpanTagRecord } from '../shared/spanTags'
 import type { CommentRecord } from '../shared/comments'
 import type { LexiconEntry } from '../shared/lexicon'
+import type { DashboardData } from '../shared/dashboard'
 import type {
   RecentSearch,
   SearchIndexStats,
@@ -316,6 +317,14 @@ const api = {
     ipcRenderer.invoke('search:query', text, options),
 
   getSearchStats: (): Promise<SearchIndexStats> => ipcRenderer.invoke('search:stats'),
+
+  getDashboardData: (): Promise<DashboardData> => ipcRenderer.invoke('dashboard:data'),
+  forgetProject: (path: string): Promise<void> => ipcRenderer.invoke('dashboard:forgetProject', path),
+  openProjectAt: (path: string): Promise<boolean> => ipcRenderer.invoke('dashboard:openProjectAt', path),
+  getSkipDashboardOnLaunch: (): Promise<boolean> => ipcRenderer.invoke('dashboard:getSkipOnLaunch'),
+  setSkipDashboardOnLaunch: (skip: boolean): Promise<void> => ipcRenderer.invoke('dashboard:setSkipOnLaunch', skip),
+  getClassicMode: (): Promise<boolean> => ipcRenderer.invoke('dashboard:getClassicMode'),
+  setClassicMode: (enabled: boolean): Promise<void> => ipcRenderer.invoke('dashboard:setClassicMode', enabled),
 
   /** Ranked, tiered results. What the project search interface uses; the raw
    *  `searchProject` above stays for anything that wants the unordered set. */

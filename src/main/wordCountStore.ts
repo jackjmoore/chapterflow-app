@@ -60,6 +60,12 @@ export async function getDailyBaseline(): Promise<number> {
   return currentTotal
 }
 
+/** The whole project's current word count, served from the same memo. Used by
+ *  the dashboard's project registry, which is restamped by the save path. */
+export function projectWordCount(): Promise<number> {
+  return totalProjectWordCount()
+}
+
 /** Sum of every document's word count except `excludeId` (the one the caller already has a live count for). */
 export async function getOtherDocumentsWordCount(excludeId: string | null): Promise<number> {
   return totalProjectWordCount(excludeId ?? undefined)

@@ -10,8 +10,8 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "test": "npm run test:freshness && npm run test:export && npm run test:pdf && npm run test:pagination && npm run test:pageview && npm run test:lexicon && npm run test:search && npm run test:rank && npm run test:searchui && npm run test:polish && npm run test:live",
-    "test:build": "esbuild tests/export.test.ts tests/pdf.test.ts tests/pagination.test.ts tests/pageview.test.ts tests/freshness.test.ts tests/live.test.ts tests/lexicon.test.ts tests/searchIndex.test.ts tests/searchRank.test.ts tests/searchUi.test.ts tests/uiPolish.test.ts --bundle --platform=node --format=cjs --outdir=node_modules/.cache/chapterflow-tests --out-extension:.js=.cjs --external:electron && esbuild tests/pagination.browser.ts --bundle --format=iife --global-name=__paginationChecks --outfile=node_modules/.cache/chapterflow-tests/pagination.browser.cjs && esbuild tests/pageview.browser.ts --bundle --format=iife --global-name=__pageviewChecks --outfile=node_modules/.cache/chapterflow-tests/pageview.browser.cjs",
+    "test": "npm run test:freshness && npm run test:export && npm run test:pdf && npm run test:pagination && npm run test:pageview && npm run test:lexicon && npm run test:search && npm run test:rank && npm run test:searchui && npm run test:polish && npm run test:dashboard && npm run test:live",
+    "test:build": "esbuild tests/export.test.ts tests/pdf.test.ts tests/pagination.test.ts tests/pageview.test.ts tests/freshness.test.ts tests/live.test.ts tests/lexicon.test.ts tests/searchIndex.test.ts tests/searchRank.test.ts tests/searchUi.test.ts tests/uiPolish.test.ts tests/dashboard.test.ts --bundle --platform=node --format=cjs --outdir=node_modules/.cache/chapterflow-tests --out-extension:.js=.cjs --external:electron && esbuild tests/pagination.browser.ts --bundle --format=iife --global-name=__paginationChecks --outfile=node_modules/.cache/chapterflow-tests/pagination.browser.cjs && esbuild tests/pageview.browser.ts --bundle --format=iife --global-name=__pageviewChecks --outfile=node_modules/.cache/chapterflow-tests/pageview.browser.cjs",
     "test:export": "npm run test:build && node node_modules/.cache/chapterflow-tests/export.test.cjs",
     "test:pdf": "npm run test:build && node scripts/run-electron-test.mjs node_modules/.cache/chapterflow-tests/pdf.test.cjs",
     "build:win": "npm run build && electron-builder --win",
@@ -25,7 +25,8 @@
     "test:search": "npm run build && npm run test:build && node scripts/run-electron-test.mjs node_modules/.cache/chapterflow-tests/searchIndex.test.cjs",
     "test:rank": "npm run build && npm run test:build && node scripts/run-electron-test.mjs node_modules/.cache/chapterflow-tests/searchRank.test.cjs",
     "test:searchui": "npm run build && npm run test:build && node node_modules/.cache/chapterflow-tests/searchUi.test.cjs",
-    "test:polish": "npm run build && npm run test:build && node node_modules/.cache/chapterflow-tests/uiPolish.test.cjs"
+    "test:polish": "npm run build && npm run test:build && node node_modules/.cache/chapterflow-tests/uiPolish.test.cjs",
+    "test:dashboard": "npm run build && npm run test:build && node node_modules/.cache/chapterflow-tests/dashboard.test.cjs"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",

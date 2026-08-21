@@ -13,6 +13,7 @@ import * as commentStore from './commentStore'
 import * as lexiconStore from './lexiconStore'
 import * as suppressedWordStore from './suppressedWordStore'
 import * as searchIndex from './searchIndex'
+import * as lifetimeStore from './lifetimeStore'
 import * as searchRank from './searchRank'
 import * as searchHistoryStore from './searchHistoryStore'
 import * as documentImageStore from './documentImageStore'
@@ -271,7 +272,13 @@ app.whenReady().then(async () => {
   // this) before anything else touches the project data — must happen before
   // the window loads so every store reads/writes the right location from the start.
   const persistedRoot = await preferencesStore.getProjectRoot()
-  if (persistedRoot) setProjectRoot(persistedRoot)
+  if (persistedRoot) {
+    setProjectRoot(persistedRoot)
+    void binderStore
+      .getState()
+      .then((state) => lifetimeStore.recordProjectOpened(persistedRoot, state.projectName))
+      .catch(() => undefined)
+  }
 
   // The search index listens to every project write from here on. Building it
   // is not awaited: the window should not wait on indexing, and any write that
@@ -526,7 +533,13 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('session:close', async (_event, open: OpenSession) => {
     const sealed = await sessionStore.closeSession(open)
-    if (sealed) backupStore.markDirty()
+    if (sealed) {
+      backupStore.markDirty()
+      // The one place the lifetime word total moves. Awaited, because unlike
+      // the display figure above this is not recoverable — the session is
+      // sealed once and its delta is never recomputed.
+      await lifetimeStore.recordSession(sealed)
+    }
     return sealed
   })
 
@@ -710,6 +723,37 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('search:stats', () => searchIndex.stats())
 
+  /** One small file, already current. Nothing is scanned or aggregated here. */
+  ipcMain.handle('dashboard:data', async () =>
+    lifetimeStore.getDashboardData(await preferencesStore.getProjectRoot())
+  )
+
+  ipcMain.handle('dashboard:forgetProject', (_event, path: string) => lifetimeStore.forgetProject(path))
+
+  ipcMain.handle('dashboard:getSkipOnLaunch', () => preferencesStore.getSkipDashboardOnLaunch())
+
+  ipcMain.handle('dashboard:setSkipOnLaunch', (_event, skip: boolean) =>
+    preferencesStore.setSkipDashboardOnLaunch(skip)
+  )
+
+  // Reserved for the alternative editor skin. Read and written so the choice
+  // survives a restart; nothing acts on it yet.
+  ipcMain.handle('dashboard:getClassicMode', () => preferencesStore.getClassicMode())
+
+  ipcMain.handle('dashboard:setClassicMode', (_event, enabled: boolean) =>
+    preferencesStore.setClassicMode(enabled)
+  )
+
+  ipcMain.handle('dashboard:openProjectAt', async (_event, path: string) => {
+    if (!projectExistsAt(path)) return false
+    setProjectRoot(path)
+    await preferencesStore.setProjectRootPref(path)
+    await lifetimeStore.recordProjectOpened(path, (await binderStore.getState()).projectName)
+    wordCountStore.invalidateAll()
+    void searchIndex.open()
+    return true
+  })
+
   /** Ranked results — the same index read, put through the tier rules. */
   ipcMain.handle('search:ranked', (_event, text: string, options?: SearchQueryOptions) =>
     searchRank.search(text, options ?? {})
@@ -798,6 +842,14 @@ app.whenReady().then(async () => {
   ipcMain.handle('document:save', async (_event, id: string, html: string) => {
     await documentStore.saveDocument(id, html)
     wordCountStore.invalidate(id)
+    // The project's size on the dashboard's Recent list, kept current by the
+    // path that already knows the count changed. Not awaited and not allowed
+    // to fail a save: it is a display figure, rebuilt on the next save if this
+    // one is lost.
+    void wordCountStore
+      .projectWordCount()
+      .then((words) => lifetimeStore.recordProjectWords(getProjectRoot(), words))
+      .catch(() => undefined)
     backupStore.markDirty()
     await spanTagStore.rebuildForDocument(id, html)
     // Prunes comment bodies whose anchor the writer has deleted. Awaited
@@ -1014,6 +1066,7 @@ app.whenReady().then(async () => {
     const chosen = result.filePaths[0]
     setProjectRoot(chosen)
     await preferencesStore.setProjectRootPref(chosen)
+    await lifetimeStore.recordProjectOpened(chosen, (await binderStore.getState()).projectName)
     binderStore.invalidateCache()
     storyBibleStore.invalidateCache()
     wordCountStore.invalidateAll()

@@ -17,6 +17,7 @@ import type { SnapshotMeta } from '../shared/snapshot'
 import type { SpanTagRecord } from '../shared/spanTags'
 import type { CommentRecord } from '../shared/comments'
 import type { LexiconEntry } from '../shared/lexicon'
+import type { DashboardData } from '../shared/dashboard'
 import type {
   RecentSearch,
   SearchIndexStats,
@@ -150,6 +151,13 @@ interface Api {
   getDocumentImages: (imageIds: string[]) => Promise<Record<string, string>>
   searchProject: (text: string, options?: SearchQueryOptions) => Promise<SearchMatch[]>
   getSearchStats: () => Promise<SearchIndexStats>
+  getDashboardData: () => Promise<DashboardData>
+  forgetProject: (path: string) => Promise<void>
+  openProjectAt: (path: string) => Promise<boolean>
+  getSkipDashboardOnLaunch: () => Promise<boolean>
+  setSkipDashboardOnLaunch: (skip: boolean) => Promise<void>
+  getClassicMode: () => Promise<boolean>
+  setClassicMode: (enabled: boolean) => Promise<void>
   searchRanked: (text: string, options?: SearchQueryOptions) => Promise<SearchResults>
   listSearchHistory: () => Promise<RecentSearch[]>
   recordSearchHistory: (text: string) => Promise<RecentSearch[]>

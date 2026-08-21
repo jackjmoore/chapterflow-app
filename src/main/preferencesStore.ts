@@ -65,6 +65,10 @@ interface Preferences {
   hiddenToolbarSections: ToolbarSectionId[]
   layoutPresets: LayoutPreset[]
   projectRoot: string | null
+  /** Load straight into the last project instead of showing the dashboard. */
+  skipDashboardOnLaunch: boolean
+  /** Reserved for the alternative editor skin. Nothing reads it yet. */
+  classicMode: boolean
   cardWidth: number
   pageSize: PageSize
   pageMarginMm: number
@@ -108,6 +112,8 @@ let state: Preferences = {
   hiddenToolbarSections: [],
   layoutPresets: [],
   projectRoot: null,
+  skipDashboardOnLaunch: false,
+  classicMode: false,
   cardWidth: DEFAULT_CARD_WIDTH,
   pageSize: DEFAULT_PAGE_SIZE,
   pageMarginMm: DEFAULT_PAGE_MARGIN_MM
@@ -155,6 +161,8 @@ function applyParsed(parsed: Record<string, unknown>): void {
   if (typeof parsed.projectRoot === 'string' || parsed.projectRoot === null) {
     state.projectRoot = parsed.projectRoot as string | null
   }
+  if (typeof parsed.skipDashboardOnLaunch === 'boolean') state.skipDashboardOnLaunch = parsed.skipDashboardOnLaunch
+  if (typeof parsed.classicMode === 'boolean') state.classicMode = parsed.classicMode
   if (typeof parsed.cardWidth === 'number') state.cardWidth = clampCardWidth(parsed.cardWidth)
   if (isPageSize(parsed.pageSize)) state.pageSize = parsed.pageSize
   if (typeof parsed.pageMarginMm === 'number') state.pageMarginMm = clampPageMargin(parsed.pageMarginMm)
@@ -347,6 +355,28 @@ export async function setLayoutPresets(presets: LayoutPreset[]): Promise<void> {
 export async function getProjectRoot(): Promise<string | null> {
   await load()
   return state.projectRoot
+}
+
+export async function getSkipDashboardOnLaunch(): Promise<boolean> {
+  await load()
+  return state.skipDashboardOnLaunch
+}
+
+export async function setSkipDashboardOnLaunch(skip: boolean): Promise<void> {
+  await load()
+  state.skipDashboardOnLaunch = skip
+  await persist()
+}
+
+export async function getClassicMode(): Promise<boolean> {
+  await load()
+  return state.classicMode
+}
+
+export async function setClassicMode(enabled: boolean): Promise<void> {
+  await load()
+  state.classicMode = enabled
+  await persist()
 }
 
 export async function setProjectRootPref(root: string | null): Promise<void> {

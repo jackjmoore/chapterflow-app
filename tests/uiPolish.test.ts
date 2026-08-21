@@ -35,7 +35,10 @@ async function seedProject(): Promise<{ userDataDir: string; cleanup: () => Prom
       pageSize: 'letter',
       pageMarginMm: 25,
       zoomPercent: 100,
-      projectRoot: projectDir
+      projectRoot: projectDir,
+      // These suites are about the editor; the dashboard now precedes it on
+      // every launch, so they ask to be taken straight through.
+      skipDashboardOnLaunch: true
     })
   )
   return { userDataDir, cleanup: () => rm(base, { recursive: true, force: true }) }

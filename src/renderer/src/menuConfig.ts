@@ -60,6 +60,9 @@ const FILE_MENU: MenuDef = {
     sep,
     item('New Project from Template…', 'newProjectFromTemplate'),
     item('Open Project…', 'openProject'),
+    // Saves and closes out to the dashboard without quitting. The only route
+    // back to it for anyone who has turned off showing it on launch.
+    item('Return to Dashboard', 'returnToDashboard'),
     sep,
     item('Save Now', 'saveNow', { ctrl: true, code: 'KeyS', display: 'Ctrl+S' }),
     sep,
