@@ -220,6 +220,10 @@ function buildMentionCandidates(items: StoryBibleItem[]): MentionCandidate[] {
   return candidates
 }
 
+/** Long enough to cross the 6px gap between a name and its card without the
+ *  card vanishing, short enough that leaving feels immediate. */
+const HOVER_DISMISS_MS = 150
+
 function App(): JSX.Element {
   const [status, setStatus] = useState<Status>('idle')
   const [tree, setTree] = useState<BinderNode[]>([])
@@ -273,6 +277,9 @@ function App(): JSX.Element {
   const [sentContent, setSentContent] = useState<{ title: string; html: string | null; error: string | null } | null>(null)
   const [hoveredMention, setHoveredMention] = useState<{ itemId: string; rect: DOMRect } | null>(null)
   const [hoveredLexiconWord, setHoveredLexiconWord] = useState<{ word: string; rect: DOMRect } | null>(null)
+  /** Mirrors hoveredLexiconWord for the mousemove rule, which must not re-run
+   *  its effect every time the hovered word changes. */
+  const hoveredLexiconWordRef = useRef<string | null>(null)
   const [hoveredMentionSheet, setHoveredMentionSheet] = useState<StoryBibleSheet | null>(null)
   const [spanTagBrowserOpen, setSpanTagBrowserOpen] = useState(false)
   const [spanTagBrowserSpans, setSpanTagBrowserSpans] = useState<SpanTagRecord[]>([])
@@ -397,6 +404,28 @@ function App(): JSX.Element {
   const mentionHideTimer = useRef<ReturnType<typeof setTimeout>>()
   const mentionSheetCache = useRef<Map<string, StoryBibleSheet>>(new Map())
   const hoveredItemIdRef = useRef<string | null>(null)
+
+  function clearHoverHideTimer(): void {
+    if (mentionHideTimer.current) {
+      clearTimeout(mentionHideTimer.current)
+      mentionHideTimer.current = undefined
+    }
+  }
+
+  /** Both cards close together: only one is ever open, and they share a timer,
+   *  so treating them separately is what let one cancel the other's hide. */
+  function closeHoverCards(): void {
+    mentionHideTimer.current = undefined
+    hoveredItemIdRef.current = null
+    hoveredLexiconWordRef.current = null
+    setHoveredMention(null)
+    setHoveredLexiconWord(null)
+  }
+
+  function scheduleHoverDismiss(): void {
+    if (mentionHideTimer.current) return
+    mentionHideTimer.current = setTimeout(closeHoverCards, HOVER_DISMISS_MS)
+  }
   const pageSizeRef = useRef<PageSize>(DEFAULT_PAGE_SIZE)
   const pageMarginMmRef = useRef(DEFAULT_PAGE_MARGIN_MM)
   const splitPaneRef = useRef<SplitViewPaneHandle>(null)
@@ -991,12 +1020,7 @@ function App(): JSX.Element {
     if (!editor) return
     const dom = editor.view.dom
 
-    function clearHideTimer(): void {
-      if (mentionHideTimer.current) {
-        clearTimeout(mentionHideTimer.current)
-        mentionHideTimer.current = undefined
-      }
-    }
+    const clearHideTimer = clearHoverHideTimer
 
     function handleMouseOver(e: MouseEvent): void {
       // A suppressed word with a Lexicon entry gets its own card. Story
@@ -1007,6 +1031,9 @@ function App(): JSX.Element {
         const word = (lexiconTarget.textContent ?? '').trim().toLowerCase()
         if (lexiconEntriesRef.current.some((entry) => entry.word.trim().toLowerCase() === word)) {
           clearHideTimer()
+          hoveredItemIdRef.current = null
+          hoveredLexiconWordRef.current = word
+          setHoveredMention(null)
           setHoveredLexiconWord({ word, rect: lexiconTarget.getBoundingClientRect() })
           return
         }
@@ -1018,6 +1045,8 @@ function App(): JSX.Element {
       const itemId = target.getAttribute('data-mention-item-id')
       if (!itemId) return
       hoveredItemIdRef.current = itemId
+      hoveredLexiconWordRef.current = null
+      setHoveredLexiconWord(null)
       setHoveredMention({ itemId, rect: target.getBoundingClientRect() })
       const cached = mentionSheetCache.current.get(itemId)
       if (cached) {
@@ -1033,26 +1062,67 @@ function App(): JSX.Element {
       }
     }
 
-    function handleMouseOut(e: MouseEvent): void {
-      if ((e.target as HTMLElement).closest('.chf-suppressed-word')) {
-        mentionHideTimer.current = setTimeout(() => setHoveredLexiconWord(null), 150)
+    /**
+     * Dismissal, asked as a question about where the cursor is rather than as
+     * a matched pair of enter/leave events.
+     *
+     * The paired version could not survive two things this interface actually
+     * does. A Story Bible name is *also* a spellcheck-suppressed word, so one
+     * span carries both classes and the old mouseout handler claimed it for
+     * the Lexicon card and returned before ever scheduling the mention card's
+     * hide — the card then had no pending dismissal at all and stayed up
+     * forever. And a card that moves or is re-rendered out from under the
+     * cursor emits no mouseleave to begin with, so there was nothing to hang a
+     * dismissal on.
+     *
+     * Asking "is the cursor over a trigger or over a card?" on each move has
+     * no such gaps: whatever happened to the elements in between, the next
+     * movement settles it. It runs only while a card is open.
+     */
+    function handleMouseMove(e: MouseEvent): void {
+      if (!hoveredItemIdRef.current && !hoveredLexiconWordRef.current) return
+      const el = e.target as HTMLElement | null
+
+      // Both cards carry this class — the Lexicon card reuses the mention
+      // card's markup and styling — so one selector covers both.
+      if (el?.closest?.('.mention-hover-card')) {
+        clearHideTimer()
         return
       }
-      const target = (e.target as HTMLElement).closest('[data-mention-item-id]')
-      if (!target) return
-      mentionHideTimer.current = setTimeout(() => {
-        hoveredItemIdRef.current = null
-        setHoveredMention(null)
-      }, 150)
+
+      // Only the trigger that opened the card keeps it alive. "Any trigger"
+      // is too generous: Story Bible names are themselves suppressed words, so
+      // treating every suppressed word as still-interacting kept a name's card
+      // up while the cursor sat on an unrelated one.
+      const mention = el?.closest?.('[data-mention-item-id]')
+      if (mention && mention.getAttribute('data-mention-item-id') === hoveredItemIdRef.current) {
+        clearHideTimer()
+        return
+      }
+      const suppressed = el?.closest?.('.chf-suppressed-word')
+      if (
+        suppressed &&
+        hoveredLexiconWordRef.current &&
+        (suppressed.textContent ?? '').trim().toLowerCase() === hoveredLexiconWordRef.current
+      ) {
+        clearHideTimer()
+        return
+      }
+
+      scheduleHoverDismiss()
     }
 
     dom.addEventListener('mouseover', handleMouseOver)
-    dom.addEventListener('mouseout', handleMouseOut)
+    // On the document, not the editor: the cursor leaving for the toolbar, the
+    // binder or the window chrome has to count, and none of those bubble
+    // through the editor.
+    document.addEventListener('mousemove', handleMouseMove, true)
     return () => {
       dom.removeEventListener('mouseover', handleMouseOver)
-      dom.removeEventListener('mouseout', handleMouseOut)
+      document.removeEventListener('mousemove', handleMouseMove, true)
       clearHideTimer()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor])
 
   // Electron's native application menu doesn't render at all with
@@ -3060,10 +3130,8 @@ function App(): JSX.Element {
                     handleViewChange('lexicon')
                     setLexiconReveal({ id: entry.id, token: Date.now() })
                   }}
-                  onMouseEnter={() => {
-                    if (mentionHideTimer.current) clearTimeout(mentionHideTimer.current)
-                  }}
-                  onMouseLeave={() => setHoveredLexiconWord(null)}
+                  onMouseEnter={clearHoverHideTimer}
+                  onMouseLeave={scheduleHoverDismiss}
                 />
               )
             })()}
@@ -3080,18 +3148,8 @@ function App(): JSX.Element {
                   type={type}
                   sheet={hoveredMentionSheet}
                   onOpenItem={() => handleOpenMentionItem(item.id)}
-                  onMouseEnter={() => {
-                    if (mentionHideTimer.current) {
-                      clearTimeout(mentionHideTimer.current)
-                      mentionHideTimer.current = undefined
-                    }
-                  }}
-                  onMouseLeave={() => {
-                    mentionHideTimer.current = setTimeout(() => {
-                      hoveredItemIdRef.current = null
-                      setHoveredMention(null)
-                    }, 150)
-                  }}
+                  onMouseEnter={clearHoverHideTimer}
+                  onMouseLeave={scheduleHoverDismiss}
                 />
               )
             })()}

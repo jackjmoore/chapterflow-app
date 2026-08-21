@@ -4660,9 +4660,9 @@ button.menubar-item:hover {
   z-index: 40;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  width: 260px;
-  padding: var(--space-3);
+  gap: var(--space-1);
+  width: 240px;
+  padding: var(--space-2);
   background: var(--chrome-bg-elevated);
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-md);
@@ -4775,6 +4775,11 @@ button.menubar-item:hover {
 }
 
 .mention-hover-card-summary {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   font-family: var(--font-editor);
   font-size: var(--text-sm);
   color: var(--chrome-text-muted);

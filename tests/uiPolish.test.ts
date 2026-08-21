@@ -289,6 +289,210 @@ async function main(): Promise<void> {
       `pressing Open does navigate to the Story Bible (section: ${sectionAfterOpen})`
     )
 
+    // ---- 2b. the card dismisses on leaving, every way of leaving ----------
+    // A Story Bible name is also a spellcheck-suppressed word, so one span
+    // carries both classes. The old mouseout handler matched the suppressed
+    // class first, scheduled a hide for the Lexicon card, and returned before
+    // ever scheduling the mention card's — leaving it with no pending
+    // dismissal at all. These walk the real cursor through each way out.
+    // The section above ends in the Story Bible; the mentions live in the
+    // manuscript.
+    await goToSection('manuscript')
+    await sleep(800)
+
+    section(report, 'the hover card always dismisses when the cursor leaves')
+
+    const move = (x: number, y: number): Promise<unknown> =>
+      send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: Math.round(x), y: Math.round(y) })
+    const cardCount = (): Promise<number> => evaluate(`document.querySelectorAll('.mention-hover-card').length`)
+    const boxOf = (sel: string): Promise<{ x: number; y: number; top: number; bottom: number } | null> =>
+      evaluate(`(() => {
+        const el = document.querySelector(${JSON.stringify(sel)})
+        if (!el) return null
+        const r = el.getBoundingClientRect()
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2, top: r.top, bottom: r.bottom }
+      })()`)
+
+    const mentionPoints = await evaluate<{ x: number; y: number }[]>(
+      `(() => [...document.querySelectorAll('.ProseMirror .mention-highlight')].slice(0, 6).map((el) => {
+        const r = el.getBoundingClientRect()
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+      }))()`
+    )
+
+    const openCard = async (pt: { x: number; y: number }): Promise<boolean> => {
+      await move(pt.x, pt.y)
+      for (let i = 0; i < 25; i += 1) {
+        if ((await cardCount()) > 0) return true
+        await sleep(150)
+      }
+      return false
+    }
+    /** Somewhere that is neither a trigger nor a card. */
+    const moveAway = async (): Promise<void> => {
+      await move(700, 20)
+      await sleep(700)
+    }
+
+    assert(report, mentionPoints.length > 1, `several mentions to work with (${mentionPoints.length})`)
+
+    await openCard(mentionPoints[0])
+    assert(report, (await cardCount()) === 1, 'hovering a name opens exactly one card')
+    await moveAway()
+    assert(report, (await cardCount()) === 0, 'moving straight from the name to elsewhere dismisses it')
+
+    // Onto the card, onto its buttons, then out.
+    await openCard(mentionPoints[0])
+    const body = await boxOf('.mention-hover-card')
+    if (body) await move(body.x, body.y)
+    await sleep(300)
+    assert(report, (await cardCount()) === 1, 'moving onto the card keeps it open')
+    const openBtn = await boxOf('.mention-hover-card-open')
+    if (openBtn) {
+      await move(openBtn.x, openBtn.y)
+      await sleep(300)
+      assert(report, (await cardCount()) === 1, 'moving onto the Open button counts as still interacting')
+    }
+    const moreBtn = await boxOf('.mention-hover-card-expand')
+    if (moreBtn) {
+      await move(moreBtn.x, moreBtn.y)
+      await sleep(300)
+      assert(report, (await cardCount()) === 1, 'moving onto the More button counts as still interacting')
+      const before = await boxOf('.mention-hover-card')
+      await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: Math.round(moreBtn.x), y: Math.round(moreBtn.y), button: 'left', clickCount: 1 })
+      await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: Math.round(moreBtn.x), y: Math.round(moreBtn.y), button: 'left', clickCount: 1 })
+      await sleep(600)
+      const after = await boxOf('.mention-hover-card')
+      note(report, `card height ${Math.round((before?.bottom ?? 0) - (before?.top ?? 0))} -> ${Math.round((after?.bottom ?? 0) - (after?.top ?? 0))}px on expand`)
+      assert(report, (await cardCount()) === 1, 'pressing More does not dismiss the card')
+    }
+    await moveAway()
+    assert(report, (await cardCount()) === 0, 'leaving after using the buttons still dismisses')
+
+    // The class-collision case: a suppressed word that is NOT a mention.
+    await openCard(mentionPoints[0])
+    // Must not sit underneath the open card: the cursor would then be over the
+    // card, where staying open is the correct behaviour and proves nothing.
+    const plainSuppressed = await evaluate<{ x: number; y: number } | null>(`(() => {
+      const card = document.querySelector('.mention-hover-card')?.getBoundingClientRect()
+      const pad = 40
+      const cx = card ? (card.left + card.right) / 2 : 0
+      const cy = card ? (card.top + card.bottom) / 2 : 0
+      const candidates = [...document.querySelectorAll('.ProseMirror .chf-suppressed-word')]
+        .filter((n) => !n.closest('[data-mention-item-id]'))
+        .map((n) => {
+          const r = n.getBoundingClientRect()
+          return { x: r.left + r.width / 2, y: r.top + r.height / 2, r }
+        })
+        // On screen: an element scrolled out of view still reports a rect, and
+        // a mouse move to a point outside the window delivers no event at all.
+        .filter((c) => c.r.top > 8 && c.r.bottom < window.innerHeight - 8 && c.r.left > 8 && c.r.right < window.innerWidth - 8)
+        .filter((c) => {
+          if (!card) return true
+          return (
+            c.r.bottom < card.top - pad ||
+            c.r.top > card.bottom + pad ||
+            c.r.right < card.left - pad ||
+            c.r.left > card.right + pad
+          )
+        })
+        // Nearest qualifying candidate, so it stays comfortably in view.
+        .sort((p, q) => Math.hypot(p.x - cx, p.y - cy) - Math.hypot(q.x - cx, q.y - cy))
+      const best = candidates[0]
+      return best ? { x: best.x, y: best.y } : null
+    })()`)
+    if (plainSuppressed) {
+      await move(plainSuppressed.x, plainSuppressed.y)
+      await sleep(900)
+      // The Lexicon card reuses .mention-hover-card, so the question is not
+      // whether a card is showing but whether the mention's card handed over
+      // cleanly rather than both being up at once.
+      const handover = await evaluate<{ count: number; isLexicon: boolean }>(`(() => {
+        const cards = [...document.querySelectorAll('.mention-hover-card')]
+        return { count: cards.length, isLexicon: !!cards[0]?.querySelector('.lexicon-hover-pill') }
+      })()`)
+      const overCardNow = await evaluate<boolean>(
+        `!!document.elementFromPoint(${Math.round(plainSuppressed.x)}, ${Math.round(plainSuppressed.y)})?.closest('.mention-hover-card')`
+      )
+      const diag = await evaluate<string>(`(() => {
+        const c = document.querySelector('.mention-hover-card')
+        const r = c ? c.getBoundingClientRect() : null
+        const under = document.elementFromPoint(${Math.round(plainSuppressed.x)}, ${Math.round(plainSuppressed.y)})
+        return JSON.stringify({
+          card: c ? (c.querySelector('.lexicon-hover-pill') ? 'lexicon' : 'mention:' + (c.querySelector('.mention-hover-card-name')?.textContent ?? '')) : 'none',
+          cardBox: r ? [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)] : null,
+          cursor: [${Math.round(plainSuppressed.x)}, ${Math.round(plainSuppressed.y)}],
+          under: under ? (under.className || under.tagName) : 'none'
+        })
+      })()`)
+      note(report, 'diag: ' + diag)
+      assert(report, handover.count <= 1, `a Lexicon word never leaves two cards up (${handover.count})`)
+      // Either the word has a Lexicon entry and its card takes over, or it has
+      // none and nothing is left behind. What must never happen is the name's
+      // card sitting there because a suppressed word cancelled its dismissal.
+      assert(report, !overCardNow, 'the chosen word is clear of the card, so this actually tests the collision')
+      assert(
+        report,
+        handover.count === 0 || handover.isLexicon,
+        `the mention card does not linger over an unrelated suppressed word (${handover.count} card, lexicon: ${handover.isLexicon})`
+      )
+      await moveAway()
+      assert(report, (await cardCount()) === 0, 'and nothing is left behind afterwards')
+    } else {
+      note(report, 'no non-mention suppressed word on screen; collision case not exercised')
+    }
+
+    // Rapid sweep: never more than one, never a leftover.
+    let maxDuringSweep = 0
+    for (const pt of mentionPoints) {
+      await move(pt.x, pt.y)
+      await sleep(60)
+      maxDuringSweep = Math.max(maxDuringSweep, await cardCount())
+    }
+    await sleep(900)
+    assert(report, maxDuringSweep <= 1, `sweeping across names never stacks cards (peak ${maxDuringSweep})`)
+    await moveAway()
+    assert(report, (await cardCount()) === 0, 'and the sweep leaves nothing stuck open')
+
+    // ---- 2c. the compact card holds back its detail -----------------------
+    section(report, 'the card is compact until asked to expand')
+    await openCard(mentionPoints[0])
+    const compact = await evaluate<{ height: number; stats: number; text: number; lists: number; width: number }>(`(() => {
+      const c = document.querySelector('.mention-hover-card')
+      const r = c.getBoundingClientRect()
+      return {
+        height: Math.round(r.height),
+        width: Math.round(r.width),
+        stats: c.querySelectorAll('.mention-hover-card-stat').length,
+        text: c.querySelectorAll('.mention-hover-card-text-preview').length,
+        lists: c.querySelectorAll('.mention-hover-card-list').length
+      }
+    })()`)
+    note(report, `compact: ${JSON.stringify(compact)}`)
+    assert(report, compact.stats === 0 && compact.text === 0 && compact.lists === 0, 'compact shows no stats, prose or lists')
+    assert(report, compact.width <= 240, `and is narrower than it was (${compact.width}px)`)
+
+    const more = await boxOf('.mention-hover-card-expand')
+    if (more) {
+      await move(more.x, more.y)
+      await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: Math.round(more.x), y: Math.round(more.y), button: 'left', clickCount: 1 })
+      await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: Math.round(more.x), y: Math.round(more.y), button: 'left', clickCount: 1 })
+      await sleep(600)
+      const full = await evaluate<{ height: number; stats: number; text: number }>(`(() => {
+        const c = document.querySelector('.mention-hover-card')
+        const r = c.getBoundingClientRect()
+        return {
+          height: Math.round(r.height),
+          stats: c.querySelectorAll('.mention-hover-card-stat').length,
+          text: c.querySelectorAll('.mention-hover-card-text-preview').length
+        }
+      })()`)
+      note(report, `expanded: ${JSON.stringify(full)}`)
+      assert(report, full.height > compact.height, `expanding grows the card (${compact.height} -> ${full.height}px)`)
+      assert(report, full.stats > 0 || full.text > 0, 'and reveals the detail the compact view held back')
+    }
+    await moveAway()
+
     // ---- 3. elevation is present and stepped ------------------------------
     section(report, 'elevation reads as three distinct steps')
     const elevation: { one: string; two: string; three: string; card: string } = await evaluate(`(() => {
