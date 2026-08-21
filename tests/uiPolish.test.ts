@@ -153,11 +153,26 @@ async function main(): Promise<void> {
       await sleep(450)
     }
 
-    const badges = (): Promise<{ full: number; dots: number; chips: number; width: number; dotTitle: string }> =>
+    const badges = (): Promise<{
+      full: number
+      dots: number
+      chips: number
+      chipTotal: number
+      rowHeights: number[]
+      width: number
+      dotTitle: string
+    }> =>
       evaluate(`(() => ({
         full: document.querySelectorAll('.binder-list .status-badge').length,
         dots: document.querySelectorAll('.binder-list .status-dot').length,
-        chips: document.querySelectorAll('.binder-list .span-tag-rollup-chip').length,
+        chips: document.querySelectorAll('.binder-list .row-chip-row > .tag-chip, .binder-list .row-chip-row > .span-tag-rollup-chip').length,
+        // Shown chips plus everything counted in a +N.
+        chipTotal: [...document.querySelectorAll('.binder-list .row-chip-row')].reduce((sum, row) => {
+          const shown = row.querySelectorAll(':scope > .tag-chip, :scope > .span-tag-rollup-chip').length
+          const more = Number((row.querySelector('.row-chip-overflow')?.textContent ?? '+0').replace('+', ''))
+          return sum + shown + more
+        }, 0),
+        rowHeights: [...new Set([...document.querySelectorAll('.binder-row')].map((r) => Math.round(r.getBoundingClientRect().height)))],
         width: Math.round(document.querySelector('.side-panel').getBoundingClientRect().width),
         dotTitle: document.querySelector('.binder-list .status-dot')?.getAttribute('title') ?? ''
       }))()`)
@@ -184,11 +199,19 @@ async function main(): Promise<void> {
       `the dot still names its status on hover ("${narrow.dotTitle}")`
     )
 
-    // The chips are explicitly out of scope for this behaviour.
+    // Chips have their own cap, so the number *rendered* differs by width on
+    // purpose. What must hold is that none are lost: whatever is not shown is
+    // counted in a +N beside them.
+    assert(report, wide.chips > 0 && narrow.chips > 0, `chips render at both widths (${wide.chips} / ${narrow.chips})`)
     assert(
       report,
-      narrow.chips === wide.chips && wide.chips > 0,
-      `character chips are untouched by the compaction (${wide.chips} wide, ${narrow.chips} narrow)`
+      wide.chipTotal === narrow.chipTotal && wide.chipTotal > 0,
+      `no chip is lost when the panel narrows (${wide.chipTotal} accounted for at both widths)`
+    )
+    assert(
+      report,
+      narrow.rowHeights.length === 1 && wide.rowHeights.length === 1,
+      `every row is the same height regardless of its chips (${wide.rowHeights.join('/')} wide, ${narrow.rowHeights.join('/')} narrow)`
     )
 
     // Guarded: if no dot rendered the assertions above already said so, and
@@ -468,9 +491,15 @@ async function main(): Promise<void> {
         lists: c.querySelectorAll('.mention-hover-card-list').length
       }
     })()`)
-    note(report, `compact: ${JSON.stringify(compact)}`)
-    assert(report, compact.stats === 0 && compact.text === 0 && compact.lists === 0, 'compact shows no stats, prose or lists')
-    assert(report, compact.width <= 240, `and is narrower than it was (${compact.width}px)`)
+    note(report, `default: ${JSON.stringify(compact)}`)
+    assert(
+      report,
+      compact.stats > 0 || compact.text > 0,
+      `the default view carries real information, not just a name (${compact.stats} stats, ${compact.text} prose block)`
+    )
+    assert(report, compact.lists === 0, 'list blocks are held back for More')
+    assert(report, compact.width <= 240, `and it stays narrow (${compact.width}px)`)
+    assert(report, compact.height <= 260, `and bounded in height (${compact.height}px)`)
 
     const more = await boxOf('.mention-hover-card-expand')
     if (more) {
@@ -489,7 +518,11 @@ async function main(): Promise<void> {
       })()`)
       note(report, `expanded: ${JSON.stringify(full)}`)
       assert(report, full.height > compact.height, `expanding grows the card (${compact.height} -> ${full.height}px)`)
-      assert(report, full.stats > 0 || full.text > 0, 'and reveals the detail the compact view held back')
+      assert(
+        report,
+        full.stats >= compact.stats && full.text >= compact.text,
+        'and adds to what was already shown rather than replacing it'
+      )
     }
     await moveAway()
 

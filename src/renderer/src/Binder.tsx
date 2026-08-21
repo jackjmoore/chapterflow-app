@@ -2,7 +2,7 @@ import { useEffect, useState, type DragEvent, type MouseEvent } from 'react'
 import type { BinderNode, StatusDef, TagDef } from '../../shared/binder'
 import type { StoryBibleItem, StoryBibleTypeDef } from '../../shared/storyBible'
 import { ChevronIcon, DocumentIcon, FolderIcon, SplitViewIcon, TrashIcon } from './icons'
-import { StatusBadge, TagChips, SpanTagRollupChips, resolveStatus, resolveTags } from './StatusTagBadges'
+import { RowChips, StatusBadge, chipCapFor, resolveStatus, resolveTags, type RowChip } from './StatusTagBadges'
 import { resolveMentionChips } from './mentionUtils'
 
 type DropMode = 'before' | 'after' | 'inside'
@@ -263,9 +263,20 @@ function BinderRow(props: RowProps): JSX.Element {
               status={resolveStatus(statuses, node.statusId)}
               compact={usableRowWidth(panelWidth, depth) < STATUS_LABEL_MIN_WIDTH}
             />
-            <TagChips tags={resolveTags(tags, node.tagIds)} />
-            <SpanTagRollupChips tags={resolveTags(tags, spanTagRollup[node.id] ?? [])} />
-            <SpanTagRollupChips tags={resolveMentionChips(storyBibleItems, storyBibleTypes, mentionRollup[node.id] ?? [])} />
+            {/* One capped list rather than three unbounded ones: the cap has to
+                apply across all of them, or a row with one tag and four
+                mentions is just as crowded as before. The status circle sits
+                outside it and is not counted. */}
+            <RowChips
+              cap={chipCapFor(usableRowWidth(panelWidth, depth))}
+              chips={[
+                ...resolveTags(tags, node.tagIds).map((t) => ({ ...t, filled: true }) as RowChip),
+                ...resolveTags(tags, spanTagRollup[node.id] ?? []).map((t) => ({ ...t, filled: false }) as RowChip),
+                ...resolveMentionChips(storyBibleItems, storyBibleTypes, mentionRollup[node.id] ?? []).map(
+                  (t) => ({ ...t, filled: false }) as RowChip
+                )
+              ]}
+            />
           </span>
         )}
 

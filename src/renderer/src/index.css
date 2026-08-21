@@ -1098,8 +1098,86 @@ button.menubar-item:hover {
   display: flex;
   align-items: center;
   gap: var(--space-1);
+}
+
+.row-chip-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* The name gets the row's remaining width and a floor it cannot be pushed
+   below. Chips are already bounded by the cap, so the two cannot fight. */
+.binder-row .node-name {
+  flex: 1 1 auto;
+  min-width: 60px;
   overflow: hidden;
-  max-width: 45%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A chip's text is capped so one long character name cannot push the title
+   out on its own. Two of these plus the circle is the row's whole budget. */
+/* A panel wide enough for two chips is wide enough to spell them out. The
+   narrow ceiling exists to protect the title, and on a wide panel the title is
+   not under threat. */
+.row-chip-row.is-roomy > .tag-chip,
+.row-chip-row.is-roomy > .span-tag-rollup-chip {
+  max-width: 108px;
+}
+
+.row-chip-row > .tag-chip,
+.row-chip-row > .span-tag-rollup-chip {
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  line-height: 14px;
+}
+
+.row-chip-overflow {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 var(--space-1);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  color: var(--chrome-text-muted);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: 8px;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.row-chip-overflow:hover {
+  color: var(--chrome-text-heading);
+  border-color: var(--chrome-border-strong);
+}
+
+/* Fixed, because the binder scrolls and anything drawn inside that scroller
+   would be clipped by it. */
+.row-chip-overflow-list .tag-chip,
+.row-chip-overflow-list .span-tag-rollup-chip {
+  max-width: none;
+  overflow: visible;
+}
+
+.row-chip-overflow-list {
+  position: fixed;
+  z-index: 45;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  max-width: 240px;
+  padding: var(--space-2);
+  background: var(--chrome-bg-elevated);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-2);
 }
 
 /* The compact form of .status-badge. Same colour, no label — used only when
@@ -4673,6 +4751,26 @@ button.menubar-item:hover {
 /* Reading the card costs nothing; leaving the editor takes a deliberate
    press. The two actions are visually distinct on purpose — expand is a
    quiet text control, open is the one that has a consequence. */
+/* The card holds three blocks now, so each one has to be economical: tight
+   leading, no block margins, and the preview clamped rather than allowed to
+   set the card's height. */
+.mention-hover-card-summary,
+.mention-hover-card-text-preview {
+  line-height: 1.35;
+}
+
+.mention-hover-card-stats {
+  gap: var(--space-05) var(--space-2);
+}
+
+.mention-hover-card-text-preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .mention-hover-card-actions {
   display: flex;
   align-items: center;
@@ -4776,8 +4874,8 @@ button.menubar-item:hover {
 
 .mention-hover-card-summary {
   display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   font-family: var(--font-editor);

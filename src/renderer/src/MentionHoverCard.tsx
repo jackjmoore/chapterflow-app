@@ -16,16 +16,18 @@ interface MentionHoverCardProps {
 /**
  * What the card shows before you ask for more.
  *
- * Compact is deliberately one glance: the type, the name, and the item's own
- * summary clamped to two lines. That is enough to answer "who is this again?"
- * without the card becoming a panel that covers the sentence you were reading.
+ * The default carries real information: the summary, the first couple of stat
+ * pairs, and the opening of the sheet's text block. A hover that shows only a
+ * name has cost the reader a gesture and told them what the sentence already
+ * said — the point of the card is to answer the question without going
+ * anywhere, so the answer has to be in it.
  *
- * Everything else — the stat pairs, the sheet's text block, any list blocks —
- * waits behind More. Previously two stats and a hundred characters of prose
- * showed by default and More was for "even more", which made the default case
- * large for no benefit: if you already know who Wren is, none of it was
- * wanted, and if you don't, you are going to open the sheet anyway.
+ * Size is controlled by spacing and by capping each block, not by withholding
+ * blocks. More is reserved for detail beyond what a glance can hold: the
+ * remaining stat pairs, the rest of the text block, and any list blocks.
  */
+const SUMMARY_STAT_COUNT = 2
+const TEXT_PREVIEW_MAX_LENGTH = 120
 const EXPANDED_TEXT_MAX_LENGTH = 420
 
 function htmlToPlainText(html: string): string {
@@ -59,8 +61,12 @@ function MentionHoverCard(props: MentionHoverCardProps): JSX.Element {
     const maxLeft = Math.max(8, window.innerWidth - cardRect.width - 8)
     const maxTop = Math.max(8, window.innerHeight - cardRect.height - 8)
     setPos({ left: Math.min(rect.left, maxLeft), top: Math.min(rect.bottom + 6, maxTop) })
+    // `sheet` is in here because the card mounts before its sheet arrives and
+    // grows when it does. Clamping only at mount measured a card that had not
+    // finished being itself, and one opened near the bottom of the window then
+    // grew past the edge — taking its own buttons out of reach with it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rect, expanded])
+  }, [rect, expanded, sheet])
 
   // A different mention reuses this component, so the expansion has to reset
   // rather than carry over to the next item.
@@ -69,18 +75,21 @@ function MentionHoverCard(props: MentionHoverCardProps): JSX.Element {
   const statsBlock = sheet?.blocks.find((b) => b.kind === 'stats')
   const statPairs = statsBlock && statsBlock.kind === 'stats' ? statsBlock.pairs : []
   const textBlock = sheet?.blocks.find((b) => b.kind === 'text')
-  const textPreview = textBlock && textBlock.kind === 'text' ? htmlToPlainText(textBlock.html) : ''
+  const rawText = textBlock && textBlock.kind === 'text' ? htmlToPlainText(textBlock.html) : ''
+  // A sheet's first text block often opens by restating the summary. Showing
+  // both spends the card's height saying one thing twice.
+  const summary = (item.summary ?? '').trim()
+  const textPreview =
+    summary && rawText.startsWith(summary) ? rawText.slice(summary.length).trim() : rawText
 
   const listBlocks = (sheet?.blocks ?? []).filter((b) => b.kind === 'list')
-  const shownStats = expanded ? statPairs : []
-  const shownText = expanded
-    ? textPreview.length > EXPANDED_TEXT_MAX_LENGTH
-      ? `${textPreview.slice(0, EXPANDED_TEXT_MAX_LENGTH)}…`
-      : textPreview
-    : ''
+  const shownStats = expanded ? statPairs : statPairs.slice(0, SUMMARY_STAT_COUNT)
+  const textLimit = expanded ? EXPANDED_TEXT_MAX_LENGTH : TEXT_PREVIEW_MAX_LENGTH
+  const shownText = textPreview.length > textLimit ? `${textPreview.slice(0, textLimit)}…` : textPreview
 
-  /** Only offer expansion when there is genuinely something held back. */
-  const hasMore = statPairs.length > 0 || textPreview.length > 0 || listBlocks.length > 0
+  /** Only offer expansion when something is genuinely held back. */
+  const hasMore =
+    statPairs.length > SUMMARY_STAT_COUNT || textPreview.length > TEXT_PREVIEW_MAX_LENGTH || listBlocks.length > 0
 
   const isEmpty = !item.summary && statPairs.length === 0 && !textPreview
 
@@ -102,14 +111,6 @@ function MentionHoverCard(props: MentionHoverCardProps): JSX.Element {
       </div>
 
       {item.summary && <div className="mention-hover-card-summary">{item.summary}</div>}
-
-      {/* An item with no summary would otherwise be a bare name in compact
-          form, which says less than the mention itself already did. */}
-      {!item.summary && !expanded && statPairs[0] && (
-        <div className="mention-hover-card-summary">
-          <strong>{statPairs[0].label || 'Untitled'}:</strong> {statPairs[0].value}
-        </div>
-      )}
 
       {shownStats.length > 0 && (
         <div className="mention-hover-card-stats">
