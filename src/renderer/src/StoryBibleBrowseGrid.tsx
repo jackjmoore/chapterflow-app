@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { StoryBibleItem, StoryBibleTypeDef } from '../../shared/storyBible'
-import { PlusIcon } from './icons'
+import { PlusIcon, StoryBibleViewIcon } from './icons'
 
 interface StoryBibleBrowseGridProps {
   items: StoryBibleItem[]
@@ -64,7 +64,13 @@ function StoryBibleBrowseGrid(props: StoryBibleBrowseGridProps): JSX.Element {
 
       <div className="story-bible-browse-scroll">
         {items.length === 0 && (
-          <div className="story-bible-browse-empty">No items yet — click New… to create a character, location, or object.</div>
+          <div className="story-bible-browse-empty">
+            <StoryBibleViewIcon />
+            <span className="story-bible-browse-empty-title">Nothing in the Story Bible yet</span>
+            <span>
+              Characters, locations and objects you record here are recognised in your manuscript as you write.
+            </span>
+          </div>
         )}
 
         {groups.map(
