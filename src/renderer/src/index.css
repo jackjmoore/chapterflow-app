@@ -4126,6 +4126,10 @@ button.menubar-item:hover {
   border-color: var(--chrome-border-strong);
 }
 
+/* The type is metadata, and the group heading above already says it — so the
+   pill carries its colour as a tint rather than a fill. A saturated block of
+   colour per card was competing with the name it labels, and white text on an
+   arbitrary user-chosen type colour was never reliably legible either. */
 .story-bible-card-type-pill {
   display: inline-flex;
   align-items: center;
@@ -4133,10 +4137,10 @@ button.menubar-item:hover {
   padding: 0 var(--space-1);
   font-size: var(--text-2xs);
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #fff;
-  text-shadow: 0 1px 1px rgb(var(--shadow-rgb) / 0.35);
+  color: var(--pill-color);
+  background: color-mix(in srgb, var(--pill-color) 16%, transparent);
   border-radius: var(--radius-sm);
 }
 

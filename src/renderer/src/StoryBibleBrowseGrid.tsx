@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { StoryBibleItem, StoryBibleTypeDef } from '../../shared/storyBible'
 import { PlusIcon, StoryBibleViewIcon } from './icons'
 
@@ -89,7 +89,10 @@ function StoryBibleBrowseGrid(props: StoryBibleBrowseGridProps): JSX.Element {
                       className="story-bible-card"
                       onClick={() => onOpenItem(item.id)}
                     >
-                      <span className="story-bible-card-type-pill" style={{ backgroundColor: type.color }}>
+                      <span
+                        className="story-bible-card-type-pill"
+                        style={{ '--pill-color': type.color } as CSSProperties}
+                      >
                         {type.name}
                       </span>
                       <span className="story-bible-card-name">{item.name || 'Untitled'}</span>
@@ -107,7 +110,10 @@ function StoryBibleBrowseGrid(props: StoryBibleBrowseGridProps): JSX.Element {
             <div className="story-bible-grid">
               {orphaned.map((item) => (
                 <button key={item.id} type="button" className="story-bible-card" onClick={() => onOpenItem(item.id)}>
-                  <span className="story-bible-card-type-pill" style={{ backgroundColor: UNKNOWN_TYPE_COLOR }}>
+                  <span
+                    className="story-bible-card-type-pill"
+                    style={{ '--pill-color': UNKNOWN_TYPE_COLOR } as CSSProperties}
+                  >
                     Unknown
                   </span>
                   <span className="story-bible-card-name">{item.name || 'Untitled'}</span>
