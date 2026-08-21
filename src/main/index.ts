@@ -9,6 +9,13 @@ import * as preferencesStore from './preferencesStore'
 import * as backupStore from './backupStore'
 import * as snapshotStore from './snapshotStore'
 import * as spanTagStore from './spanTagStore'
+import * as commentStore from './commentStore'
+import * as lexiconStore from './lexiconStore'
+import * as suppressedWordStore from './suppressedWordStore'
+import * as searchIndex from './searchIndex'
+import * as searchRank from './searchRank'
+import * as searchHistoryStore from './searchHistoryStore'
+import * as documentImageStore from './documentImageStore'
 import * as storyBibleStore from './storyBibleStore'
 import * as storyBibleSheetStore from './storyBibleSheetStore'
 import * as storyBibleImageStore from './storyBibleImageStore'
@@ -22,6 +29,9 @@ import { getProjectRoot, setProjectRoot, projectExistsAt } from './projectRoot'
 import type { Theme, TypographyDefaults, PageSize } from '../shared/preferences'
 import type { ActiveView, ManuscriptView, OutlinerSort, StatusDef, TagDef, SavedView } from '../shared/binder'
 import type { StoryBibleBlock, StoryBibleTypeDef } from '../shared/storyBible'
+import type { CommentRecord } from '../shared/comments'
+import type { LexiconEntry } from '../shared/lexicon'
+import type { SearchQueryOptions } from '../shared/search'
 import type { ExportFormat } from '../shared/export'
 import type { TemplateId } from '../shared/templates'
 import type { ToolbarSectionId } from '../shared/toolbarSections'
@@ -176,6 +186,20 @@ async function createWindow(): Promise<void> {
           items.push({ label: suggestion, click: () => mainWindow.webContents.replaceMisspelling(suggestion) })
         }
       }
+      // Adds to this project's own word list — deliberately NOT
+      // session.addWordToSpellCheckerDictionary, which would write the word
+      // into the operating system's dictionary and teach it to every other
+      // app on the machine.
+      const misspelled = params.misspelledWord
+      items.push({
+        label: 'Add to Dictionary',
+        click: () => {
+          void suppressedWordStore.addPhrase(misspelled, 'lexicon').then(() => {
+            backupStore.markDirty()
+            mainWindow.webContents.send('lexicon:suppressedWordsChanged')
+          })
+        }
+      })
       items.push({ type: 'separator' })
     }
 
@@ -248,6 +272,12 @@ app.whenReady().then(async () => {
   // the window loads so every store reads/writes the right location from the start.
   const persistedRoot = await preferencesStore.getProjectRoot()
   if (persistedRoot) setProjectRoot(persistedRoot)
+
+  // The search index listens to every project write from here on. Building it
+  // is not awaited: the window should not wait on indexing, and any write that
+  // lands first is picked up by the same hook rather than being missed.
+  searchIndex.install()
+  void searchIndex.open()
 
   ipcMain.handle('binder:getState', () => binderStore.getState())
 
@@ -404,6 +434,9 @@ app.whenReady().then(async () => {
 
     const documentIds = await binderStore.deleteNode(id)
     await Promise.all(documentIds.map((docId) => mentionStore.deleteAllForDocument(docId)))
+    // Comment bodies live outside the document file, so deleting the document
+    // has to take them with it or they'd outlive the text they annotate.
+    await Promise.all(documentIds.map((docId) => commentStore.deleteAllForDocument(docId)))
     // Submissions referencing a deleted document keep the record but lose the
     // (now-meaningless) document/snapshot link — see submissionStore.
     await Promise.all(documentIds.map((docId) => submissionStore.handleDocumentDeleted(docId)))
@@ -652,6 +685,94 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('storyBible:deleteImage', (_event, imageId: string) => storyBibleImageStore.deleteImage(imageId))
 
+  // Manuscript images — a separate store and folder from the Story Bible's
+  // reference photos, since these get exported into the PDF/docx and must not
+  // be collected by a Story Bible sheet deletion.
+  ipcMain.handle('documentImage:import', (event) => documentImageStore.importImage(event))
+
+  ipcMain.handle('documentImage:get', (_event, imageId: string) =>
+    documentImageStore.getImageDataUri(imageId)
+  )
+
+  ipcMain.handle('documentImage:getMany', (_event, imageIds: string[]) =>
+    documentImageStore.getImageDataUris(imageIds)
+  )
+
+  // Lexicon + the shared, APP-ONLY suppression list. Nothing here calls
+  // session.addWordToSpellCheckerDictionary: that writes through to the
+  // operating system dictionary on Windows 10+ and macOS, which would teach
+  // the word to every other application on the machine. Suppression is done
+  // entirely in the editor — see the SpellcheckSuppress extension.
+  /** Reads the already-current index — nothing is scanned or parsed here. */
+  ipcMain.handle('search:query', (_event, text: string, options?: SearchQueryOptions) =>
+    searchIndex.query(text, options ?? {})
+  )
+
+  ipcMain.handle('search:stats', () => searchIndex.stats())
+
+  /** Ranked results — the same index read, put through the tier rules. */
+  ipcMain.handle('search:ranked', (_event, text: string, options?: SearchQueryOptions) =>
+    searchRank.search(text, options ?? {})
+  )
+
+  ipcMain.handle('search:history', () => searchHistoryStore.list())
+
+  ipcMain.handle('search:recordHistory', (_event, text: string) => searchHistoryStore.record(text))
+
+  ipcMain.handle('search:clearHistory', async () => {
+    await searchHistoryStore.clear()
+  })
+
+  ipcMain.handle('lexicon:list', () => lexiconStore.listEntries())
+
+  ipcMain.handle('lexicon:add', async (_event, word: string, meaning?: string, pronunciation?: string) => {
+    const entry = await lexiconStore.addEntry(word, meaning ?? '', pronunciation ?? '')
+    backupStore.markDirty()
+    return entry
+  })
+
+  ipcMain.handle(
+    'lexicon:update',
+    async (_event, id: string, changes: Partial<Pick<LexiconEntry, 'word' | 'meaning' | 'pronunciation'>>) => {
+      await lexiconStore.updateEntry(id, changes)
+      backupStore.markDirty()
+    }
+  )
+
+  ipcMain.handle('lexicon:delete', async (_event, id: string) => {
+    await lexiconStore.deleteEntry(id)
+    backupStore.markDirty()
+  })
+
+  ipcMain.handle('suppressedWords:list', () => suppressedWordStore.listWords())
+
+  /** Right-click "Add to Dictionary": suppresses the word in this project
+   *  only, with no Lexicon entry and no OS involvement. */
+  ipcMain.handle('suppressedWords:add', async (_event, word: string) => {
+    await suppressedWordStore.addPhrase(word, 'lexicon')
+    backupStore.markDirty()
+  })
+
+  ipcMain.handle('comment:list', () => commentStore.listComments())
+
+  ipcMain.handle('comment:add', async (_event, record: CommentRecord) => {
+    await commentStore.addComment(record)
+    backupStore.markDirty()
+  })
+
+  ipcMain.handle(
+    'comment:update',
+    async (_event, id: string, changes: Partial<Pick<CommentRecord, 'body' | 'resolved'>>) => {
+      await commentStore.updateComment(id, changes)
+      backupStore.markDirty()
+    }
+  )
+
+  ipcMain.handle('comment:delete', async (_event, id: string) => {
+    await commentStore.deleteComment(id)
+    backupStore.markDirty()
+  })
+
   ipcMain.handle('storyBible:getMentionRollup', async () => {
     const [mentions, { items }] = await Promise.all([mentionStore.listMentions(), storyBibleStore.getState()])
     const validItemIds = new Set(items.map((i) => i.id))
@@ -679,6 +800,11 @@ app.whenReady().then(async () => {
     wordCountStore.invalidate(id)
     backupStore.markDirty()
     await spanTagStore.rebuildForDocument(id, html)
+    // Prunes comment bodies whose anchor the writer has deleted. Awaited
+    // alongside the span-tag rebuild rather than fired off, because a comment
+    // body is authored content — losing the ordering here could resurrect a
+    // record the user just deleted.
+    await commentStore.reconcileForDocument(id, html)
     // Not awaited: this shares a write-queue with the much slower full-project
     // rescan (triggered by Story Bible item edits), and every autosave must
     // never stall behind one already in flight. The renderer's mention
@@ -712,7 +838,7 @@ app.whenReady().then(async () => {
     const node = binderStore.getNode(id)
     const html = await documentStore.loadDocument(id)
     const options = await buildExportOptions(preset, node?.name ?? 'Untitled')
-    return printHtml(renderDocumentHtml(html, options), options)
+    return printHtml(await renderDocumentHtml(html, options), options)
   })
 
   ipcMain.handle('print:project', async (_event, preset: ExportPreset = 'standard') => {
@@ -891,6 +1017,9 @@ app.whenReady().then(async () => {
     binderStore.invalidateCache()
     storyBibleStore.invalidateCache()
     wordCountStore.invalidateAll()
+    // A different project means a different index; open() validates the
+    // persisted one against the files and re-indexes only what disagrees.
+    void searchIndex.open()
     return { opened: true, path: chosen }
   })
 

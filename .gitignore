@@ -9,3 +9,10 @@ out/
 Thumbs.db
 .vscode/*
 !.vscode/extensions.json
+
+# Test suites write their report here.
+report.txt
+
+# Left over from a path-mangling bug; kept out of history pending removal.
+/UsersjackmOneDriveDocumentsChapterFlow Demo/
+/verifyDemo.mjs

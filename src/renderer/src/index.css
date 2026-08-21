@@ -18,6 +18,16 @@
   /* Editor / page tokens — fixed paper tone. These never change with the
      interface theme: the page stays paper regardless of chrome light/dark. */
   --editor-bg: #faf6ec;
+  /* The surface the page sits on, visible outside the page's edges. Kept in
+     the same warm family as the paper rather than a neutral grey, so the two
+     read as one material and one lighting condition — a cool grey against
+     cream looks like a mistake. Fixed across themes for the same reason the
+     paper tone is: the page is a page regardless of the interface theme. */
+  --editor-surround: #e6e2d9;
+  /* Both hairline-thin and deliberately weak: the page edge should register
+     as depth, not as a drawn outline. */
+  --editor-page-edge: rgba(43, 38, 32, 0.09);
+  --editor-page-shadow: rgba(43, 38, 32, 0.07);
   --editor-text: #2b2620;
   --editor-muted: #8a8270;
   --editor-dim: #a39c89;
@@ -368,31 +378,62 @@ button.menubar-item:hover {
   cursor: default;
 }
 
-/* Collapsed: an icon-only strip, not a hidden panel. Every section's
-   navigation keeps rendering here — binder rows, Story Bible items, continuity
-   entries, tracker statuses — reduced to their single identifying glyph, with
-   the name moved into the tooltip. */
+/* Collapsed: a slim reserved column, not a hidden panel and not an overlay.
+   It keeps its width in the workspace flex row at all times, so a manuscript
+   page filling a narrow pane is never sitting underneath it. Every section's
+   navigation keeps rendering here — the manuscript as a minimap of bars, the
+   tool sections as their single identifying glyph — with names moved into the
+   tooltip and the hover flyout. */
 
 .side-panel-header--collapsed {
   justify-content: center;
   padding: var(--space-3) 0 var(--space-2);
+  /* Always chrome — this row matches the toolbar's own color whether or not
+     the rest of the rail is in page-margin mode below it (see .is-paged),
+     the same way nav-rail already matches the toolbar with no seam. */
+  background: var(--chrome-bg-elevated);
+  /* Its height is set explicitly (to the toolbar's real height) in
+     page-margin mode — flex's default shrink:1 could otherwise let it get
+     squeezed shorter than that under space pressure on a short window,
+     throwing the zone match off exactly where it needs to hold. */
+  flex-shrink: 0;
 }
 
-.side-panel.is-collapsed .binder-row,
+/* Collapsed reads as ordinary chrome by default — matching nav-rail, the
+   toolbar, and the footer, exactly like every other tool section's rail
+   (Story Bible, Continuity, Query Tracker) and like Outliner/Corkboard, none
+   of which have a "page" for a margin to blend with. */
+.side-panel.is-collapsed {
+  background: var(--chrome-bg-elevated);
+  border-right: none;
+}
+
+/* Only while an actual paper page is on screen: the middle zone (see
+   .binder-minimap-wrap) blends into the page's own margin instead. The top
+   and bottom zones (the header above, stretched to the toolbar's real
+   height in SidePanel.tsx, and the footer-spacer below) stay chrome so they
+   read as a continuation of the real toolbar and footer beside them, not a
+   differently-colored strip interrupting them. */
+.side-panel.is-collapsed.is-paged {
+  background: transparent;
+}
+
+.side-panel-rail-spacer {
+  flex-shrink: 0;
+  background: var(--chrome-bg-elevated);
+}
+
+/* Matches .editor-footer's own fixed height exactly (see FOOTER_HEIGHT in
+   SidePanel.tsx) — no measurement needed, the footer never wraps or resizes. */
+.side-panel-rail-spacer--footer {
+  border-top: 1px solid var(--chrome-border);
+}
+
 .panel-nav.is-collapsed .panel-nav-row {
   justify-content: center;
   gap: 0;
   padding-left: 0;
   padding-right: 0;
-}
-
-.side-panel.is-collapsed .binder-row .node-icon {
-  margin: 0;
-}
-
-/* Nesting is meaningless without names, so nested lists sit flush. */
-.side-panel.is-collapsed .binder-list {
-  padding-left: 0;
 }
 
 .panel-nav.is-collapsed .panel-nav-group + .panel-nav-group {
@@ -408,6 +449,244 @@ button.menubar-item:hover {
 .panel-nav.is-collapsed .panel-nav-count {
   min-width: 0;
   padding-top: 0;
+}
+
+/* The collapsed stand-in for a row. Sized to match the binder's icon rail
+   sitting in the same strip — an 8px dot or a 10px dim numeral read as noise
+   next to a 16px document icon. */
+.panel-nav-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--chrome-border-strong);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--chrome-text-muted);
+  background: var(--chrome-control-bg);
+}
+
+/* A ring rather than a border colour: the Story Bible glyph paints its border
+   transparent inline to sit flush on its type colour, which would win over any
+   border-color set here. */
+.panel-nav-glyph.is-active {
+  box-shadow: 0 0 0 2px var(--chrome-accent);
+  color: var(--chrome-text-heading);
+}
+
+.panel-nav-row:hover .panel-nav-glyph {
+  border-color: var(--chrome-accent);
+}
+
+/* Binder minimap — the collapsed manuscript. One bar per document or folder in
+   tree order, so the shape of the manuscript and your place in it stay legible
+   at 44px. Height is a fixed slot per node, never proportional to word count:
+   a 200-word scene would otherwise render as a sub-pixel sliver beside a
+   5,000-word chapter. Width and weight carry the hierarchy instead. */
+
+/* The block sits in the remaining rail height between the header (stretched
+   to the toolbar's height in page-margin mode) and the footer-spacer (see
+   .side-panel-rail-spacer) and centers itself there — vertically only; the
+   block itself stretches to the rail's width. Doesn't scroll itself: the
+   fixed-height block inside does.
+
+   In page-margin mode this zone spans exactly the visible page's own extent
+   — no taller, no shorter — so the minimap's center lands on the page's true
+   center rather than an approximation. Toned only in that mode; otherwise it
+   stays the rail's own chrome, uninvolved in the color story at all. */
+.binder-minimap-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* The surround tone, NOT the paper tone: what actually abuts the rail is the
+   surface the page sits on, since the editor now pads the page away from its
+   own left edge. Blending to paper here would leave a cream stripe beside a
+   grey one and reintroduce exactly the visible seam this mode exists to
+   avoid. Moves with --editor-surround by construction. */
+.side-panel.is-collapsed.is-paged .binder-minimap-wrap {
+  background: var(--editor-surround);
+}
+
+/* Fixed on-screen footprint regardless of document count — a 5-document
+   project and a 500-document one occupy the same block. Short lists cluster
+   at the block's own center (see .is-scrollable below); a list too long even
+   for the compressed floor scrolls inside these same fixed bounds instead of
+   growing them. */
+.binder-minimap {
+  -webkit-app-region: no-drag;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  padding: 0 8px;
+  scrollbar-width: none;
+}
+
+.binder-minimap.is-scrollable {
+  justify-content: flex-start;
+  overflow-y: auto;
+}
+
+.binder-minimap::-webkit-scrollbar {
+  display: none;
+}
+
+.binder-minimap-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  flex-shrink: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* Default (not page-margin mode): the same chrome tokens the rest of the rail
+   uses, since the background here is chrome, not paper. Darker/more opaque
+   across the board than a typical secondary-chrome element — this is the
+   whole content of the collapsed rail, not a minor accent within a bigger
+   view, so it needs to read as defined at a glance, not merely present. */
+.binder-minimap-bar {
+  border-radius: 999px;
+  background: var(--chrome-text-muted);
+  opacity: 0.85;
+  transition: background-color 0.12s ease, opacity 0.12s ease;
+}
+
+/* Folders span the full track and sit visibly heavier — width and weight
+   both, so the difference reads at a glance without hovering: documents are
+   a narrow tick; folders are a full-width, solid, high-contrast rule. */
+.binder-minimap-bar.is-folder {
+  border-radius: 1px;
+  background: var(--chrome-text-heading);
+  opacity: 1;
+}
+
+.binder-minimap-bar.is-selected {
+  background: var(--chrome-text-heading);
+  opacity: 1;
+}
+
+/* 'You are here' — the one solid accent bar in the column. Reads fine against
+   both chrome and paper, so it doesn't need a page-margin-mode override. */
+.binder-minimap-bar.is-active {
+  background: var(--chrome-accent);
+  opacity: 1;
+}
+
+/* A collapsed folder holding the open document carries the marker on its
+   behalf, so the open document never drops off the rail entirely. */
+.binder-minimap-bar.contains-active {
+  box-shadow: 0 0 0 1px var(--chrome-accent);
+}
+
+.binder-minimap-row:hover .binder-minimap-bar {
+  background: var(--chrome-text-heading);
+  opacity: 1;
+}
+
+.binder-minimap-row:hover .binder-minimap-bar.is-active {
+  background: var(--chrome-accent);
+}
+
+/* Page-margin mode: colors switch to the editor's own fixed paper/ink tokens
+   instead — the background here is --editor-bg (see .binder-minimap-wrap),
+   and the chrome palette's near-white "heading" tone would nearly vanish
+   against cream paper even though it reads fine against a dark chrome
+   background. --editor-* stays the same paper tone across all three chrome
+   themes, so this needs no further per-theme override. */
+.side-panel.is-collapsed.is-paged .binder-minimap-bar {
+  background: var(--editor-muted);
+  opacity: 0.95;
+}
+
+.side-panel.is-collapsed.is-paged .binder-minimap-bar.is-folder,
+.side-panel.is-collapsed.is-paged .binder-minimap-bar.is-selected {
+  background: var(--editor-text);
+  opacity: 1;
+}
+
+/* :not(.is-active) so this can't outrank the accent-on-hover rule above by
+   specificity — the active bar stays accent-colored on hover in both modes. */
+.side-panel.is-collapsed.is-paged .binder-minimap-row:hover .binder-minimap-bar:not(.is-active) {
+  background: var(--editor-text);
+  opacity: 1;
+}
+
+/* Hover flyout — a compact, floating list of names only: no search, no create
+   buttons, no badges. A temporary reveal in the page's own gutter space,
+   absolutely positioned so it is out of flow and cannot alter the reserved
+   width of the rail it hangs off — the editor keeps exactly the same geometry
+   open or closed.
+
+   Sized independently from the rest-state minimap block: height is auto, so
+   a small project's flyout is only as tall as its own list, not stretched to
+   match the rail's fixed 320px block or its full height. max-height is the
+   only ceiling — a sensible absolute cap, and never more than the rail
+   actually has room for — past which the list scrolls internally instead of
+   growing further. Centered vertically in the space that leaves. */
+.side-panel-flyout {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 6px);
+  transform: translateY(-50%);
+  z-index: 35;
+  display: flex;
+  flex-direction: column;
+  width: 220px;
+  max-width: calc(100vw - 160px);
+  max-height: min(480px, calc(100% - var(--space-4)));
+  padding: var(--space-2) 0;
+  border-radius: var(--radius-md);
+  background: var(--chrome-bg-elevated);
+  border: 1px solid var(--chrome-border-strong);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.binder-flyout-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--space-1);
+}
+
+.binder-flyout-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 28px;
+  padding-right: var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.binder-flyout-row:hover {
+  background: var(--chrome-row-hover);
+}
+
+.binder-flyout-row.is-selected {
+  background: var(--chrome-row-selected);
+}
+
+.binder-flyout-row.is-active-doc .node-name {
+  color: var(--chrome-accent);
+  font-weight: 600;
+}
+
+.panel-nav.is-compact-flyout {
+  padding: var(--space-1) 0;
 }
 
 .side-panel-new-item {
@@ -1821,6 +2100,65 @@ button.menubar-item:hover {
   background: var(--editor-bg);
 }
 
+/* Pages sit on a surface: the scroll area takes the surround tone and each
+   sheet keeps the paper tone, so every page has its own visible edges.
+   Excludes .page-measure-host — that shares the .editor class purely to
+   inherit typography for off-screen pagination measurement, and restyling it
+   would change how its content lays out and throw every page break off. */
+.editor:not(.page-measure-host) {
+  padding: var(--space-5) var(--space-4);
+  background: var(--editor-surround);
+  /* The page is a fixed physical size, so a window narrower than one page
+     scrolls sideways rather than squeezing the paper. */
+  overflow: auto;
+}
+
+/* Holds the sheets and the text in one coordinate space. Its width is the
+   real page width, set inline from the measured geometry — never a
+   percentage, which is what made the old treatment stretch to the window. */
+.page-stack {
+  position: relative;
+  margin: 0 auto;
+}
+
+.page-sheets {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* One sheet per page, positioned from the same stride the pagination maths
+   used. Same restrained edge treatment as before: a hairline ring and one
+   close shadow, enough to separate paper from surface. */
+.page-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--editor-bg);
+  box-shadow:
+    0 0 0 1px var(--editor-page-edge),
+    0 1px 3px var(--editor-page-shadow);
+}
+
+/* The empty spacer that carries content down onto the next sheet. Has no
+   appearance of its own — the gap it opens simply reveals the surround
+   between two sheets. */
+.chf-page-gap {
+  pointer-events: none;
+  user-select: none;
+}
+
+/* A break falling inside a paragraph, at a line boundary. inline-block at
+   full width rather than display:block: a block-level box inside a <p> splits
+   it into anonymous block boxes and re-flows the text around it, whereas a
+   full-width inline-block simply takes a line of its own and pushes the rest
+   of the paragraph down — which is exactly the gap a page break needs. */
+.chf-page-gap--inline {
+  display: inline-block;
+  width: 100%;
+  vertical-align: top;
+}
+
 .editor .ProseMirror {
   min-height: 100%;
   max-width: 760px;
@@ -1831,6 +2169,25 @@ button.menubar-item:hover {
   color: var(--editor-text);
   font-family: var(--font-editor);
   outline: none;
+}
+
+/* The text sits above the sheets and paints nothing itself — the paper it
+   appears to be written on is the .page-sheet behind it. Its padding is the
+   page's real margin, which is what makes the live line length identical to
+   the width pagination measured at; if these two ever diverge, every
+   measured break lands in the wrong place. */
+.page-stack .ProseMirror {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  margin: 0;
+  /* All four margins, bottom included. The bottom one was zero, which let
+     text run to the very edge of the last sheet. */
+  padding: var(--chf-page-margin);
+  background: transparent;
+  box-shadow: none;
 }
 
 .editor .ProseMirror p {
@@ -1911,10 +2268,20 @@ button.menubar-item:hover {
   pointer-events: none;
 }
 
+/* Measurement geometry must stay exactly what it was before the page
+   treatment existed: this node's scrollHeight *is* the page count. Anything
+   that adds box height or changes how children lay out (padding, borders,
+   becoming a flex container) would silently shift every page figure in the
+   app, so the page styling is explicitly undone here as well as scoped away
+   from .page-measure-host above. */
 .page-measure-content.ProseMirror {
+  display: block;
+  flex: none;
   max-width: none;
   margin: 0;
   padding: 0;
+  background: none;
+  box-shadow: none;
 }
 
 .footer-page-count {
@@ -2236,18 +2603,49 @@ button.menubar-item:hover {
   background: var(--chrome-control-hover);
 }
 
+/* Present in every scope, inert where it cannot act. The bar keeping one
+   shape is the point: a control that vanishes takes the knowledge that it
+   exists with it. */
+.find-options button:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+.find-options button:disabled:hover {
+  background: transparent;
+}
+
 .find-options button.is-active {
   background: var(--chrome-control-active-bg);
   border-color: var(--chrome-border-strong);
   color: var(--chrome-accent);
 }
 
+/* Counter and arrows read as one control: "3 of 12, walk them". Keeping them
+   together is also what stops the counter's reserved width from opening a gap
+   in the middle of the row. */
+.find-matches {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+/* Wide enough that the arrows do not shift as the count grows from "1 of 3"
+   to "12 of 340", and no wider. Right-aligned so it sits against them. */
 .find-count {
   flex-shrink: 0;
   font-size: 12px;
   color: var(--chrome-text-muted);
-  min-width: 88px;
+  min-width: 52px;
+  text-align: right;
   white-space: nowrap;
+}
+
+/* The project-scope result count stands alone, so it needs no reserved gutter. */
+.find-options-bar > .find-count {
+  min-width: 0;
+  text-align: left;
 }
 
 .find-count--error {
@@ -2289,22 +2687,348 @@ button.menubar-item:hover {
   flex: 1;
 }
 
-.find-project-results {
-  max-height: 240px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--chrome-border);
+/* Project search
+   ----------------------------------------------------------------------
+   The ranked result list, its tier groups, the recent-search list, and the
+   kind filters. All of it lives inside .find-options-popover, so it inherits
+   that surface's width, position and elevation rather than introducing a
+   second kind of dropdown. */
+
+/* Same shape as the other replace-row buttons, but it toggles rather than
+   acts, so it takes the accent when armed. */
+.find-replace-scope-btn.is-active {
+  border-color: var(--chrome-accent);
+  color: var(--chrome-accent);
+  background: var(--chrome-control-active-bg);
 }
 
-.find-project-result {
+.search-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
+  min-width: 0;
+}
+
+/* Deliberately the lightest control on the row: no fill, hairline border,
+   10px type. Six of these sit beside the scope toggle without competing with
+   it, and they wrap rather than overflow if the window gets narrow. */
+.search-filter {
+  flex-shrink: 0;
+  height: 20px;
+  padding: 0 var(--space-2);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: var(--chrome-text-muted);
+  background: transparent;
+  border: 1px solid var(--chrome-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.search-filters.is-disabled {
+  opacity: 0.45;
+}
+
+.search-filter:disabled {
+  cursor: default;
+}
+
+.search-filter:disabled:hover {
+  background: transparent;
+  color: var(--chrome-text-muted);
+}
+
+.search-filter:hover {
+  background: var(--chrome-control-hover);
+  color: var(--chrome-text);
+}
+
+.search-filter.is-active {
+  background: var(--chrome-control-active-bg);
+  border-color: var(--chrome-accent);
+  color: var(--chrome-accent);
+}
+
+.search-filter-clear {
+  flex-shrink: 0;
+  height: 20px;
+  padding: 0 var(--space-1);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  color: var(--chrome-text-dim);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* --- results ------------------------------------------------------- */
+
+.search-results {
   display: flex;
   flex-direction: column;
+  gap: var(--space-3);
+  max-height: 380px;
+  overflow-y: auto;
+  border-top: 1px solid var(--chrome-border);
+  padding-top: var(--space-3);
+}
+
+.search-result-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.search-result-group-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2) var(--space-1);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--chrome-text-dim);
+}
+
+.search-result-group-name {
+  flex-shrink: 0;
+}
+
+.search-result-group-count {
+  font-weight: 400;
+  letter-spacing: 0;
+  opacity: 0.7;
+}
+
+/* The group header is the collapse control. Full width and hoverable so it
+   reads as a control rather than a caption, and it carries the state three
+   ways — caret direction, the word Hide/Hidden, and a shaded bar when shut —
+   because a lone chevron at this size is easy to skate past. */
+.search-result-group-label {
+  width: 100%;
+  font-family: var(--font-ui);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.search-result-group-label:hover {
+  background: var(--chrome-row-hover);
+  color: var(--chrome-text);
+}
+
+.search-result-group-caret {
+  flex-shrink: 0;
+  width: 9px;
+  font-size: 8px;
+  line-height: 1;
+  color: var(--chrome-text-muted);
+}
+
+.search-result-group-state {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--chrome-text-dim);
+  opacity: 0;
+}
+
+.search-result-group-label:hover .search-result-group-state {
+  opacity: 1;
+}
+
+.search-result-group.is-collapsed .search-result-group-label {
+  background: var(--chrome-control-bg);
+  border: 1px dashed var(--chrome-border-strong);
+  color: var(--chrome-text-muted);
+  margin-bottom: 0;
+}
+
+/* Always shown when shut: the point is that a collapsed group can never be
+   mistaken for an empty one. */
+.search-result-group.is-collapsed .search-result-group-state {
+  opacity: 1;
+  color: var(--chrome-accent);
+}
+
+.search-result-group.is-collapsed .search-result-group-caret {
+  color: var(--chrome-accent);
+}
+
+.search-result {
+  display: flex;
   align-items: flex-start;
-  gap: 2px;
+  gap: var(--space-2);
+  width: 100%;
   padding: var(--space-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-result:hover,
+.search-result:focus-visible {
+  background: var(--chrome-row-hover);
+  outline: none;
+}
+
+.search-result-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--chrome-text-dim);
+}
+
+.search-result-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.search-result-heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: 13px;
+  color: var(--chrome-text-heading);
+}
+
+.search-result-kind {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--chrome-text-dim);
+  white-space: nowrap;
+}
+
+.search-result-detail {
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--chrome-text-muted);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.search-result-hit {
+  background: transparent;
+  color: var(--chrome-accent);
+  font-weight: 600;
+}
+
+/* Weight descends with the tier, so a result's kind is legible from the row
+   itself and not only from where it sits in the list. Tiers 1 and 2 are the
+   thing you were looking for: a bordered row with an accent edge, a serif
+   name, room to breathe. Tier 5 is a mention of it: one dense line. */
+.search-result[data-tier='1'],
+.search-result[data-tier='2'] {
+  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-3);
+  border-color: var(--chrome-border);
+  background: var(--chrome-control-bg);
+  border-left: 2px solid var(--chrome-accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  margin-bottom: 2px;
+}
+
+.search-result[data-tier='1'] .search-result-heading,
+.search-result[data-tier='2'] .search-result-heading {
+  font-family: var(--font-editor);
+  font-size: 15px;
+}
+
+.search-result[data-tier='1'] .search-result-icon,
+.search-result[data-tier='2'] .search-result-icon {
+  color: var(--chrome-accent);
+  margin-top: 3px;
+}
+
+.search-result[data-tier='2'] {
+  border-left-color: var(--chrome-border-strong);
+}
+
+.search-result[data-tier='5'] .search-result-heading {
+  font-size: 12px;
+  color: var(--chrome-text);
+}
+
+.search-result[data-tier='5'] .search-result-detail {
+  font-family: var(--font-editor);
+}
+
+.search-result.is-current {
+  background: var(--chrome-row-selected);
+}
+
+.search-result.is-current .search-result-heading {
+  color: var(--chrome-text-heading);
+}
+
+.search-results-truncated {
+  padding: var(--space-2);
+  font-size: 11px;
+  color: var(--chrome-text-dim);
+}
+
+/* --- recent searches ----------------------------------------------- */
+
+.search-history {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-top: 1px solid var(--chrome-border);
+  padding-top: var(--space-3);
+}
+
+.search-history-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-2) var(--space-1);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--chrome-text-dim);
+}
+
+.search-history-clear {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--chrome-text-dim);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.search-history-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--chrome-text);
   background: transparent;
   border: none;
   border-radius: var(--radius-sm);
@@ -2312,29 +3036,19 @@ button.menubar-item:hover {
   cursor: pointer;
 }
 
-.find-project-result:hover {
+.search-history-item:hover {
   background: var(--chrome-row-hover);
 }
 
-.find-project-result-name {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--chrome-text-heading);
-}
-
-.find-project-result-count {
-  font-size: 11px;
-  font-weight: 400;
+.search-history-item .icon {
+  flex-shrink: 0;
   color: var(--chrome-text-dim);
 }
 
-.find-project-result-snippet {
+.search-history-empty {
+  padding: var(--space-2);
   font-size: 12px;
-  color: var(--chrome-text-muted);
-  font-family: var(--font-editor);
+  color: var(--chrome-text-dim);
 }
 
 /* Confirm modal */
@@ -2827,6 +3541,131 @@ button.menubar-item:hover {
   text-decoration: line-through;
 }
 
+/* Insert-menu content in the editor.
+
+   These all live on the paper page, so they use the editor's own fixed ink
+   tokens rather than the chrome palette — the page stays cream in every
+   interface theme. */
+
+/* A page or chapter break has no printed appearance of its own: on screen it
+   needs to be visible enough to select and delete, which a zero-height
+   element could never be. The label is generated content, so it never enters
+   the document's text or its word count. */
+.editor .chf-page-break,
+.editor .chf-chapter-break {
+  position: relative;
+  height: 0;
+  margin: 1.6em 0;
+  border-top: 1px dashed var(--editor-quote-border);
+}
+
+.editor .chf-page-break::after,
+.editor .chf-chapter-break::after {
+  content: 'Page Break';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 0 0.6em;
+  background: var(--editor-bg);
+  color: var(--editor-dim);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.editor .chf-chapter-break::after {
+  content: 'Chapter Break';
+}
+
+.editor .chf-page-break.ProseMirror-selectednode,
+.editor .chf-chapter-break.ProseMirror-selectednode,
+.editor .chf-chapter-line.ProseMirror-selectednode {
+  border-color: var(--chrome-accent);
+  outline: 1px solid var(--chrome-accent);
+  outline-offset: 4px;
+}
+
+/* The decorative rule — this one IS printed, so it's styled to match the
+   export rather than annotated like the breaks above. */
+.editor .chf-chapter-line {
+  width: 38%;
+  height: 0;
+  margin: 1.6em auto;
+  border-top: 1px solid var(--editor-quote-border);
+}
+
+.editor .chf-document-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1em auto;
+}
+
+.editor .chf-document-image.ProseMirror-selectednode {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: 2px;
+}
+
+/* The footnote marker. Its number comes from --chf-footnote-number, painted
+   on by the extension's decoration plugin from document order — so it stays
+   correct after any edit without the number being stored in the document. */
+.editor .chf-footnote {
+  font-size: 0.7em;
+  line-height: 0;
+  vertical-align: super;
+  color: var(--chrome-accent);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-weight: 600;
+}
+
+.editor .chf-footnote::after {
+  content: var(--chf-footnote-number, '*');
+}
+
+.editor .chf-footnote.ProseMirror-selectednode {
+  outline: 1px solid var(--chrome-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Commented text. Deliberately distinct from a span tag's solid underline —
+   these are two different mechanisms and must not be mistaken for each
+   other at a glance. */
+.editor .chf-comment-mark {
+  background: color-mix(in srgb, var(--editor-highlight-default) 22%, transparent);
+  border-bottom: 1px dotted var(--editor-muted);
+  cursor: pointer;
+}
+
+/* Comment and footnote bodies are free text, so the modal gets a real
+   multi-line field rather than the single-line input other prompts use. */
+.note-edit-textarea {
+  width: 100%;
+  min-height: 96px;
+  padding: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--chrome-text-heading);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+}
+
+.note-edit-textarea:focus {
+  outline: none;
+  border-color: var(--chrome-accent);
+}
+
+.modal-cancel--danger {
+  margin-right: auto;
+  color: var(--chrome-accent-error);
+}
+
 /* Inline span tags */
 
 .span-tag-mark {
@@ -3019,7 +3858,7 @@ button.menubar-item:hover {
 /* Story Bible — stays in chrome tokens like Outliner/Corkboard (not the
    paper editor tokens), but with its own card rhythm and, for text-block
    prose specifically, the same font-family-only serif nod already used by
-   .find-project-result-snippet. */
+   .search-result-detail. */
 
 .story-bible {
   flex: 1;
@@ -3414,7 +4253,7 @@ button.menubar-item:hover {
 }
 
 /* Text block: the one deliberate paper nod — font-family only, chrome text
-   color, exactly the pattern .find-project-result-snippet already uses. */
+   color, exactly the pattern .search-result-detail already uses. */
 .story-bible-text-block-content .ProseMirror {
   min-height: 60px;
   font-family: var(--font-editor);
@@ -5428,4 +6267,125 @@ button.menubar-item:hover {
   font-family: var(--font-ui);
   font-size: 13px;
   color: var(--chrome-text-heading);
+}
+
+/* Lexicon — the project's own vocabulary.
+
+   .chf-suppressed-word carries spellcheck="false" as a decoration, which is
+   what actually stops Chromium flagging the word (see the SpellcheckSuppress
+   extension). It is deliberately almost invisible: these are correct words,
+   not annotations, and marking them would be worse than the squiggle. The
+   faint underline appears only on hover, as the affordance for the card. */
+.editor .chf-suppressed-word {
+  border-bottom: 1px dotted transparent;
+}
+
+.editor .chf-suppressed-word:hover {
+  border-bottom-color: var(--editor-dim);
+}
+
+.lexicon-hover-pill {
+  background: var(--chrome-accent);
+  color: var(--chrome-accent-contrast);
+}
+
+.lexicon-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--chrome-bg);
+  overflow-y: auto;
+}
+
+.lexicon-header {
+  flex-shrink: 0;
+  padding: var(--space-5) var(--space-5) var(--space-3);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.lexicon-title {
+  margin: 0 0 var(--space-1);
+  font-size: 20px;
+  color: var(--chrome-text-heading);
+}
+
+.lexicon-intro {
+  margin: 0 0 var(--space-4);
+  max-width: 60ch;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--chrome-text-muted);
+}
+
+.lexicon-add {
+  display: flex;
+  gap: var(--space-2);
+  max-width: 420px;
+}
+
+.lexicon-add input {
+  flex: 1;
+}
+
+.lexicon-filter {
+  margin: var(--space-3) 0 0;
+  max-width: 420px;
+}
+
+.lexicon-list {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-3) var(--space-5) var(--space-6);
+}
+
+/* Word, pronunciation, meaning, delete — the meaning gets the remaining
+   width because it is the field that actually runs long. */
+.lexicon-row {
+  display: grid;
+  grid-template-columns: 180px 160px 1fr 26px;
+  align-items: start;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.lexicon-row.is-revealed {
+  background: var(--chrome-row-selected);
+}
+
+.lexicon-word,
+.lexicon-field {
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--chrome-text);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+}
+
+.lexicon-word {
+  font-weight: 600;
+  color: var(--chrome-text-heading);
+}
+
+.lexicon-word:focus,
+.lexicon-field:focus {
+  outline: none;
+  border-color: var(--chrome-accent);
+}
+
+.lexicon-meaning {
+  min-height: 30px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.lexicon-delete {
+  opacity: 0;
+}
+
+.lexicon-row:hover .lexicon-delete {
+  opacity: 1;
 }

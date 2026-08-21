@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron'
 import { effectiveMarginMm, type ExportOptions } from '../../shared/export'
+import { PAGE_DIMENSIONS_MM } from '../../shared/preferences'
 
 const MM_PER_INCH = 25.4
 const CSS_PX_PER_INCH = 96
@@ -15,6 +16,35 @@ const SHARED_CSS = `
   .chf-toc h1 { break-after: avoid; }
   .chf-toc ul { list-style: none; padding-left: 0; }
   .chf-toc li { margin: 0.35em 0; }
+
+  /* Insert-menu structural blocks. Page and chapter breaks are zero-height —
+     they exist only to carry the break, never to add visible space. */
+  .chf-page-break, .chf-chapter-break { break-after: page; height: 0; }
+  .chf-page-break:last-child, .chf-chapter-break:last-child { break-after: avoid; }
+
+  /* The decorative rule between chapters or major scene transitions. Kept
+     with the text that follows so it can't strand itself at a page foot. */
+  .chf-chapter-line {
+    width: 38%;
+    margin: 1.6em auto;
+    border-top: 1px solid currentColor;
+    opacity: 0.45;
+    break-after: avoid;
+    break-inside: avoid;
+  }
+
+  .chf-figure { margin: 1em 0; text-align: center; break-inside: avoid; }
+  .chf-figure img { max-width: 100%; height: auto; }
+
+  /* Endnotes, NOT footnotes — Chromium (which is what printToPDF is) does not
+     implement the CSS Paged Media footnote spec, so there is no way to place
+     a note at the foot of its own page through this renderer. The docx path
+     emits real Word footnotes instead; both share the same numbering. */
+  .chf-endnotes { break-before: page; }
+  .chf-endnotes h2 { break-after: avoid; }
+  .chf-endnotes ol { list-style: none; padding-left: 0; }
+  .chf-endnotes li { margin: 0.4em 0; font-size: 0.9em; break-inside: avoid; }
+  .chf-footnote-ref a, .chf-fn-back { text-decoration: none; color: inherit; }
 `
 
 /** The app's own page look — the same serif setting the editor shows. */
@@ -119,13 +149,17 @@ function manuscriptHeaderTemplate(options: ExportOptions): string {
 }
 
 export interface PageGeometry {
-  pageSize: 'A4' | 'Letter'
+  /** Explicit inches rather than a page *name*. Passing 'A4' or 'Letter' left
+   *  Chromium applying its own built-in dimensions, which happened to agree
+   *  for those two and could not express any other size at all. */
+  pageSize: { width: number; height: number }
   marginInches: number
 }
 
 export function pageGeometry(options: ExportOptions): PageGeometry {
+  const { widthMm, heightMm } = PAGE_DIMENSIONS_MM[options.pageSize]
   return {
-    pageSize: options.pageSize === 'letter' ? 'Letter' : 'A4',
+    pageSize: { width: widthMm / MM_PER_INCH, height: heightMm / MM_PER_INCH },
     marginInches: effectiveMarginMm(options) / MM_PER_INCH
   }
 }

@@ -1,5 +1,10 @@
 import { useState } from 'react'
-import { MIN_PAGE_MARGIN_MM, MAX_PAGE_MARGIN_MM, type PageSize } from '../../shared/preferences'
+import {
+  MIN_PAGE_MARGIN_MM,
+  MAX_PAGE_MARGIN_MM,
+  PAGE_SIZE_OPTIONS,
+  type PageSize
+} from '../../shared/preferences'
 
 interface PageSetupModalProps {
   initialPageSize: PageSize
@@ -37,8 +42,13 @@ function PageSetupModal(props: PageSetupModalProps): JSX.Element {
           <label className="typography-field">
             <span>Page size</span>
             <select value={pageSize} onChange={(e) => setPageSize(e.target.value as PageSize)}>
-              <option value="a4">A4 (210 × 297 mm)</option>
-              <option value="letter">US Letter (8.5 × 11 in)</option>
+              {/* Built from the shared list, so adding a size in
+                  preferences.ts is all that is needed here too. */}
+              {PAGE_SIZE_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </label>
 

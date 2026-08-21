@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { StoryBibleItem, StoryBibleTypeDef } from '../../shared/storyBible'
+import PanelNavGlyph, { initialOf } from './PanelNavGlyph'
 
 interface StoryBibleNavListProps {
   items: StoryBibleItem[]
@@ -10,6 +11,10 @@ interface StoryBibleNavListProps {
   selectedItemId: string | null
   /** Icon-only rail mode: type dots only, names carried by the tooltip. */
   collapsed: boolean
+  /** Hover-flyout mode: names only, same as the expanded list but without the
+   *  filter box — there's nowhere for typed-ahead state to survive a flyout
+   *  that closes the moment the mouse leaves. */
+  compact?: boolean
   onOpenItem: (id: string) => void
 }
 
@@ -19,12 +24,12 @@ interface StoryBibleNavListProps {
  * the type list's own order, matching StoryBibleBrowseGrid.
  */
 function StoryBibleNavList(props: StoryBibleNavListProps): JSX.Element {
-  const { items, types, selectedItemId, collapsed, onOpenItem } = props
+  const { items, types, selectedItemId, collapsed, compact, onOpenItem } = props
   const [filter, setFilter] = useState('')
 
-  // The filter box has nowhere to go in an icon rail, so a stale filter would
-  // silently hide items with no visible cause. Collapsed shows everything.
-  const query = collapsed ? '' : filter.trim().toLowerCase()
+  // The filter box has nowhere to go in an icon rail or a compact flyout, so
+  // a stale filter would otherwise silently hide items with no visible cause.
+  const query = collapsed || compact ? '' : filter.trim().toLowerCase()
   // Aliases are searchable too — the same text the editor's mention detection
   // matches on, so looking up "the Captain" finds the item it resolves to.
   const visible = query
@@ -50,15 +55,23 @@ function StoryBibleNavList(props: StoryBibleNavListProps): JSX.Element {
         title={collapsed ? item.name || 'Untitled' : undefined}
         onClick={() => onOpenItem(item.id)}
       >
-        <span className="panel-nav-dot" style={{ background: color }} />
-        {!collapsed && <span className="panel-nav-label">{item.name || 'Untitled'}</span>}
+        {collapsed ? (
+          // A bare type dot was identical for every character in the list —
+          // the initial is what actually tells two items apart at this width.
+          <PanelNavGlyph token={initialOf(item.name)} color={color} active={selectedItemId === item.id} />
+        ) : (
+          <>
+            <span className="panel-nav-dot" style={{ background: color }} />
+            <span className="panel-nav-label">{item.name || 'Untitled'}</span>
+          </>
+        )}
       </button>
     )
   }
 
   return (
     <div className={`panel-nav ${collapsed ? 'is-collapsed' : ''}`}>
-      {items.length > 0 && !collapsed && (
+      {items.length > 0 && !collapsed && !compact && (
         <input
           type="text"
           className="panel-nav-filter"

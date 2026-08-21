@@ -1,8 +1,18 @@
-import { Fragment, useEffect, useReducer, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import {
+  Fragment,
+  useEffect,
+  useLayoutEffect,
+  useReducer,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent
+} from 'react'
 import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import { createEditorExtensions } from './editorExtensions'
 import { FindReplace } from './extensions/findReplace'
 import { ReadAloudHighlight } from './extensions/readAloudHighlight'
+import { Pagination } from './extensions/pagination'
+import { SpellcheckSuppress } from './extensions/spellcheckSuppress'
 import {
   isManuscriptView,
   railSectionFor,
@@ -19,13 +29,32 @@ import {
 import type { EditorContextMenuPayload } from '../../shared/contextMenu'
 import type { StoryBibleItem, StoryBibleSheet, StoryBibleTypeDef } from '../../shared/storyBible'
 import type { MentionCandidate } from '../../shared/mentionMatcher'
-import { countWords } from '../../shared/wordCount'
+import { countCharacters, countWords } from '../../shared/wordCount'
+import {
+  formatCharacterCount,
+  formatDateTime,
+  formatWordCount,
+  type CountRounding
+} from '../../shared/insertions'
+import {
+  applyImageSources,
+  referencedImageIds,
+  stripTransientImageSrc
+} from './extensions/documentImage'
+import NoteEditModal from './NoteEditModal'
+import LexiconView from './LexiconView'
+import LexiconNavList from './LexiconNavList'
+import type { LexiconEntry } from '../../shared/lexicon'
+import type { CommentRecord } from '../../shared/comments'
 import { computePace } from '../../shared/pace'
 import { findNode } from './binderUtils'
 import Binder from './Binder'
+import BinderMinimap from './BinderMinimap'
+import BinderFlyoutList from './BinderFlyoutList'
 import EditorContextMenu from './EditorContextMenu'
 import BinderContextMenu from './BinderContextMenu'
 import MentionHoverCard from './MentionHoverCard'
+import LexiconHoverCard from './LexiconHoverCard'
 import ImportReportModal from './ImportReportModal'
 import type { ImportResult } from '../../shared/import'
 import SubmissionsView from './SubmissionsView'
@@ -53,6 +82,7 @@ import type { Relationship, RelationshipDraft } from '../../shared/relationships
 import TimelineEntryModal from './TimelineEntryModal'
 import type { TimelineDraft, TimelineEntry } from '../../shared/timeline'
 import FindBar, { type FindFocusRequest } from './FindBar'
+import type { RankedMatch } from '../../shared/search'
 import BackupsModal from './BackupsModal'
 import SnapshotsModal from './SnapshotsModal'
 import SpanTagToolbarPicker from './SpanTagToolbarPicker'
@@ -78,7 +108,7 @@ import SaveViewModal from './SaveViewModal'
 import ManageSavedViewsModal from './ManageSavedViewsModal'
 import PageSetupModal from './PageSetupModal'
 import SplitViewPane, { type SplitViewPaneHandle } from './SplitViewPane'
-import { computePageCount } from './pagePreview'
+import { paginate, pageGeometry, PAGE_GAP_PX, type Pagination as PaginationResult } from './pagePreview'
 import { ALL_SHORTCUTS, buildMenus, matchesShortcut } from './menuConfig'
 import { shadeHex, isDarkHex } from './colorUtils'
 import {
@@ -136,6 +166,26 @@ const MAX_UNSAVED_MS = 3000
 // Short enough that the word counter still reads as live while typing, long
 // enough that a fast typist never pays for a full-document recount per key.
 const WORD_COUNT_DELAY_MS = 200
+// Repagination waits for a pause in typing, because measuring page breaks
+// means laying the whole document out off-screen — measured at roughly 45ms
+// on a 39,000-word manuscript. At that cost a short pause is affordable, and
+// a longer one only makes new pages feel late.
+const PAGINATION_DEBOUNCE_MS = 350
+// A pure debounce is reset by every keystroke, so typing continuously past
+// the bottom of the last page produced no new page at all until the writer
+// stopped. This is the ceiling on that: however long someone keeps typing,
+// the pages catch up at least this often.
+//
+// Adaptive rather than fixed, because the cost is a property of the document
+// rather than a constant: an ordinary manuscript paginates in ~45ms, while a
+// pathological one — a single 40,000-word paragraph with no breaks at all —
+// takes ~430ms, and repaginating that every 700ms would spend most of a
+// second of every second on it. Budgeting a fixed share of the time keeps
+// the common case responsive without letting the rare case saturate.
+const PAGINATION_MIN_INTERVAL_MS = 700
+const PAGINATION_MAX_INTERVAL_MS = 2500
+/** Repaginate at most one part in six of elapsed time. */
+const PAGINATION_DUTY_FACTOR = 6
 const ALIGN_VALUES: Align[] = ['left', 'center', 'right', 'justify']
 const ALIGN_SHORTCUTS: Record<Align, string> = {
   left: 'Ctrl+Shift+L',
@@ -177,6 +227,28 @@ function App(): JSX.Element {
   const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null)
   const [editRequestId, setEditRequestId] = useState<{ id: string; token: number } | null>(null)
   const [editorContextMenu, setEditorContextMenu] = useState<EditorContextMenuPayload | null>(null)
+  // Footnote being written or edited. `pos` addresses the node in the current
+  // document, so the modal can write the text straight back onto it.
+  const [footnoteEdit, setFootnoteEdit] = useState<{ pos: number; text: string; isNew: boolean } | null>(null)
+  // Comment being written or edited. A new one has its mark applied only when
+  // the modal is saved, so cancelling leaves no orphan highlight behind.
+  const [commentEdit, setCommentEdit] = useState<{
+    commentId: string
+    body: string
+    snippet: string
+    isNew: boolean
+  } | null>(null)
+  const [comments, setComments] = useState<CommentRecord[]>([])
+  const [lexiconEntries, setLexiconEntries] = useState<LexiconEntry[]>([])
+  const [lexiconReveal, setLexiconReveal] = useState<{ id: string; token: number } | null>(null)
+  // The hover listener is attached once, so it reads entries through a ref
+  // rather than closing over a stale render.
+  const lexiconEntriesRef = useRef<LexiconEntry[]>([])
+  lexiconEntriesRef.current = lexiconEntries
+  // The editor's handleClickOn closure is created once, so it can't read
+  // `comments` directly without going stale — it reads this instead.
+  const commentsRef = useRef<CommentRecord[]>([])
+  commentsRef.current = comments
   const [binderContextMenu, setBinderContextMenu] = useState<{
     node: BinderNode | null
     x: number
@@ -200,6 +272,7 @@ function App(): JSX.Element {
   const [timelineEdit, setTimelineEdit] = useState<{ existing: TimelineEntry | null } | null>(null)
   const [sentContent, setSentContent] = useState<{ title: string; html: string | null; error: string | null } | null>(null)
   const [hoveredMention, setHoveredMention] = useState<{ itemId: string; rect: DOMRect } | null>(null)
+  const [hoveredLexiconWord, setHoveredLexiconWord] = useState<{ word: string; rect: DOMRect } | null>(null)
   const [hoveredMentionSheet, setHoveredMentionSheet] = useState<StoryBibleSheet | null>(null)
   const [spanTagBrowserOpen, setSpanTagBrowserOpen] = useState(false)
   const [spanTagBrowserSpans, setSpanTagBrowserSpans] = useState<SpanTagRecord[]>([])
@@ -280,6 +353,10 @@ function App(): JSX.Element {
   const [pageSize, setPageSizeState] = useState<PageSize>(DEFAULT_PAGE_SIZE)
   const [pageMarginMm, setPageMarginMmState] = useState(DEFAULT_PAGE_MARGIN_MM)
   const [pageCount, setPageCount] = useState(0)
+  // Where the sheets go and how big they are. Null until the first
+  // measurement lands, which is why the stack falls back to a single
+  // correctly-sized page rather than to no page at all.
+  const [pagination, setPagination] = useState<PaginationResult | null>(null)
   const [pageSetupModalOpen, setPageSetupModalOpen] = useState(false)
   const [referenceDocumentId, setReferenceDocumentIdState] = useState<string | null>(null)
   const [splitViewLocked, setSplitViewLockedState] = useState(false)
@@ -291,6 +368,12 @@ function App(): JSX.Element {
   const maxWaitTimer = useRef<ReturnType<typeof setTimeout>>()
   const sidebarWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH)
   const isResizingRef = useRef(false)
+  // The collapsed rail matches its top zone's chrome-colored height to the
+  // real toolbar's, so it reads as a continuation of the toolbar rather than
+  // a separately-colored strip beside it. Measured rather than assumed
+  // because the toolbar wraps to more than one row at narrow widths.
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const [toolbarHeight, setToolbarHeight] = useState(0)
   const textColorInputRef = useRef<HTMLInputElement>(null)
   const highlightColorInputRef = useRef<HTMLInputElement>(null)
   const accentColorInputRef = useRef<HTMLInputElement>(null)
@@ -299,6 +382,16 @@ function App(): JSX.Element {
   const toolbarOverflowRef = useRef<HTMLDivElement>(null)
   const outlinerFilterSaveTimer = useRef<ReturnType<typeof setTimeout>>()
   const pageCountTimer = useRef<ReturnType<typeof setTimeout>>()
+  const paginationMaxWaitTimer = useRef<ReturnType<typeof setTimeout>>()
+  /** Latest pagination result, read by the tail check's rAF callback — which
+   *  must not close over a stale render's state. */
+  const paginationRef = useRef<PaginationResult | null>(null)
+  const tailCheckFrame = useRef<number | null>(null)
+  /** Set when an instant pass failed to add a page; cleared by the next
+   *  measurement. See runTailCheck. */
+  const instantPaginationSuppressed = useRef(false)
+  /** Cost of the most recent pagination pass, in ms — see schedulePageCount. */
+  const lastPaginationMsRef = useRef(0)
   const wordCountTimer = useRef<ReturnType<typeof setTimeout>>()
   const mentionScanTimer = useRef<ReturnType<typeof setTimeout>>()
   const mentionHideTimer = useRef<ReturnType<typeof setTimeout>>()
@@ -324,9 +417,37 @@ function App(): JSX.Element {
   const [sessionBaseline, setSessionBaseline] = useState(0)
 
   const editor = useEditor({
-    extensions: [...createEditorExtensions(), FindReplace, ReadAloudHighlight],
+    // Pagination is main-editor only: the split pane is a narrow reference
+    // view where a full-width sheet would mean permanent horizontal scroll.
+    extensions: [...createEditorExtensions(), FindReplace, ReadAloudHighlight, Pagination, SpellcheckSuppress],
     content: '',
-    editorProps: { attributes: { spellcheck: 'true' } },
+    editorProps: {
+      attributes: { spellcheck: 'true' },
+      // Click a footnote marker or commented text to edit the note behind it.
+      // handleClickOn gives the exact node/position, so neither needs a
+      // NodeView or a DOM query to find what was clicked.
+      handleClickOn: (_view, _pos, node, nodePos) => {
+        if (node.type.name === 'footnote') {
+          setFootnoteEdit({ pos: nodePos, text: String(node.attrs.text ?? ''), isNew: false })
+          return true
+        }
+        const commentMark = node.marks?.find((mark) => mark.type.name === 'comment')
+        if (commentMark) {
+          const commentId = String(commentMark.attrs.commentId ?? '')
+          const existing = commentsRef.current.find((c) => c.id === commentId)
+          if (existing) {
+            setCommentEdit({
+              commentId,
+              body: existing.body,
+              snippet: existing.snippet,
+              isNew: false
+            })
+            return true
+          }
+        }
+        return false
+      }
+    },
     // Nothing here may touch the document's full HTML. Serializing the doc
     // (editor.getHTML) and re-scanning it (countWords) on every keystroke was
     // the measured typing bottleneck on a large document — ~2.7ms/keystroke
@@ -341,6 +462,8 @@ function App(): JSX.Element {
       scheduleWordCount()
       scheduleSave()
       schedulePageCount()
+      // Cheap, rAF-deferred, last-page-only: see scheduleTailCheck.
+      scheduleTailCheck()
       scheduleMentionScan(editor)
     },
     // Lets the main process's context-menu handler tell this editor apart
@@ -388,8 +511,25 @@ function App(): JSX.Element {
     if (pageCountTimer.current) clearTimeout(pageCountTimer.current)
     pageCountTimer.current = setTimeout(() => {
       if (!editor) return
-      setPageCount(computePageCount(editor.getHTML(), pageSizeRef.current, pageMarginMmRef.current))
-    }, 600)
+      applyPagination(editor.getHTML())
+    }, PAGINATION_DEBOUNCE_MS)
+
+    // The debounce above is reset by every keystroke, so on its own it never
+    // fires while someone is actually typing — which is exactly when a page
+    // fills up and a new one needs to appear. This max-wait guarantees the
+    // pages keep up during continuous typing, the same shape as the
+    // max-unsaved guarantee that backs autosave. Its interval is scaled to
+    // what this document actually costs to measure; see the constants.
+    if (!paginationMaxWaitTimer.current) {
+      const interval = Math.min(
+        PAGINATION_MAX_INTERVAL_MS,
+        Math.max(PAGINATION_MIN_INTERVAL_MS, lastPaginationMsRef.current * PAGINATION_DUTY_FACTOR)
+      )
+      paginationMaxWaitTimer.current = setTimeout(() => {
+        paginationMaxWaitTimer.current = undefined
+        if (editor) applyPagination(editor.getHTML())
+      }, interval)
+    }
   }
 
   // The visible word count updates on a brief pause rather than per
@@ -404,14 +544,125 @@ function App(): JSX.Element {
     }, WORD_COUNT_DELAY_MS)
   }
 
-  /** Computes the page count for content the caller already has in hand,
-   *  but on the next frame, so opening/restoring a document paints first
-   *  and pays for the offscreen layout measurement afterwards. */
+  /** One measurement pass drives both the sheets on screen and the count in
+   *  the footer — they read the same Pagination object, so they cannot
+   *  report different numbers of pages. */
+  function applyPagination(html: string): PaginationResult {
+    // Whichever timer got here first, both are now satisfied — and the
+    // max-wait must be disarmed so the next burst of typing arms a fresh one
+    // rather than inheriting an almost-expired timer.
+    if (pageCountTimer.current) {
+      clearTimeout(pageCountTimer.current)
+      pageCountTimer.current = undefined
+    }
+    if (paginationMaxWaitTimer.current) {
+      clearTimeout(paginationMaxWaitTimer.current)
+      paginationMaxWaitTimer.current = undefined
+    }
+    const startedAt = performance.now()
+    const result = paginate(html, pageSizeRef.current, pageMarginMmRef.current)
+    // Feeds the adaptive max-wait interval above, so a document that is
+    // expensive to measure is measured less often.
+    lastPaginationMsRef.current = performance.now() - startedAt
+    paginationRef.current = result
+    setPagination(result)
+    setPageCount(result.pageCount)
+    // Not added to the undo history and doesn't touch the document — see the
+    // setPageBreaks command.
+    editor?.commands.setPageBreaks(result.breaks)
+    // A fresh measurement re-arms the instant path: whatever made it give up
+    // before is no longer the current state of the document.
+    instantPaginationSuppressed.current = false
+    return result
+  }
+
+  /**
+   * Appending past the bottom of the last page repaginates immediately
+   * instead of waiting for the debounce, so a new sheet appears as you type
+   * rather than after you stop.
+   *
+   * Deliberately narrow. This reads the live editor — which contains the gap
+   * decorations pagination itself renders — so it is confined to producing a
+   * single boolean: "measure now". It never decides where a break goes. Every
+   * break position still comes from paginate() against the clean off-screen
+   * copy, which has no gaps in it, exactly as before. That separation is what
+   * keeps this from feeding its own output back into its next input.
+   *
+   * Runs inside requestAnimationFrame, so the browser has already laid out:
+   * it observes a settled DOM, never forces a synchronous reflow on the
+   * keystroke path, and can run at most once per frame.
+   */
+  function scheduleTailCheck(): void {
+    if (tailCheckFrame.current !== null) return
+    if (instantPaginationSuppressed.current) return
+    tailCheckFrame.current = requestAnimationFrame(() => {
+      tailCheckFrame.current = null
+      runTailCheck()
+    })
+  }
+
+  function runTailCheck(): void {
+    const current = paginationRef.current
+    if (!editor || !current) return
+
+    const { geometry, pageCount } = current
+    const stride = geometry.usableHeightPx + geometry.marginPx * 2 + PAGE_GAP_PX
+
+    let caretBottom: number
+    let editorRect: DOMRect
+    try {
+      // ProseMirror's own coordinate lookup rather than the DOM selection
+      // API: it answers for the document position, so it stays correct when
+      // the selection is inside a node view or beside a widget.
+      caretBottom = editor.view.coordsAtPos(editor.state.selection.head).bottom
+      editorRect = editor.view.dom.getBoundingClientRect()
+    } catch {
+      // A position that no longer resolves (mid-transaction) is not worth
+      // reacting to; the debounced pass will catch up regardless.
+      return
+    }
+
+    // Into the same content-box coordinates paginate() works in.
+    const caretPage = Math.floor((caretBottom - editorRect.top - geometry.marginPx) / stride)
+
+    // The element is margin + content + margin, so this is where the content
+    // actually ends — including any gaps pagination has already inserted,
+    // which is exactly the coordinate space the page boundaries live in.
+    const contentBottom = editorRect.height - geometry.marginPx * 2
+    const lastPageTextBottom = (pageCount - 1) * stride + geometry.usableHeightPx
+    const previousPageTextBottom = (pageCount - 2) * stride + geometry.usableHeightPx
+
+    // Symmetric in effect, but the two cases cannot share a caret test.
+    //
+    // Growing: strictly the last page. An edit further back can shift breaks
+    // for everything after it, which is the debounced path's job, and letting
+    // this fire there would mean a full repagination every frame while
+    // someone types mid-manuscript.
+    //
+    // Shrinking: one page of extra slack, because deleting backwards across a
+    // boundary lands the caret on the page *before* the last — the caret
+    // never goes past a page bottom on the way up, which is why the forward
+    // check could never see this case. Safe to allow, since content that no
+    // longer reaches the last page can only mean there is one too many.
+    const needsAnotherPage = caretPage >= pageCount - 1 && contentBottom > lastPageTextBottom + 1
+    const hasSparePage =
+      pageCount > 1 && caretPage >= pageCount - 2 && contentBottom <= previousPageTextBottom
+    if (!needsAnotherPage && !hasSparePage) return
+
+    const result = applyPagination(editor.getHTML())
+    // If measuring changed nothing, the content is past a boundary that
+    // pagination cannot resolve — a single line taller than a page. Stop
+    // trying until the next debounced pass re-arms it, rather than paying for
+    // a full measurement on every frame.
+    if (result.pageCount === pageCount) instantPaginationSuppressed.current = true
+  }
+
+  /** Paginates content the caller already has in hand, but on the next
+   *  frame, so opening/restoring a document paints first and pays for the
+   *  offscreen layout measurement afterwards. */
   function deferPageCount(html: string): void {
     if (pageCountTimer.current) clearTimeout(pageCountTimer.current)
-    requestAnimationFrame(() => {
-      setPageCount(computePageCount(html, pageSizeRef.current, pageMarginMmRef.current))
-    })
+    requestAnimationFrame(() => applyPagination(html))
   }
 
   /** Immediate, cheap side of an edit: flag unsaved state and arm the
@@ -443,7 +694,9 @@ function App(): JSX.Element {
   useEffect(() => {
     pageSizeRef.current = pageSize
     pageMarginMmRef.current = pageMarginMm
-    if (editor) setPageCount(computePageCount(editor.getHTML(), pageSize, pageMarginMm))
+    // Changing page size or margins changes where every break falls, so the
+    // sheets have to be re-laid-out, not just recounted.
+    if (editor) applyPagination(editor.getHTML())
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageSize, pageMarginMm])
 
@@ -487,7 +740,11 @@ function App(): JSX.Element {
     if (html === lastSavedHtml.current) return
     setStatus('saving')
     try {
-      await window.api.saveDocument(docId, html)
+      // The base64 data URIs the editor paints images with are transient —
+      // only the durable image id is written to disk, or every save would
+      // put megabytes of binary into a text file. lastSavedHtml keeps the
+      // editor's own version so the next dirty-check compares like with like.
+      await window.api.saveDocument(docId, stripTransientImageSrc(html))
       lastSavedHtml.current = html
       setStatus('saved')
       // The main process rebuilds spanTags.json from this same save, so the
@@ -553,10 +810,21 @@ function App(): JSX.Element {
     void refreshMentionRollup()
   }
 
+  /** Paints the saved image ids back into displayable data URIs. The inverse
+   *  of the strip on save — one IPC round trip for all of a document's
+   *  images rather than one per image. */
+  async function hydrateImages(html: string): Promise<string> {
+    const ids = referencedImageIds(html)
+    if (ids.length === 0) return html
+    const sources = await window.api.getDocumentImages(ids)
+    return applyImageSources(html, sources)
+  }
+
   async function switchDocument(id: string): Promise<void> {
     if (!editor || activeDocumentIdRef.current === id) return
     await flushPendingSave()
-    const html = await window.api.loadDocument(id)
+    const stored = await window.api.loadDocument(id)
+    const html = await hydrateImages(stored)
     activeDocumentIdRef.current = id
     lastSavedHtml.current = html
     editor.commands.setContent(html, false)
@@ -654,6 +922,9 @@ function App(): JSX.Element {
     })
     window.api.getDailyWordCountBaseline().then(setSessionBaseline)
     window.api.getSpanTagRollup().then(setSpanTagRollup)
+    void refreshComments()
+    void refreshLexicon()
+    void refreshSuppressedWords()
     void refreshStoryBibleIndex()
     void refreshMentionRollup()
     void refreshSubmissions()
@@ -679,6 +950,11 @@ function App(): JSX.Element {
     const state = await window.api.getStoryBibleIndex()
     setStoryBibleItems(state.items)
     setStoryBibleTypes(state.types)
+    // Item names and aliases are the other writer of the shared suppression
+    // list (the main process re-registers them on every name change), so any
+    // refresh of the index is also the moment to re-read that list. The
+    // Lexicon is untouched by this — neither feature reads the other's data.
+    await refreshSuppressedWords()
   }
 
   async function refreshMentionRollup(): Promise<void> {
@@ -723,6 +999,19 @@ function App(): JSX.Element {
     }
 
     function handleMouseOver(e: MouseEvent): void {
+      // A suppressed word with a Lexicon entry gets its own card. Story
+      // Bible names are suppressed too but have no Lexicon entry, so they
+      // fall through — the two features stay independent here as well.
+      const lexiconTarget = (e.target as HTMLElement).closest('.chf-suppressed-word')
+      if (lexiconTarget) {
+        const word = (lexiconTarget.textContent ?? '').trim().toLowerCase()
+        if (lexiconEntriesRef.current.some((entry) => entry.word.trim().toLowerCase() === word)) {
+          clearHideTimer()
+          setHoveredLexiconWord({ word, rect: lexiconTarget.getBoundingClientRect() })
+          return
+        }
+      }
+
       const target = (e.target as HTMLElement).closest('[data-mention-item-id]')
       if (!target) return
       clearHideTimer()
@@ -745,6 +1034,10 @@ function App(): JSX.Element {
     }
 
     function handleMouseOut(e: MouseEvent): void {
+      if ((e.target as HTMLElement).closest('.chf-suppressed-word')) {
+        mentionHideTimer.current = setTimeout(() => setHoveredLexiconWord(null), 150)
+        return
+      }
       const target = (e.target as HTMLElement).closest('[data-mention-item-id]')
       if (!target) return
       mentionHideTimer.current = setTimeout(() => {
@@ -1286,6 +1579,16 @@ function App(): JSX.Element {
     return () => document.removeEventListener('mousedown', handlePointerDown)
   }, [toolbarOverflowOpen])
 
+  // The word list is fetched before the editor necessarily exists, and the
+  // native right-click menu can add to it from the main process — so push it
+  // again whenever the editor appears, and whenever main says it changed.
+  useEffect(() => {
+    if (!editor) return
+    void refreshSuppressedWords()
+    return window.api.onSuppressedWordsChanged(() => void refreshSuppressedWords())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor])
+
   // Binder width — loaded once, persisted only when a drag finishes (not on
   // every pixel of movement).
   useEffect(() => {
@@ -1295,6 +1598,28 @@ function App(): JSX.Element {
     })
     window.api.getSidebarCollapsed().then(setSidebarCollapsedState)
   }, [])
+
+  // The toolbar only exists in editor view, and only mounts/unmounts as that
+  // and the open document change — re-attaching the observer on those changes
+  // (rather than once on mount) keeps toolbarHeight accurate, including
+  // resetting to 0 the moment there's no toolbar to measure.
+  useLayoutEffect(() => {
+    const el = toolbarRef.current
+    if (!el) {
+      setToolbarHeight(0)
+      return
+    }
+    // Re-measure via the element itself rather than trusting the observer
+    // entry: ResizeObserver's contentRect excludes padding and border, while
+    // getBoundingClientRect() (used for the first read below) includes them.
+    // The toolbar has both, so reading contentRect here would report it as
+    // ~17px shorter the moment the observer's first callback landed —
+    // exactly the seam this measurement exists to prevent.
+    const observer = new ResizeObserver(() => setToolbarHeight(el.getBoundingClientRect().height))
+    observer.observe(el)
+    setToolbarHeight(el.getBoundingClientRect().height)
+    return () => observer.disconnect()
+  }, [activeView, activeDocumentId, distractionFree])
 
   function handleResizeMove(e: MouseEvent): void {
     if (!isResizingRef.current) return
@@ -1460,6 +1785,47 @@ function App(): JSX.Element {
   async function handleDeleteRelationship(relationship: Relationship): Promise<void> {
     await window.api.deleteRelationship(relationship.id)
     await refreshRelationships()
+  }
+
+  /**
+   * Takes a ranked search result to whatever it is.
+   *
+   * Every branch reuses the entry point that view already exposes — the same
+   * one the nav list, the hover card or the continuity board uses — so search
+   * never becomes a second, subtly different way of opening things.
+   */
+  async function handleNavigateToSearchResult(match: RankedMatch): Promise<void> {
+    const { entry } = match
+    switch (entry.kind) {
+      case 'prose':
+      case 'footnote':
+      case 'comment':
+      case 'spanTag':
+      case 'documentTitle':
+        if (entry.documentId) await handleOpenFromOtherView(entry.documentId)
+        break
+      case 'storyBibleName':
+      case 'storyBibleAlias':
+      case 'storyBibleField':
+        handleOpenStoryBibleItem(entry.ownerId)
+        break
+      case 'relationship':
+        // Relationships are read on the item's own sheet; there is no
+        // free-standing relationship view to reveal.
+        handleViewChange('storyBible')
+        break
+      case 'lexicon':
+        handleViewChange('lexicon')
+        setLexiconReveal({ id: entry.ownerId, token: Date.now() })
+        break
+      case 'timeline':
+        handleViewChange('timeline')
+        setTimelineRevealRequest({ id: entry.ownerId, token: Date.now() })
+        break
+      case 'submission':
+        handleViewChange('submissions')
+        break
+    }
   }
 
   /** Opening a character from the map or a relationship row goes through the
@@ -1694,6 +2060,153 @@ function App(): JSX.Element {
     editor?.chain().focus().unsetHighlight().run()
   }
 
+  async function refreshComments(): Promise<void> {
+    setComments(await window.api.listComments())
+  }
+
+  /** Adds the word to the Lexicon and suppresses it in one action, then
+   *  jumps to the new entry so a meaning can be typed straight away. */
+  async function handleDefineInLexicon(word: string): Promise<void> {
+    const entry = await window.api.addLexiconEntry(word)
+    await refreshLexicon()
+    await refreshSuppressedWords()
+    if (entry) {
+      handleViewChange('lexicon')
+      setLexiconReveal({ id: entry.id, token: Date.now() })
+    }
+  }
+
+  async function refreshLexicon(): Promise<void> {
+    setLexiconEntries(await window.api.listLexicon())
+  }
+
+  /**
+   * Pushes the project word list into the editor, which stops flagging those
+   * words by decorating them with spellcheck=false.
+   *
+   * App-only by construction: no OS dictionary call is involved anywhere in
+   * this path, so the words stay unknown to every other program on the
+   * machine. Both the Lexicon and Story Bible names feed the same list.
+   */
+  async function refreshSuppressedWords(): Promise<void> {
+    const words = await window.api.listSuppressedWords()
+    editor?.commands.setSuppressedWords(words)
+  }
+
+  /** Menu actions carry the rounding as a string; anything unrecognized
+   *  falls back to exact rather than silently rounding by a wrong amount. */
+  function parseRounding(raw: string): CountRounding {
+    if (raw === 'exact') return 'exact'
+    const value = Number(raw)
+    return value === 50 || value === 100 || value === 250 || value === 500 || value === 1000
+      ? value
+      : 'exact'
+  }
+
+  async function handleInsertImage(): Promise<void> {
+    if (!editor) return
+    const imageId = await window.api.importDocumentImage()
+    // Null means the picker was cancelled — not an error worth reporting.
+    if (!imageId) return
+    const src = await window.api.getDocumentImage(imageId)
+    if (!src) return
+    // Decoded before it goes in, so the first pagination pass measures the
+    // image at its real height. Inserting first would have the measurement
+    // race the decode and see a zero-height box, leaving the page breaks
+    // around it wrong until some later edit happened to trigger a recompute.
+    await new Promise<void>((resolve) => {
+      const probe = new Image()
+      probe.onload = () => resolve()
+      probe.onerror = () => resolve()
+      probe.src = src
+    })
+    editor.chain().focus().insertDocumentImage({ imageId, src }).run()
+  }
+
+  /** Inserts an empty marker, then opens the editor for its text. The node
+   *  goes in first so the modal has a real position to write back to. */
+  function handleInsertFootnote(): void {
+    if (!editor) return
+    editor.chain().focus().insertFootnote('').run()
+    // insertContent leaves the selection just after the inserted node.
+    const pos = Math.max(0, editor.state.selection.from - 1)
+    setFootnoteEdit({ pos, text: '', isNew: true })
+  }
+
+  function handleSaveFootnote(text: string): void {
+    if (!editor || !footnoteEdit) return
+    const trimmed = text.trim()
+    // An empty footnote is nothing but a stray superscript — discard the
+    // marker rather than leaving an unexplained number in the prose.
+    if (!trimmed) {
+      editor
+        .chain()
+        .focus()
+        .deleteRange({ from: footnoteEdit.pos, to: footnoteEdit.pos + 1 })
+        .run()
+    } else {
+      editor.chain().focus().updateFootnote(footnoteEdit.pos, trimmed).run()
+    }
+    setFootnoteEdit(null)
+  }
+
+  function handleDeleteFootnote(): void {
+    if (!editor || !footnoteEdit) return
+    editor
+      .chain()
+      .focus()
+      .deleteRange({ from: footnoteEdit.pos, to: footnoteEdit.pos + 1 })
+      .run()
+    setFootnoteEdit(null)
+  }
+
+  /** Opens the comment composer for the current selection. The mark isn't
+   *  applied until the modal saves, so cancelling leaves nothing behind. */
+  function handleStartComment(): void {
+    if (!editor) return
+    const { from, to } = editor.state.selection
+    if (from === to) return
+    const snippet = editor.state.doc.textBetween(from, to, ' ').trim()
+    setCommentEdit({ commentId: crypto.randomUUID(), body: '', snippet, isNew: true })
+  }
+
+  async function handleSaveComment(body: string): Promise<void> {
+    if (!editor || !commentEdit) return
+    const trimmed = body.trim()
+    const documentId = activeDocumentIdRef.current
+    if (!trimmed || !documentId) {
+      setCommentEdit(null)
+      return
+    }
+    if (commentEdit.isNew) {
+      // Mark first, then the body: the save that follows reconciles bodies
+      // against anchors, and a body without its anchor would be pruned.
+      editor.chain().focus().addComment(commentEdit.commentId).run()
+      await window.api.addComment({
+        id: commentEdit.commentId,
+        documentId,
+        body: trimmed,
+        createdAt: Date.now(),
+        snippet: commentEdit.snippet,
+        resolved: false
+      })
+      await performSave(editor.getHTML())
+    } else {
+      await window.api.updateComment(commentEdit.commentId, { body: trimmed })
+    }
+    setCommentEdit(null)
+    void refreshComments()
+  }
+
+  async function handleDeleteComment(): Promise<void> {
+    if (!editor || !commentEdit) return
+    editor.chain().focus().removeComment(commentEdit.commentId).run()
+    await window.api.deleteComment(commentEdit.commentId)
+    await performSave(editor.getHTML())
+    setCommentEdit(null)
+    void refreshComments()
+  }
+
   function handleMenuAction(action: string): void {
     if (action === 'newDocument') {
       void handleCreateDocument()
@@ -1737,6 +2250,65 @@ function App(): JSX.Element {
       editor?.chain().focus().selectAll().run()
       return
     }
+    // ---- Insert menu ----------------------------------------------------
+    // The three static-text insertions. Each resolves to a plain string that
+    // goes in as ordinary text: nothing here is a live field, so once
+    // inserted it never updates itself and exports to every format for free.
+    if (action === 'insertDateTime') {
+      editor?.chain().focus().insertContent(formatDateTime(new Date())).run()
+      return
+    }
+    if (action.startsWith('insertWordCount:')) {
+      const rounding = parseRounding(action.slice('insertWordCount:'.length))
+      const count = countWords(editor?.getHTML() ?? '')
+      editor?.chain().focus().insertContent(formatWordCount(count, rounding)).run()
+      return
+    }
+    if (action.startsWith('insertCharacterCount:')) {
+      const rounding = parseRounding(action.slice('insertCharacterCount:'.length))
+      const count = countCharacters(editor?.getHTML() ?? '')
+      editor?.chain().focus().insertContent(formatCharacterCount(count, rounding)).run()
+      return
+    }
+
+    if (action === 'insertPageBreak') {
+      editor?.chain().focus().insertPageBreak().run()
+      return
+    }
+    if (action === 'insertChapterBreak') {
+      editor?.chain().focus().insertChapterBreak().run()
+      return
+    }
+    if (action === 'insertChapterLine') {
+      editor?.chain().focus().insertChapterLine().run()
+      return
+    }
+    if (action === 'insertImage') {
+      void handleInsertImage()
+      return
+    }
+    if (action === 'insertFootnote') {
+      handleInsertFootnote()
+      return
+    }
+    // Both stop the word being flagged through the same project-only list;
+    // neither touches the operating system dictionary.
+    if (action.startsWith('addToDictionary:')) {
+      const word = action.slice('addToDictionary:'.length)
+      void window.api.addSuppressedWord(word).then(refreshSuppressedWords)
+      return
+    }
+    if (action.startsWith('defineInLexicon:')) {
+      const word = action.slice('defineInLexicon:'.length)
+      void handleDefineInLexicon(word)
+      return
+    }
+
+    if (action === 'insertComment') {
+      handleStartComment()
+      return
+    }
+
     if (action === 'toggleBold') {
       editor?.chain().focus().toggleBold().run()
       return
@@ -1877,14 +2449,20 @@ function App(): JSX.Element {
       void handleImportFiles(resolveTargetParentId())
       return
     }
+    // Scope is left alone here. Ctrl+F forcing 'document' was how the
+    // project-wide default got silently overridden — the habitual key dropped
+    // you into the one mode where the filters and the ranked list do not
+    // exist, which made changes to them look like they had not shipped.
     if (action === 'find') {
-      setFindFocusRequest({ token: Date.now(), scope: 'document', showReplace: false })
+      setFindFocusRequest({ token: Date.now(), scope: null, showReplace: false })
       return
     }
     if (action === 'findReplace') {
-      setFindFocusRequest({ token: Date.now(), scope: 'document', showReplace: true })
+      setFindFocusRequest({ token: Date.now(), scope: null, showReplace: true })
       return
     }
+    // The one shortcut that still names a scope. It only ever widens, so it
+    // cannot strand anyone in a mode with less interface than they expected.
     if (action === 'findInProject') {
       setFindFocusRequest({ token: Date.now(), scope: 'project', showReplace: false })
       return
@@ -1996,6 +2574,11 @@ function App(): JSX.Element {
   // click, "Reveal in Outliner", a continuity entry's document link) moves the
   // rail with it automatically, so the two can never disagree.
   const activeRailSection = railSectionFor(activeView)
+  // True only when there's an actual paper page on screen — the collapsed
+  // rail's page-margin treatment (Fix 3) only makes sense then. Outliner,
+  // Corkboard, and the other sections' own panels are chrome-styled, not
+  // paper, so the rail should read as ordinary chrome beside them instead.
+  const isPagedView = activeRailSection === 'manuscript' && activeView === 'editor' && !!activeDocumentId
 
   const checkedActions = new Set<string>()
   checkedActions.add(`setTheme:${theme}`)
@@ -2040,6 +2623,204 @@ function App(): JSX.Element {
         }}
         onOpenProject={() => void handleOpenProject()}
       />
+    )
+  }
+
+  /** The active section's full navigation, for the expanded panel only. The
+   *  hover flyout gets its own compact rendering below — it shows names, not
+   *  this component's search box, create buttons, badges, or row actions. */
+  function renderSectionNav(): JSX.Element {
+    return (
+      <>
+        {/* The binder is Manuscript-mode navigation, so it appears only
+            there — the tool sections bring their own navigation rather
+            than showing documents that aren't relevant to them. */}
+        {activeRailSection === 'manuscript' && (
+          <Binder
+            tree={tree}
+            activeDocumentId={activeDocumentId}
+            selectedId={selectedId}
+            editRequestId={editRequestId}
+            statuses={statuses}
+            tags={tags}
+            spanTagRollup={spanTagRollup}
+            storyBibleItems={storyBibleItems}
+            storyBibleTypes={storyBibleTypes}
+            mentionRollup={mentionRollup}
+            onSelect={setSelectedId}
+            onOpenDocument={(id) => void switchDocument(id)}
+            onToggleCollapse={(id) => void handleToggleCollapse(id)}
+            onRename={(id, name) => void handleRename(id, name)}
+            onDelete={(id) => void handleDelete(id)}
+            onMove={(id, parentId, index) => void handleMove(id, parentId, index)}
+            onOpenSplitView={handleOpenSplitView}
+            onContextMenu={(node, x, y) => setBinderContextMenu({ node, x, y })}
+          />
+        )}
+
+        {activeRailSection === 'storyBible' && (
+          <StoryBibleNavList
+            items={storyBibleItems}
+            types={storyBibleTypes}
+            selectedItemId={storyBibleSelectedId}
+            collapsed={false}
+            // Deliberately the same entry point the mention hover card
+            // uses — one way to open a sheet, not two.
+            onOpenItem={(id) => storyBibleRef.current?.openItem(id)}
+          />
+        )}
+
+        {activeRailSection === 'timeline' && (
+          <TimelineNavList
+            entries={timelineEntries}
+            collapsed={false}
+            onJumpToEntry={(id) => setTimelineRevealRequest({ id, token: Date.now() })}
+          />
+        )}
+
+        {activeRailSection === 'submissions' && (
+          <SubmissionsNavFilter
+            submissions={submissions}
+            statuses={submissionStatuses}
+            statusFilter={submissionStatusFilter}
+            collapsed={false}
+            onChange={setSubmissionStatusFilter}
+          />
+        )}
+        {activeRailSection === 'lexicon' && (
+          <LexiconNavList
+            entries={lexiconEntries}
+            collapsed={false}
+            onJumpToEntry={(id) => setLexiconReveal({ id, token: Date.now() })}
+          />
+        )}
+      </>
+    )
+  }
+
+  /** The hover flyout's content: a compact, names-only version of the active
+   *  section's navigation — no search box, no create buttons, no per-row
+   *  badges or actions. Opening a document or jumping to an entry dismisses
+   *  the flyout the way clicking through a menu does; a filter toggle isn't
+   *  navigating away, so it leaves the flyout up. */
+  function renderFlyoutNav(close: () => void): JSX.Element {
+    return (
+      <>
+        {activeRailSection === 'manuscript' && (
+          <BinderFlyoutList
+            tree={tree}
+            activeDocumentId={activeDocumentId}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onToggleCollapse={(id) => void handleToggleCollapse(id)}
+            onOpenDocument={(id) => {
+              void switchDocument(id)
+              close()
+            }}
+          />
+        )}
+
+        {activeRailSection === 'storyBible' && (
+          <StoryBibleNavList
+            items={storyBibleItems}
+            types={storyBibleTypes}
+            selectedItemId={storyBibleSelectedId}
+            collapsed={false}
+            compact
+            onOpenItem={(id) => {
+              storyBibleRef.current?.openItem(id)
+              close()
+            }}
+          />
+        )}
+
+        {activeRailSection === 'timeline' && (
+          <TimelineNavList
+            entries={timelineEntries}
+            collapsed={false}
+            onJumpToEntry={(id) => {
+              setTimelineRevealRequest({ id, token: Date.now() })
+              close()
+            }}
+          />
+        )}
+
+        {activeRailSection === 'submissions' && (
+          <SubmissionsNavFilter
+            submissions={submissions}
+            statuses={submissionStatuses}
+            statusFilter={submissionStatusFilter}
+            collapsed={false}
+            onChange={setSubmissionStatusFilter}
+          />
+        )}
+        {activeRailSection === 'lexicon' && (
+          <LexiconNavList
+            entries={lexiconEntries}
+            collapsed={false}
+            compact
+            onJumpToEntry={(id) => {
+              setLexiconReveal({ id, token: Date.now() })
+              close()
+            }}
+          />
+        )}
+      </>
+    )
+  }
+
+  /** The same navigation reduced to the collapsed rail's reserved width. The
+   *  manuscript gets a minimap of the binder; the tool sections keep their
+   *  glyph strips. */
+  function renderSectionRail(): JSX.Element {
+    return (
+      <>
+        {activeRailSection === 'manuscript' && (
+          <BinderMinimap
+            tree={tree}
+            activeDocumentId={activeDocumentId}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onOpenDocument={(id) => void switchDocument(id)}
+          />
+        )}
+
+        {activeRailSection === 'storyBible' && (
+          <StoryBibleNavList
+            items={storyBibleItems}
+            types={storyBibleTypes}
+            selectedItemId={storyBibleSelectedId}
+            collapsed
+            onOpenItem={(id) => storyBibleRef.current?.openItem(id)}
+          />
+        )}
+
+        {activeRailSection === 'timeline' && (
+          <TimelineNavList
+            entries={timelineEntries}
+            collapsed
+            onJumpToEntry={(id) => setTimelineRevealRequest({ id, token: Date.now() })}
+          />
+        )}
+
+        {activeRailSection === 'submissions' && (
+          <SubmissionsNavFilter
+            submissions={submissions}
+            statuses={submissionStatuses}
+            statusFilter={submissionStatusFilter}
+            collapsed
+            onChange={setSubmissionStatusFilter}
+          />
+        )}
+
+        {activeRailSection === 'lexicon' && (
+          <LexiconNavList
+            entries={lexiconEntries}
+            collapsed
+            onJumpToEntry={(id) => setLexiconReveal({ id, token: Date.now() })}
+          />
+        )}
+      </>
     )
   }
 
@@ -2120,6 +2901,32 @@ function App(): JSX.Element {
           onClose={() => setManageTagsModalOpen(false)}
         />
       )}
+      {footnoteEdit && (
+        <NoteEditModal
+          title={footnoteEdit.isNew ? 'Add footnote' : 'Edit footnote'}
+          message="Appears as a superscript marker here, and as a real footnote in Word or an endnote in PDF. Numbering follows document order automatically."
+          placeholder="Footnote text…"
+          initialText={footnoteEdit.text}
+          onDelete={footnoteEdit.isNew ? undefined : handleDeleteFootnote}
+          onSave={handleSaveFootnote}
+          // Cancelling a brand-new footnote takes the empty marker with it,
+          // rather than leaving an unexplained superscript in the prose.
+          onClose={() => (footnoteEdit.isNew ? handleDeleteFootnote() : setFootnoteEdit(null))}
+        />
+      )}
+
+      {commentEdit && (
+        <NoteEditModal
+          title={commentEdit.isNew ? 'Add comment' : 'Edit comment'}
+          message={`On “${commentEdit.snippet}”. Comments stay in the project — they're never exported into the manuscript.`}
+          placeholder="Comment…"
+          initialText={commentEdit.body}
+          onDelete={commentEdit.isNew ? undefined : () => void handleDeleteComment()}
+          onSave={(text) => void handleSaveComment(text)}
+          onClose={() => setCommentEdit(null)}
+        />
+      )}
+
       {saveViewModalOpen && (
         <SaveViewModal onSave={handleSaveCurrentFilterAsView} onClose={() => setSaveViewModalOpen(false)} />
       )}
@@ -2162,11 +2969,7 @@ function App(): JSX.Element {
           tree={tree}
           activeDocumentId={activeDocumentId}
           focusRequest={findFocusRequest}
-          // Routed through handleOpenFromOtherView (not switchDocument alone)
-          // so a hit opened while the Story Bible or a tool section is active
-          // actually takes you to the manuscript, matching what the outliner,
-          // corkboard, and continuity board already do.
-          onOpenDocument={(id) => handleOpenFromOtherView(id)}
+          onNavigateToResult={handleNavigateToSearchResult}
           onProjectDataChanged={() => {
             void refreshOtherDocsWordCount()
             void window.api.getSpanTagRollup().then(setSpanTagRollup)
@@ -2183,7 +2986,7 @@ function App(): JSX.Element {
       <div className="workspace">
         {!distractionFree && <NavRail activeSection={activeRailSection} onChange={handleRailChange} />}
 
-        {/* Always rendered: collapsing narrows it to an icon rail rather than
+        {/* Always rendered: collapsing narrows it to a minimap rail rather than
             removing it, so the current section's navigation never disappears. */}
         {!distractionFree && (
           <SidePanel
@@ -2207,63 +3010,12 @@ function App(): JSX.Element {
             onCreateStoryBibleItem={(typeId) => void handleCreateStoryBibleItemFromPanel(typeId)}
             onCollapse={handleToggleSidebarCollapsed}
             onResizeStart={handleResizeStart}
+            isPagedView={isPagedView}
+            toolbarHeight={toolbarHeight}
+            railBody={renderSectionRail()}
+            flyoutBody={(close) => renderFlyoutNav(close)}
           >
-            {/* The binder is Manuscript-mode navigation, so it appears only
-                there — the tool sections bring their own navigation rather
-                than showing documents that aren't relevant to them. */}
-            {activeRailSection === 'manuscript' && (
-              <Binder
-                tree={tree}
-                activeDocumentId={activeDocumentId}
-                selectedId={selectedId}
-                editRequestId={editRequestId}
-                statuses={statuses}
-                tags={tags}
-                spanTagRollup={spanTagRollup}
-                storyBibleItems={storyBibleItems}
-                storyBibleTypes={storyBibleTypes}
-                mentionRollup={mentionRollup}
-                collapsed={sidebarCollapsed}
-                onSelect={setSelectedId}
-                onOpenDocument={(id) => void switchDocument(id)}
-                onToggleCollapse={(id) => void handleToggleCollapse(id)}
-                onRename={(id, name) => void handleRename(id, name)}
-                onDelete={(id) => void handleDelete(id)}
-                onMove={(id, parentId, index) => void handleMove(id, parentId, index)}
-                onOpenSplitView={handleOpenSplitView}
-                onContextMenu={(node, x, y) => setBinderContextMenu({ node, x, y })}
-              />
-            )}
-
-            {activeRailSection === 'storyBible' && (
-              <StoryBibleNavList
-                items={storyBibleItems}
-                types={storyBibleTypes}
-                selectedItemId={storyBibleSelectedId}
-                collapsed={sidebarCollapsed}
-                // Deliberately the same entry point the mention hover card
-                // uses — one way to open a sheet, not two.
-                onOpenItem={(id) => storyBibleRef.current?.openItem(id)}
-              />
-            )}
-
-            {activeRailSection === 'timeline' && (
-              <TimelineNavList
-                entries={timelineEntries}
-                collapsed={sidebarCollapsed}
-                onJumpToEntry={(id) => setTimelineRevealRequest({ id, token: Date.now() })}
-              />
-            )}
-
-            {activeRailSection === 'submissions' && (
-              <SubmissionsNavFilter
-                submissions={submissions}
-                statuses={submissionStatuses}
-                statusFilter={submissionStatusFilter}
-                collapsed={sidebarCollapsed}
-                onChange={setSubmissionStatusFilter}
-              />
-            )}
+            {renderSectionNav()}
           </SidePanel>
         )}
 
@@ -2277,6 +3029,29 @@ function App(): JSX.Element {
               onClose={() => setEditorContextMenu(null)}
             />
           )}
+
+          {hoveredLexiconWord &&
+            (() => {
+              const entry = lexiconEntries.find(
+                (e) => e.word.trim().toLowerCase() === hoveredLexiconWord.word
+              )
+              if (!entry) return null
+              return (
+                <LexiconHoverCard
+                  rect={hoveredLexiconWord.rect}
+                  entry={entry}
+                  onOpenEntry={() => {
+                    setHoveredLexiconWord(null)
+                    handleViewChange('lexicon')
+                    setLexiconReveal({ id: entry.id, token: Date.now() })
+                  }}
+                  onMouseEnter={() => {
+                    if (mentionHideTimer.current) clearTimeout(mentionHideTimer.current)
+                  }}
+                  onMouseLeave={() => setHoveredLexiconWord(null)}
+                />
+              )
+            })()}
 
           {hoveredMention &&
             (() => {
@@ -2479,7 +3254,7 @@ function App(): JSX.Element {
         ) : (
           <>
             {!distractionFree && (
-            <div className="toolbar">
+            <div className="toolbar" ref={toolbarRef}>
               {(() => {
                 const sections: { id: ToolbarSectionId; node: JSX.Element }[] = [
                   {
@@ -2768,7 +3543,38 @@ function App(): JSX.Element {
             )}
 
             <div className="editor" ref={mainScrollRef} style={{ zoom: `${zoomPercent}%` }}>
-              <EditorContent editor={editor} />
+              {(() => {
+                // Before the first measurement lands, show one correctly-sized
+                // empty page rather than nothing — a new or just-opened
+                // document should never flash a stretched or missing sheet.
+                const geometry = pagination?.geometry ?? pageGeometry(pageSize, pageMarginMm)
+                const sheets = pagination?.pageCount ?? 1
+                const stride = geometry.pageHeightPx + PAGE_GAP_PX
+                return (
+                  <div
+                    className="page-stack"
+                    style={{
+                      width: `${geometry.pageWidthPx}px`,
+                      minHeight: `${pagination?.stackHeightPx ?? geometry.pageHeightPx}px`,
+                      // The writing column's padding is the page's real
+                      // margin, which is what makes the live text measure
+                      // identical to the width pagination measured at.
+                      ['--chf-page-margin' as string]: `${geometry.marginPx}px`
+                    }}
+                  >
+                    <div className="page-sheets" aria-hidden="true">
+                      {Array.from({ length: sheets }, (_, index) => (
+                        <div
+                          key={index}
+                          className="page-sheet"
+                          style={{ top: `${index * stride}px`, height: `${geometry.pageHeightPx}px` }}
+                        />
+                      ))}
+                    </div>
+                    <EditorContent editor={editor} />
+                  </div>
+                )
+              })()}
             </div>
           </>
         ))}
@@ -2890,6 +3696,35 @@ function App(): JSX.Element {
             />
           )}
 
+          {activeView === 'lexicon' && (
+            <LexiconView
+              entries={lexiconEntries}
+              revealRequest={lexiconReveal}
+              onAdd={async (word) => {
+                await window.api.addLexiconEntry(word)
+                await refreshLexicon()
+                await refreshSuppressedWords()
+              }}
+              onUpdate={async (id, changes) => {
+                // Optimistic: typing in a field shouldn't wait on a disk write
+                // and a round trip before the character appears.
+                setLexiconEntries((current) =>
+                  current.map((entry) => (entry.id === id ? { ...entry, ...changes } : entry))
+                )
+                await window.api.updateLexiconEntry(id, changes)
+                // A renamed word suppresses something different now.
+                if (changes.word !== undefined) await refreshSuppressedWords()
+              }}
+              onDelete={async (id) => {
+                await window.api.deleteLexiconEntry(id)
+                await refreshLexicon()
+                // The word becomes flaggable again — unless the Story Bible
+                // still claims it.
+                await refreshSuppressedWords()
+              }}
+            />
+          )}
+
         {!distractionFree && (
         <div className="editor-footer">
           {projectWordTarget != null && (
@@ -2918,7 +3753,7 @@ function App(): JSX.Element {
             {activeDocumentId ? (
               <>
                 <span className="footer-word-count">{documentWordCount.toLocaleString()} words</span>
-                <span className="footer-page-count">{pageCount.toFixed(1)} pages</span>
+                <span className="footer-page-count">{pageCount.toLocaleString()} {pageCount === 1 ? "page" : "pages"}</span>
                 <div className="footer-word-count-popover">
                   <div className="stats-popover-row">
                     <span className="stats-popover-label">Today</span>

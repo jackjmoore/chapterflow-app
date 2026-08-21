@@ -1,9 +1,13 @@
 import {
   AlignmentType,
+  BorderStyle,
   Document,
   Footer,
+  FootnoteReferenceRun,
   Header,
   HeadingLevel,
+  ImageRun,
+  PageBreak,
   PageNumber,
   Packer,
   Paragraph,
@@ -13,8 +17,50 @@ import {
   type ISectionOptions
 } from 'docx'
 import { SCENE_BREAK_MARK, effectiveMarginMm, type ExportOptions } from '../../shared/export'
+import { PAGE_DIMENSIONS_MM } from '../../shared/preferences'
 import { isSceneBreakBlock } from './blocksToHtml'
+import { fitWithin, imageSize } from './imageSize'
 import type { Align, Block, Run } from './htmlToBlocks'
+
+/** An image resolved to bytes, ready for ImageRun. Callers resolve these
+ *  before rendering, since the block walk itself is synchronous. */
+export interface DocxImage {
+  data: Buffer
+  mime: string
+}
+
+/** docx only accepts these four container formats. WebP — which the image
+ *  picker does accept, and which displays and exports to PDF perfectly well —
+ *  has no representation in the Word format at all, so it maps to undefined
+ *  and the image is skipped rather than written as a corrupt part. */
+const DOCX_IMAGE_TYPES: Record<string, 'jpg' | 'png' | 'gif' | 'bmp'> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/bmp': 'bmp'
+}
+
+/**
+ * Collects footnote text in document order while paragraphs are built, so the
+ * numbers docx assigns line up with the order the markers appear.
+ *
+ * Word footnotes live in a separate part of the .docx package, referenced by
+ * id from the body — so unlike every other renderer, the note text can't be
+ * emitted inline as it's encountered. It has to be gathered here and handed
+ * to the Document constructor afterwards. Shared across sections so a
+ * whole-project export numbers continuously rather than restarting per file.
+ */
+export interface FootnoteCollector {
+  notes: { id: number; text: string }[]
+}
+
+export function createFootnoteCollector(): FootnoteCollector {
+  return { notes: [] }
+}
+
+/** Word reserves footnote ids 0 and 1 for the separator marks it inserts into
+ *  every document, so real notes have to start at 2 or they collide. */
+const FIRST_FOOTNOTE_ID = 2
 
 export const HEADING_LEVELS = [HeadingLevel.HEADING_1, HeadingLevel.HEADING_2, HeadingLevel.HEADING_3]
 
@@ -79,8 +125,24 @@ function toTextRun(run: Run): TextRun {
   })
 }
 
-function toParagraph(block: Block, orderedLevel: number): Paragraph {
-  const children = block.runs.length ? block.runs.map(toTextRun) : [new TextRun('')]
+/** Builds a paragraph's children, turning footnote marker runs into real
+ *  Word footnote references and registering their text with the collector. */
+function toChildren(block: Block, footnotes: FootnoteCollector): (TextRun | FootnoteReferenceRun)[] {
+  const children: (TextRun | FootnoteReferenceRun)[] = []
+  for (const run of block.runs) {
+    if (run.footnote !== undefined) {
+      const id = FIRST_FOOTNOTE_ID + footnotes.notes.length
+      footnotes.notes.push({ id, text: run.footnote })
+      children.push(new FootnoteReferenceRun(id))
+      continue
+    }
+    children.push(toTextRun(run))
+  }
+  return children.length ? children : [new TextRun('')]
+}
+
+function toParagraph(block: Block, orderedLevel: number, footnotes: FootnoteCollector): Paragraph {
+  const children = toChildren(block, footnotes)
   const alignment = block.align ? ALIGN_MAP[block.align] : undefined
 
   if (block.kind === 'heading') {
@@ -102,9 +164,24 @@ function toParagraph(block: Block, orderedLevel: number): Paragraph {
   return new Paragraph({ alignment, children })
 }
 
+/** Printable column width in pixels at 96dpi, used to scale oversized images
+ *  down. Letter width less one-inch margins, the manuscript default. */
+const MAX_IMAGE_WIDTH_PX = 624
+
+export interface DocxRenderOptions {
+  manuscript?: boolean
+  /** Shared across every section of a project export, so footnote numbering
+   *  runs continuously through the whole manuscript. */
+  footnotes?: FootnoteCollector
+  /** Image id → bytes, resolved by the caller before rendering. */
+  images?: Record<string, DocxImage>
+}
+
 /** Converts a shared Block[] model into docx Paragraphs — used for both a single
  *  document export and as one section's worth of content in a project export. */
-export function blocksToDocxParagraphs(blocks: Block[], manuscript = false): Paragraph[] {
+export function blocksToDocxParagraphs(blocks: Block[], options: DocxRenderOptions = {}): Paragraph[] {
+  const { manuscript = false, images = {} } = options
+  const footnotes = options.footnotes ?? createFootnoteCollector()
   let orderedInstance = 0
   let prevWasOrdered = false
   const paragraphs: Paragraph[] = []
@@ -116,9 +193,68 @@ export function blocksToDocxParagraphs(blocks: Block[], manuscript = false): Par
       prevWasOrdered = false
       continue
     }
+
+    if (block.kind === 'pageBreak' || block.kind === 'chapterBreak') {
+      paragraphs.push(new Paragraph({ children: [new PageBreak()] }))
+      // Manuscript convention: a new chapter opens roughly a third of the way
+      // down its page rather than at the top margin. Only chapter breaks get
+      // it — that semantic difference is why they aren't just page breaks.
+      if (manuscript && block.kind === 'chapterBreak') {
+        paragraphs.push(
+          new Paragraph({ spacing: { before: convertInchesToTwip(2.5) }, children: [new TextRun('')] })
+        )
+      }
+      prevWasOrdered = false
+      continue
+    }
+
+    if (block.kind === 'chapterLine') {
+      // A bottom border on an empty centered paragraph — Word has no
+      // horizontal-rule primitive, and this is how one is conventionally drawn.
+      paragraphs.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 240, after: 240 },
+          indent: { firstLine: 0 },
+          border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '888888', space: 1 } },
+          children: [new TextRun('')]
+        })
+      )
+      prevWasOrdered = false
+      continue
+    }
+
+    if (block.kind === 'image') {
+      const image = block.imageId ? images[block.imageId] : undefined
+      const size = image ? imageSize(image.data) : null
+      const type = image ? DOCX_IMAGE_TYPES[image.mime] : undefined
+      // A missing file, an unreadable header, or a format Word can't hold
+      // (WebP) drops the image rather than failing the export or writing a
+      // box Word will refuse to open.
+      if (image && size && type) {
+        const fitted = fitWithin(size, MAX_IMAGE_WIDTH_PX)
+        paragraphs.push(
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            indent: { firstLine: 0 },
+            children: [
+              new ImageRun({
+                type,
+                data: image.data,
+                transformation: { width: fitted.width, height: fitted.height },
+                altText: block.alt ? { name: block.alt, description: block.alt, title: block.alt } : undefined
+              })
+            ]
+          })
+        )
+      }
+      prevWasOrdered = false
+      continue
+    }
+
     if (block.kind === 'ordered' && !prevWasOrdered) orderedInstance += 1
     prevWasOrdered = block.kind === 'ordered'
-    paragraphs.push(toParagraph(block, orderedInstance))
+    paragraphs.push(toParagraph(block, orderedInstance, footnotes))
   }
   return paragraphs
 }
@@ -175,15 +311,34 @@ function manuscriptHeader(options: ExportOptions): Header {
   })
 }
 
-/** Section-level page geometry + running header for the manuscript preset. */
-export function manuscriptSectionProperties(options: ExportOptions): Partial<ISectionOptions> {
+/**
+ * Page geometry for every .docx section, from the shared millimetre table.
+ *
+ * The size was previously omitted altogether, so exports came out at Word's
+ * own default page size no matter what Page Setup said — the one path that
+ * genuinely did not read the shared geometry. It applies to both presets:
+ * page size is the writer's setting, not a manuscript convention.
+ */
+export function sectionPageProperties(options: ExportOptions): Partial<ISectionOptions> {
   const marginTwips = Math.round((effectiveMarginMm(options) / MM_PER_INCH) * 1440)
+  const { widthMm, heightMm } = PAGE_DIMENSIONS_MM[options.pageSize]
   return {
     properties: {
       page: {
+        size: {
+          width: Math.round((widthMm / MM_PER_INCH) * 1440),
+          height: Math.round((heightMm / MM_PER_INCH) * 1440)
+        },
         margin: { top: marginTwips, bottom: marginTwips, left: marginTwips, right: marginTwips }
       }
-    },
+    }
+  }
+}
+
+/** The manuscript preset adds its running header on top of the page geometry. */
+export function manuscriptSectionProperties(options: ExportOptions): Partial<ISectionOptions> {
+  return {
+    ...sectionPageProperties(options),
     headers: { default: manuscriptHeader(options) },
     // Supplied empty so Word doesn't inherit a footer from elsewhere.
     footers: { default: new Footer({ children: [new Paragraph({ children: [] })] }) }
@@ -192,11 +347,22 @@ export function manuscriptSectionProperties(options: ExportOptions): Partial<ISe
 
 export async function sectionsToDocxBuffer(
   sections: ISectionOptions[],
-  options?: ExportOptions
+  options?: ExportOptions,
+  footnotes?: FootnoteCollector
 ): Promise<Buffer> {
   const manuscript = options?.preset === 'manuscript'
+  // Real Word footnotes: the body carries FootnoteReferenceRuns, and their
+  // text goes into the package's own footnotes part, keyed by the same ids.
+  // Word renders and numbers them at the foot of the correct page itself.
+  const footnoteConfig = footnotes?.notes.length
+    ? Object.fromEntries(
+        footnotes.notes.map((note) => [note.id, { children: [new Paragraph({ children: [new TextRun(note.text)] })] }])
+      )
+    : undefined
+
   const doc = new Document({
     styles: manuscript ? manuscriptStyles() : undefined,
+    footnotes: footnoteConfig,
     numbering: {
       config: [
         {
@@ -205,11 +371,23 @@ export async function sectionsToDocxBuffer(
         }
       ]
     },
-    sections: manuscript && options ? sections.map((s) => ({ ...manuscriptSectionProperties(options), ...s })) : sections
+    // Page geometry applies to every export; the manuscript preset layers its
+    // running header on top of it.
+    sections: options
+      ? sections.map((s) => ({
+          ...(manuscript ? manuscriptSectionProperties(options) : sectionPageProperties(options)),
+          ...s
+        }))
+      : sections
   })
   return Packer.toBuffer(doc)
 }
 
-export async function blocksToDocxBuffer(blocks: Block[]): Promise<Buffer> {
-  return sectionsToDocxBuffer([{ children: blocksToDocxParagraphs(blocks) }])
+export async function blocksToDocxBuffer(
+  blocks: Block[],
+  render: DocxRenderOptions = {}
+): Promise<Buffer> {
+  const footnotes = render.footnotes ?? createFootnoteCollector()
+  const children = blocksToDocxParagraphs(blocks, { ...render, footnotes })
+  return sectionsToDocxBuffer([{ children }], undefined, footnotes)
 }

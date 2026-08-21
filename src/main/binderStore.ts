@@ -156,7 +156,8 @@ function parseViewState(raw: unknown): ViewState {
     r.activeView === 'corkboard' ||
     r.activeView === 'storyBible' ||
     r.activeView === 'timeline' ||
-    r.activeView === 'submissions'
+    r.activeView === 'submissions' ||
+    r.activeView === 'lexicon'
       ? r.activeView
       : 'editor'
   const manuscriptView: ManuscriptView =

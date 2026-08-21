@@ -8,6 +8,21 @@ import { getSheet, deleteSheet } from './storyBibleSheetStore'
 import { deleteImage } from './storyBibleImageStore'
 import { DEFAULT_STORY_BIBLE_TYPES } from '../shared/storyBibleTypeDefaults'
 import type { StoryBibleItem, StoryBibleTypeDef, StoryBibleState } from '../shared/storyBible'
+import * as suppressedWordStore from './suppressedWordStore'
+
+/**
+ * Re-registers every item name and alias with the shared suppression list.
+ *
+ * Rebuilt from current state after any change that touches names, rather
+ * than tracked as deltas: renaming turns the old name into an alias behind
+ * the scenes, so a delta-based scheme has several ways to leave a stale
+ * claim behind. The Lexicon claims words through the same store and is
+ * unaffected by this — neither feature reads the other.
+ */
+async function syncSuppression(): Promise<void> {
+  const phrases = state.items.flatMap((item) => [item.name, ...item.aliases])
+  await suppressedWordStore.replaceSource(phrases, 'storyBible')
+}
 
 function indexPath(): string {
   return join(getProjectRoot(), 'storybible', 'index.json')
@@ -98,6 +113,7 @@ export async function createItem(typeId: string, name = 'Untitled'): Promise<Sto
   const item: StoryBibleItem = { id: randomUUID(), typeId, name, aliases: [], summary: '', createdAt: now, updatedAt: now }
   state.items.push(item)
   await persist()
+  await syncSuppression()
   return item
 }
 
@@ -118,6 +134,7 @@ export async function renameItem(id: string, name: string): Promise<void> {
   item.name = trimmed
   item.updatedAt = new Date().toISOString()
   await persist()
+  await syncSuppression()
 }
 
 export async function setItemAliases(id: string, aliases: string[]): Promise<void> {
@@ -127,6 +144,7 @@ export async function setItemAliases(id: string, aliases: string[]): Promise<voi
   item.aliases = aliases.map((a) => a.trim()).filter(Boolean)
   item.updatedAt = new Date().toISOString()
   await persist()
+  await syncSuppression()
 }
 
 export async function setItemType(id: string, typeId: string): Promise<void> {
@@ -174,4 +192,5 @@ export async function deleteItem(id: string): Promise<void> {
 
   state.items.splice(index, 1)
   await persist()
+  await syncSuppression()
 }

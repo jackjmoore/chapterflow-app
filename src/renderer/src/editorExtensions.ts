@@ -11,6 +11,10 @@ import { FontSize } from './extensions/fontSize'
 import { LineHeight } from './extensions/lineHeight'
 import { SpanTag } from './extensions/spanTag'
 import { MentionHighlight } from './extensions/mentionHighlight'
+import { ChapterBreak, ChapterLine, PageBreak } from './extensions/structuralBreaks'
+import { Footnote } from './extensions/footnote'
+import { DocumentImage } from './extensions/documentImage'
+import { Comment } from './extensions/comment'
 
 /**
  * The document schema/extensions, shared between the live editor and
@@ -40,7 +44,16 @@ export function createEditorExtensions(): AnyExtension[] {
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
     LineHeight,
     SpanTag,
-    MentionHighlight
+    MentionHighlight,
+    // Insert-menu content. StarterKit's own horizontalRule stays off (above):
+    // these three carry distinct data attributes so export can tell a chapter
+    // line from a page break, which a shared <hr> could not.
+    PageBreak,
+    ChapterBreak,
+    ChapterLine,
+    Footnote,
+    DocumentImage,
+    Comment
   ]
 }
 

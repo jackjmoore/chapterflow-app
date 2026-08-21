@@ -15,6 +15,15 @@ import type { Theme, TypographyDefaults, PageSize } from '../shared/preferences'
 import type { BackupInfo } from '../shared/backup'
 import type { SnapshotMeta } from '../shared/snapshot'
 import type { SpanTagRecord } from '../shared/spanTags'
+import type { CommentRecord } from '../shared/comments'
+import type { LexiconEntry } from '../shared/lexicon'
+import type {
+  RecentSearch,
+  SearchIndexStats,
+  SearchMatch,
+  SearchQueryOptions,
+  SearchResults
+} from '../shared/search'
 import type { ExportFormat, ExportPreset, ExportResult } from '../shared/export'
 import type { ImportResult } from '../shared/import'
 import type { Submission, SubmissionState, SubmissionStatus } from '../shared/submissions'
@@ -136,6 +145,32 @@ interface Api {
   restoreSnapshot: (documentId: string, snapshotId: string) => Promise<string>
   listSpanTags: () => Promise<SpanTagRecord[]>
   getSpanTagRollup: () => Promise<Record<string, string[]>>
+  importDocumentImage: () => Promise<string | null>
+  getDocumentImage: (imageId: string) => Promise<string | null>
+  getDocumentImages: (imageIds: string[]) => Promise<Record<string, string>>
+  searchProject: (text: string, options?: SearchQueryOptions) => Promise<SearchMatch[]>
+  getSearchStats: () => Promise<SearchIndexStats>
+  searchRanked: (text: string, options?: SearchQueryOptions) => Promise<SearchResults>
+  listSearchHistory: () => Promise<RecentSearch[]>
+  recordSearchHistory: (text: string) => Promise<RecentSearch[]>
+  clearSearchHistory: () => Promise<void>
+  listLexicon: () => Promise<LexiconEntry[]>
+  addLexiconEntry: (word: string, meaning?: string, pronunciation?: string) => Promise<LexiconEntry | null>
+  updateLexiconEntry: (
+    id: string,
+    changes: Partial<Pick<LexiconEntry, 'word' | 'meaning' | 'pronunciation'>>
+  ) => Promise<void>
+  deleteLexiconEntry: (id: string) => Promise<void>
+  listSuppressedWords: () => Promise<string[]>
+  addSuppressedWord: (word: string) => Promise<void>
+  onSuppressedWordsChanged: (callback: () => void) => () => void
+  listComments: () => Promise<CommentRecord[]>
+  addComment: (record: CommentRecord) => Promise<void>
+  updateComment: (
+    id: string,
+    changes: Partial<Pick<CommentRecord, 'body' | 'resolved'>>
+  ) => Promise<void>
+  deleteComment: (id: string) => Promise<void>
   exportDocument: (id: string, format: ExportFormat, preset?: ExportPreset) => Promise<ExportResult>
   exportProject: (format: ExportFormat, preset?: ExportPreset) => Promise<ExportResult>
   printDocument: (id: string, preset?: ExportPreset) => Promise<{ printed: boolean }>

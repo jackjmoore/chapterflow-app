@@ -1,4 +1,5 @@
 import type { Submission, SubmissionStatus } from '../../shared/submissions'
+import PanelNavGlyph, { initialOf } from './PanelNavGlyph'
 
 interface SubmissionsNavFilterProps {
   submissions: Submission[]
@@ -35,8 +36,17 @@ function SubmissionsNavFilter(props: SubmissionsNavFilterProps): JSX.Element {
           title={collapsed ? `All — ${submissions.length}` : undefined}
           onClick={() => onChange(null)}
         >
-          {!collapsed && <span className="panel-nav-label">All</span>}
-          <span className="panel-nav-count">{submissions.length}</span>
+          {collapsed ? (
+            // This rail picks a filter rather than reporting figures, so the
+            // glyph names the status and the tooltip carries its count. A bare
+            // count told you nothing about which row you were clicking.
+            <PanelNavGlyph token="∗" active={statusFilter === null} />
+          ) : (
+            <>
+              <span className="panel-nav-label">All</span>
+              <span className="panel-nav-count">{submissions.length}</span>
+            </>
+          )}
         </button>
 
         {statuses.map((status) => (
@@ -47,8 +57,14 @@ function SubmissionsNavFilter(props: SubmissionsNavFilterProps): JSX.Element {
             title={collapsed ? `${status.name} — ${countFor(status.id)}` : undefined}
             onClick={() => onChange(status.id)}
           >
-            {!collapsed && <span className="panel-nav-label">{status.name}</span>}
-            <span className="panel-nav-count">{countFor(status.id)}</span>
+            {collapsed ? (
+              <PanelNavGlyph token={initialOf(status.name)} active={statusFilter === status.id} />
+            ) : (
+              <>
+                <span className="panel-nav-label">{status.name}</span>
+                <span className="panel-nav-count">{countFor(status.id)}</span>
+              </>
+            )}
           </button>
         ))}
 
@@ -59,8 +75,14 @@ function SubmissionsNavFilter(props: SubmissionsNavFilterProps): JSX.Element {
             title={collapsed ? `Unknown status — ${unknownCount}` : 'Entries whose status was deleted'}
             onClick={() => onChange('__unknown__')}
           >
-            {!collapsed && <span className="panel-nav-label panel-nav-label--dim">Unknown status</span>}
-            <span className="panel-nav-count">{unknownCount}</span>
+            {collapsed ? (
+              <PanelNavGlyph token="?" active={statusFilter === '__unknown__'} />
+            ) : (
+              <>
+                <span className="panel-nav-label panel-nav-label--dim">Unknown status</span>
+                <span className="panel-nav-count">{unknownCount}</span>
+              </>
+            )}
           </button>
         )}
       </div>

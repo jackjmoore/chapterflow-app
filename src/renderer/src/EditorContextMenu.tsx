@@ -68,6 +68,25 @@ function EditorContextMenu(props: EditorContextMenuProps): JSX.Element {
     >
       {payload.misspelledWord && (
         <>
+          {/* Both add the word to this project's own list, which stops the
+              editor flagging it. Neither writes to the operating system's
+              dictionary, so the word stays unknown to every other app. */}
+          <button
+            type="button"
+            className="menubar-item"
+            onClick={() => act(`addToDictionary:${payload.misspelledWord}`)}
+          >
+            <span className="menubar-item-label">Add to Dictionary</span>
+          </button>
+          <button
+            type="button"
+            className="menubar-item"
+            onClick={() => act(`defineInLexicon:${payload.misspelledWord}`)}
+          >
+            <span className="menubar-item-label">Define in Lexicon…</span>
+          </button>
+          <div className="menubar-separator" />
+
           {payload.dictionarySuggestions.length === 0 ? (
             <button type="button" className="menubar-item menubar-item--disabled" disabled>
               <span className="menubar-item-label">No suggestions</span>
@@ -155,6 +174,28 @@ function EditorContextMenu(props: EditorContextMenuProps): JSX.Element {
           </div>
         )}
       </div>
+
+      <div className="menubar-separator" />
+
+      {/* Comment and the two structural breaks are here as well as on the
+          Insert menu — they're the entries you reach for mid-sentence, where
+          travelling to the menu bar loses your place. Every one dispatches
+          the same handleMenuAction the menu bar does. */}
+      <button
+        type="button"
+        className={`menubar-item ${!payload.hasSelection ? 'menubar-item--disabled' : ''}`}
+        disabled={!payload.hasSelection}
+        onClick={() => act('insertComment')}
+      >
+        <span className="menubar-item-label">Comment…</span>
+      </button>
+
+      <button type="button" className="menubar-item" onClick={() => act('insertChapterBreak')}>
+        <span className="menubar-item-label">Chapter Break</span>
+      </button>
+      <button type="button" className="menubar-item" onClick={() => act('insertPageBreak')}>
+        <span className="menubar-item-label">Page Break</span>
+      </button>
 
       <div className="menubar-separator" />
 

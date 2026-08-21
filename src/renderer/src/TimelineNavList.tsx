@@ -1,4 +1,5 @@
 import type { TimelineEntry } from '../../shared/timeline'
+import PanelNavGlyph from './PanelNavGlyph'
 
 interface TimelineNavListProps {
   entries: TimelineEntry[]
@@ -29,12 +30,16 @@ function TimelineNavList(props: TimelineNavListProps): JSX.Element {
             title={collapsed ? `${index + 1}. ${entry.description || 'Untitled event'}` : undefined}
             onClick={() => onJumpToEntry(entry.id)}
           >
-            <span className="panel-nav-number">{index + 1}</span>
-            {!collapsed && (
-              <span className="panel-nav-stacked">
-                <span className="panel-nav-label">{entry.description || 'Untitled event'}</span>
-                {entry.whenText && <span className="panel-nav-sublabel">{entry.whenText}</span>}
-              </span>
+            {collapsed ? (
+              <PanelNavGlyph token={String(index + 1)} />
+            ) : (
+              <>
+                <span className="panel-nav-number">{index + 1}</span>
+                <span className="panel-nav-stacked">
+                  <span className="panel-nav-label">{entry.description || 'Untitled event'}</span>
+                  {entry.whenText && <span className="panel-nav-sublabel">{entry.whenText}</span>}
+                </span>
+              </>
             )}
           </button>
         ))}

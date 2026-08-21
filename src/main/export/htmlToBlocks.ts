@@ -7,9 +7,23 @@ export interface Run {
   underline?: boolean
   color?: string
   highlight?: string
+  /** A footnote marker sits in the run stream where the superscript appears.
+   *  `text` is empty for these; `footnote` carries the note's own text. The
+   *  running number is never stored — every renderer derives it from document
+   *  order, so deleting note 2 renumbers the rest with no bookkeeping. */
+  footnote?: string
 }
 
-export type BlockKind = 'paragraph' | 'heading' | 'blockquote' | 'bullet' | 'ordered'
+export type BlockKind =
+  | 'paragraph'
+  | 'heading'
+  | 'blockquote'
+  | 'bullet'
+  | 'ordered'
+  | 'pageBreak'
+  | 'chapterBreak'
+  | 'chapterLine'
+  | 'image'
 export type Align = 'left' | 'center' | 'right' | 'justify'
 
 export interface Block {
@@ -17,6 +31,18 @@ export interface Block {
   level?: number
   align?: Align
   runs: Run[]
+  /** Set only on `image` blocks — the file's id inside the project's own
+   *  documents/images folder. Renderers resolve it to bytes themselves. */
+  imageId?: string
+  alt?: string
+}
+
+/** node-html-parser returns `undefined` — not `null` — for an attribute that
+ *  isn't present, so a `!== null` test is true for every element and the
+ *  first branch of a dispatch chain swallows all the rest. Always go through
+ *  this. */
+function hasAttr(el: HTMLElement, name: string): boolean {
+  return el.getAttribute(name) != null
 }
 
 function extractStyle(el: HTMLElement, prop: string): string | undefined {
@@ -39,6 +65,14 @@ function collectRuns(
   if (node.nodeType !== NodeType.ELEMENT_NODE) return
   const el = node as HTMLElement
   const tag = el.tagName?.toLowerCase()
+
+  // A footnote marker is an atom: it contributes a run of its own and has no
+  // text children worth descending into.
+  if (tag === 'sup' && hasAttr(el, 'data-footnote')) {
+    out.push({ text: '', footnote: el.getAttribute('data-footnote') ?? '' })
+    return
+  }
+
   const next = { ...inherited }
   if (tag === 'strong' || tag === 'b') next.bold = true
   if (tag === 'em' || tag === 'i') next.italic = true
@@ -80,7 +114,23 @@ export function htmlToBlocks(html: string): Block[] {
     const el = node as HTMLElement
     const tag = el.tagName?.toLowerCase()
 
-    if (tag === 'h1' || tag === 'h2' || tag === 'h3') {
+    // Structural atoms carry no runs — they're recognized by the data
+    // attribute their TipTap node serializes, never by a bare tag, so a
+    // chapter line stays distinguishable from a page break.
+    if (tag === 'div' && hasAttr(el, 'data-page-break')) {
+      blocks.push({ kind: 'pageBreak', runs: [] })
+    } else if (tag === 'div' && hasAttr(el, 'data-chapter-break')) {
+      blocks.push({ kind: 'chapterBreak', runs: [] })
+    } else if (tag === 'div' && hasAttr(el, 'data-chapter-line')) {
+      blocks.push({ kind: 'chapterLine', runs: [] })
+    } else if (tag === 'img' && hasAttr(el, 'data-image-id')) {
+      blocks.push({
+        kind: 'image',
+        runs: [],
+        imageId: el.getAttribute('data-image-id') ?? undefined,
+        alt: el.getAttribute('alt') ?? undefined
+      })
+    } else if (tag === 'h1' || tag === 'h2' || tag === 'h3') {
       blocks.push({ kind: 'heading', level: Number(tag[1]), align: alignOf(el), runs: runsOf(el) })
     } else if (tag === 'blockquote') {
       const inner = innerParagraph(el)

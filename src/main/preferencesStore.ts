@@ -18,6 +18,7 @@ import {
   MAX_PAGE_MARGIN_MM,
   DEFAULT_PAGE_MARGIN_MM,
   DEFAULT_PAGE_SIZE,
+  isPageSize,
   type Theme,
   type TypographyDefaults,
   type PageSize
@@ -155,7 +156,7 @@ function applyParsed(parsed: Record<string, unknown>): void {
     state.projectRoot = parsed.projectRoot as string | null
   }
   if (typeof parsed.cardWidth === 'number') state.cardWidth = clampCardWidth(parsed.cardWidth)
-  if (parsed.pageSize === 'letter' || parsed.pageSize === 'a4') state.pageSize = parsed.pageSize
+  if (isPageSize(parsed.pageSize)) state.pageSize = parsed.pageSize
   if (typeof parsed.pageMarginMm === 'number') state.pageMarginMm = clampPageMargin(parsed.pageMarginMm)
 }
 

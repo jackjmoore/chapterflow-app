@@ -233,7 +233,7 @@ const SplitViewPane = forwardRef<SplitViewPaneHandle, SplitViewPaneProps>(functi
       <div className="split-pane-footer">
         <span className={`autosave-status autosave-status--${status}`}>{statusLabel}</span>
         <span className="footer-word-count">{wordCount.toLocaleString()} words</span>
-        <span className="footer-page-count">{pageCount.toFixed(1)} pages</span>
+        <span className="footer-page-count">{pageCount.toLocaleString()} {pageCount === 1 ? "page" : "pages"}</span>
       </div>
     </div>
   )

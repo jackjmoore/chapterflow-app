@@ -1,4 +1,5 @@
 import { COLOR_PRESETS } from '../../shared/colorPresets'
+import { COUNT_ROUNDINGS, roundingLabel } from '../../shared/insertions'
 import { TOOLBAR_SECTIONS } from '../../shared/toolbarSections'
 import type { LayoutPreset } from '../../shared/layoutPresets'
 import type { SavedView } from '../../shared/binder'
@@ -122,9 +123,10 @@ const EDIT_MENU: MenuDef = {
     nativeItem('Paste', 'paste', { ctrl: true, code: 'KeyV', display: 'Ctrl+V' }),
     nativeItem('Select All', 'selectAll', { ctrl: true, code: 'KeyA', display: 'Ctrl+A' }),
     sep,
-    item('Find', 'find', { ctrl: true, code: 'KeyF', display: 'Ctrl+F' }),
-    item('Replace', 'findReplace', { ctrl: true, code: 'KeyH', display: 'Ctrl+H' }),
-    item('Find in Project', 'findInProject', { ctrl: true, shift: true, code: 'KeyF', display: 'Ctrl+Shift+F' })
+    // One entry, because there is one surface. Ctrl+H and Ctrl+Shift+F still
+    // work and are listed inside the bar itself, so collapsing the menu does
+    // not hide them.
+    item('Find & Replace…', 'find', { ctrl: true, code: 'KeyF', display: 'Ctrl+F' })
   ]
 }
 
@@ -172,6 +174,31 @@ const FORMAT_MENU: MenuDef = {
     sep,
     item('Increase Font Size', 'fontSize:increase', { ctrl: true, shift: true, code: 'Period', display: 'Ctrl+Shift+.' }),
     item('Decrease Font Size', 'fontSize:decrease', { ctrl: true, shift: true, code: 'Comma', display: 'Ctrl+Shift+,' })
+  ]
+}
+
+/** Exact plus the five rounding tiers, built from the shared list so the two
+ *  count items can never offer different options. Presented as a submenu per
+ *  item rather than a modal at insertion time or a buried preference: one
+ *  click, and the rounding you picked is visible at the point of use. */
+function countRoundingItems(prefix: string): MenuEntry[] {
+  return COUNT_ROUNDINGS.map((rounding) => item(roundingLabel(rounding), `${prefix}:${rounding}`))
+}
+
+const INSERT_MENU: MenuDef = {
+  label: 'Insert',
+  items: [
+    item('Image…', 'insertImage'),
+    item('Footnote', 'insertFootnote', { ctrl: true, alt: true, code: 'KeyF', display: 'Ctrl+Alt+F' }),
+    item('Comment…', 'insertComment', { ctrl: true, alt: true, code: 'KeyM', display: 'Ctrl+Alt+M' }),
+    sep,
+    item('Chapter Break', 'insertChapterBreak'),
+    item('Page Break', 'insertPageBreak', { ctrl: true, code: 'Enter', display: 'Ctrl+Enter' }),
+    item('Chapter Line', 'insertChapterLine'),
+    sep,
+    item('Current Date & Time', 'insertDateTime'),
+    { type: 'submenu', label: 'Draft Word Count', items: countRoundingItems('insertWordCount') },
+    { type: 'submenu', label: 'Character Count', items: countRoundingItems('insertCharacterCount') }
   ]
 }
 
@@ -270,7 +297,15 @@ const HELP_MENU: MenuDef = {
   items: [item('About ChapterFlow…', 'showAbout'), item('Check for Updates…', 'checkForUpdates')]
 }
 
-const BASE_MENUS: MenuDef[] = [FILE_MENU, EDIT_MENU, FORMAT_MENU, VIEW_MENU_BASE, PROJECT_MENU_BASE, HELP_MENU]
+const BASE_MENUS: MenuDef[] = [
+  FILE_MENU,
+  EDIT_MENU,
+  FORMAT_MENU,
+  INSERT_MENU,
+  VIEW_MENU_BASE,
+  PROJECT_MENU_BASE,
+  HELP_MENU
+]
 
 /** Builds the full menu bar for this render, splicing the user's saved
  *  layout presets into View > Layout Presets and saved filter views into
@@ -323,6 +358,14 @@ export const ALL_SHORTCUTS: { action: string; shortcut: ShortcutSpec }[] = (() =
   // shortcut each), but the original quick-toggle shortcut is kept working
   // as a "virtual" binding not tied to any single menu label.
   out.push({ action: 'toggleTheme', shortcut: { ctrl: true, alt: true, code: 'KeyT', display: 'Ctrl+Alt+T' } })
+
+  // Find, Replace and Find in Project are one menu entry and one surface now,
+  // but the two other shortcuts are long-standing muscle memory. They stay
+  // bound as virtual shortcuts — Ctrl+H opens the same bar with the replace
+  // row expanded, Ctrl+Shift+F with the scope widened to the project — and the
+  // bar itself displays both, so collapsing the menu hides nothing.
+  out.push({ action: 'findReplace', shortcut: { ctrl: true, code: 'KeyH', display: 'Ctrl+H' } })
+  out.push({ action: 'findInProject', shortcut: { ctrl: true, shift: true, code: 'KeyF', display: 'Ctrl+Shift+F' } })
 
   return out
 })()

@@ -16,6 +16,15 @@ import type { Theme, TypographyDefaults, PageSize } from '../shared/preferences'
 import type { BackupInfo } from '../shared/backup'
 import type { SnapshotMeta } from '../shared/snapshot'
 import type { SpanTagRecord } from '../shared/spanTags'
+import type { CommentRecord } from '../shared/comments'
+import type { LexiconEntry } from '../shared/lexicon'
+import type {
+  RecentSearch,
+  SearchIndexStats,
+  SearchMatch,
+  SearchQueryOptions,
+  SearchResults
+} from '../shared/search'
 import type { ExportFormat, ExportPreset, ExportResult } from '../shared/export'
 import type { ImportResult } from '../shared/import'
 import type { Submission, SubmissionState, SubmissionStatus } from '../shared/submissions'
@@ -290,6 +299,70 @@ const api = {
   listSpanTags: (): Promise<SpanTagRecord[]> => ipcRenderer.invoke('spanTag:list'),
 
   getSpanTagRollup: (): Promise<Record<string, string[]>> => ipcRenderer.invoke('spanTag:getRollup'),
+
+  importDocumentImage: (): Promise<string | null> => ipcRenderer.invoke('documentImage:import'),
+
+  getDocumentImage: (imageId: string): Promise<string | null> =>
+    ipcRenderer.invoke('documentImage:get', imageId),
+
+  /** Resolved in one round trip when a document opens, rather than one call
+   *  per image. */
+  getDocumentImages: (imageIds: string[]): Promise<Record<string, string>> =>
+    ipcRenderer.invoke('documentImage:getMany', imageIds),
+
+  /** Raw, unranked matches from the maintained index. Nothing is scanned
+   *  at query time. */
+  searchProject: (text: string, options?: SearchQueryOptions): Promise<SearchMatch[]> =>
+    ipcRenderer.invoke('search:query', text, options),
+
+  getSearchStats: (): Promise<SearchIndexStats> => ipcRenderer.invoke('search:stats'),
+
+  /** Ranked, tiered results. What the project search interface uses; the raw
+   *  `searchProject` above stays for anything that wants the unordered set. */
+  searchRanked: (text: string, options?: SearchQueryOptions): Promise<SearchResults> =>
+    ipcRenderer.invoke('search:ranked', text, options),
+
+  listSearchHistory: (): Promise<RecentSearch[]> => ipcRenderer.invoke('search:history'),
+
+  recordSearchHistory: (text: string): Promise<RecentSearch[]> =>
+    ipcRenderer.invoke('search:recordHistory', text),
+
+  clearSearchHistory: (): Promise<void> => ipcRenderer.invoke('search:clearHistory'),
+
+  listLexicon: (): Promise<LexiconEntry[]> => ipcRenderer.invoke('lexicon:list'),
+
+  addLexiconEntry: (word: string, meaning?: string, pronunciation?: string): Promise<LexiconEntry | null> =>
+    ipcRenderer.invoke('lexicon:add', word, meaning, pronunciation),
+
+  updateLexiconEntry: (
+    id: string,
+    changes: Partial<Pick<LexiconEntry, 'word' | 'meaning' | 'pronunciation'>>
+  ): Promise<void> => ipcRenderer.invoke('lexicon:update', id, changes),
+
+  deleteLexiconEntry: (id: string): Promise<void> => ipcRenderer.invoke('lexicon:delete', id),
+
+  /** Every word the editor should stop flagging. App-only: no OS dictionary
+   *  is ever written. */
+  listSuppressedWords: (): Promise<string[]> => ipcRenderer.invoke('suppressedWords:list'),
+
+  addSuppressedWord: (word: string): Promise<void> => ipcRenderer.invoke('suppressedWords:add', word),
+
+  onSuppressedWordsChanged: (callback: () => void): (() => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('lexicon:suppressedWordsChanged', listener)
+    return () => ipcRenderer.removeListener('lexicon:suppressedWordsChanged', listener)
+  },
+
+  listComments: (): Promise<CommentRecord[]> => ipcRenderer.invoke('comment:list'),
+
+  addComment: (record: CommentRecord): Promise<void> => ipcRenderer.invoke('comment:add', record),
+
+  updateComment: (
+    id: string,
+    changes: Partial<Pick<CommentRecord, 'body' | 'resolved'>>
+  ): Promise<void> => ipcRenderer.invoke('comment:update', id, changes),
+
+  deleteComment: (id: string): Promise<void> => ipcRenderer.invoke('comment:delete', id),
 
   exportDocument: (id: string, format: ExportFormat, preset: ExportPreset = 'standard'): Promise<ExportResult> =>
     ipcRenderer.invoke('export:document', id, format, preset),

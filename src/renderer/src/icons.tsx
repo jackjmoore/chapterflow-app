@@ -632,3 +632,31 @@ export function TextBlockIcon(): JSX.Element {
     </Svg>
   )
 }
+
+/** Lexicon — an open book, distinct from the Story Bible's bookmark. */
+export function LexiconViewIcon(): JSX.Element {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M12 6.5C10.5 5.2 8.6 4.6 6 4.6c-.8 0-1.5.05-2 .12v13c.5-.07 1.2-.12 2-.12 2.6 0 4.5.6 6 1.9" />
+      <path d="M12 6.5c1.5-1.3 3.4-1.9 6-1.9.8 0 1.5.05 2 .12v13c-.5-.07-1.2-.12-2-.12-2.6 0-4.5.6-6 1.9" />
+      <path d="M12 6.5v13" />
+    </svg>
+  )
+}
+
+export function CommentIcon(): JSX.Element {
+  return (
+    <Svg>
+      <path d="M2.5 3.5h11v7.5h-6.5l-3 2.5v-2.5h-1.5z" />
+    </Svg>
+  )
+}
+
+export function HistoryIcon(): JSX.Element {
+  return (
+    <Svg>
+      <circle cx="8" cy="8" r="5.5" />
+      <path d="M8 4.8v3.4l2.2 1.4" />
+    </Svg>
+  )
+}

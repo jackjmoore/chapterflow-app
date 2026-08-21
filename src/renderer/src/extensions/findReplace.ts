@@ -26,6 +26,7 @@ declare module '@tiptap/core' {
       setSearchQuery: (query: string, options: SearchOptions) => ReturnType
       findNext: () => ReturnType
       findPrevious: () => ReturnType
+      goToMatch: (index: number) => ReturnType
       replaceCurrentMatch: (replacement: string) => ReturnType
       replaceAllMatches: (replacement: string) => ReturnType
       clearSearch: () => ReturnType
@@ -113,6 +114,24 @@ export const FindReplace = Extension.create<Record<string, never>, FindReplaceSt
               const first = matches[0]
               tr.setSelection(TextSelection.create(tr.doc, first.from, first.to)).scrollIntoView()
             }
+            dispatch(tr)
+          }
+          return true
+        },
+
+      /** Jumps straight to one match by its position in the list — what a
+       *  result row does, as against walking the list with the arrows. */
+      goToMatch:
+        (index) =>
+        ({ tr, dispatch }) => {
+          const { matches } = this.storage
+          if (index < 0 || index >= matches.length) return false
+          this.storage.currentIndex = index
+          if (dispatch) {
+            const match = matches[index]
+            tr.setMeta(pluginKey, true)
+              .setSelection(TextSelection.create(tr.doc, match.from, match.to))
+              .scrollIntoView()
             dispatch(tr)
           }
           return true

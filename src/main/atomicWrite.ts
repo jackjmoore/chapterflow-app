@@ -36,6 +36,36 @@ async function writeNow(filePath: string, data: string): Promise<void> {
   await renameWithRetry(tempPath, filePath)
 }
 
+type WriteObserver = (filePath: string, data: string) => void
+
+let observer: WriteObserver | null = null
+
+/**
+ * Registers a single observer notified after every successful project write,
+ * with the path and the exact content that was written.
+ *
+ * This is the seam the search index hangs off. Every store that persists
+ * project data already writes through atomicWrite, so one hook here keeps the
+ * index current across all of them — no store, IPC handler or feature needs to
+ * know the index exists, and because the content is passed through, the
+ * observer never re-reads the file and cannot race the write it is reacting
+ * to. The observer is invoked after the rename lands, so a failed write is
+ * never indexed.
+ */
+export function setProjectWriteObserver(next: WriteObserver | null): void {
+  observer = next
+}
+
+function notify(filePath: string, data: string): void {
+  if (!observer) return
+  try {
+    observer(filePath, data)
+  } catch {
+    // An observer must never be able to fail a save. Whatever it was
+    // maintaining will be rebuilt from the file itself on next load.
+  }
+}
+
 /**
  * Writes a file atomically (write to a temp file, then rename over the
  * target) so a crash mid-write never leaves a truncated/corrupt file.
@@ -44,10 +74,8 @@ async function writeNow(filePath: string, data: string): Promise<void> {
  */
 export function atomicWrite(filePath: string, data: string): Promise<void> {
   const previous = writeQueues.get(filePath) ?? Promise.resolve()
-  const thisWrite = previous.then(
-    () => writeNow(filePath, data),
-    () => writeNow(filePath, data)
-  )
+  const write = (): Promise<void> => writeNow(filePath, data).then(() => notify(filePath, data))
+  const thisWrite = previous.then(write, write)
   writeQueues.set(
     filePath,
     thisWrite.catch(() => undefined)

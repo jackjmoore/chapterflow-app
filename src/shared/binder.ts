@@ -62,9 +62,9 @@ export type ManuscriptView = 'editor' | 'outliner' | 'corkboard'
  * data without being manuscript-editing surfaces, which is exactly the
  * distinction the flat tab row used to hide.
  */
-export type RailSection = 'manuscript' | 'storyBible' | 'timeline' | 'submissions'
+export type RailSection = 'manuscript' | 'storyBible' | 'timeline' | 'submissions' | 'lexicon'
 
-export type ActiveView = ManuscriptView | 'storyBible' | 'timeline' | 'submissions'
+export type ActiveView = ManuscriptView | 'storyBible' | 'timeline' | 'submissions' | 'lexicon'
 
 export const MANUSCRIPT_VIEWS: ManuscriptView[] = ['editor', 'outliner', 'corkboard']
 

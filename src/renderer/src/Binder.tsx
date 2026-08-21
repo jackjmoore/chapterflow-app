@@ -36,8 +36,6 @@ interface BinderProps extends BinderActions {
   storyBibleItems: StoryBibleItem[]
   storyBibleTypes: StoryBibleTypeDef[]
   mentionRollup: Record<string, string[]>
-  /** Icon-only rail mode: names, badges, and row actions are suppressed. */
-  collapsed: boolean
 }
 
 interface RowProps {
@@ -61,8 +59,6 @@ interface RowProps {
   storyBibleItems: StoryBibleItem[]
   storyBibleTypes: StoryBibleTypeDef[]
   mentionRollup: Record<string, string[]>
-  /** Icon-only rail mode: names, badges, and row actions are suppressed. */
-  collapsed: boolean
 }
 
 function BinderRow(props: RowProps): JSX.Element {
@@ -86,8 +82,7 @@ function BinderRow(props: RowProps): JSX.Element {
     spanTagRollup,
     storyBibleItems,
     storyBibleTypes,
-    mentionRollup,
-    collapsed
+    mentionRollup
   } = props
 
   const [nameDraft, setNameDraft] = useState(node.name)
@@ -159,7 +154,6 @@ function BinderRow(props: RowProps): JSX.Element {
 
   const rowClasses = [
     'binder-row',
-    collapsed ? 'is-icon-only' : '',
     isSelected ? 'is-selected' : '',
     isActiveDoc ? 'is-active-doc' : '',
     isDropHighlight ? `drop-${dropTarget?.mode}` : ''
@@ -171,10 +165,7 @@ function BinderRow(props: RowProps): JSX.Element {
     <div className="binder-node">
       <div
         className={rowClasses}
-        // Indentation is meaningless without names to indent — the icon rail
-        // is a flat column, and the tooltip carries the name instead.
-        style={collapsed ? undefined : { paddingLeft: `${8 + depth * 16}px` }}
-        title={collapsed ? node.name || 'Untitled' : undefined}
+        style={{ paddingLeft: `${8 + depth * 16}px` }}
         draggable={!isEditing}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
@@ -194,7 +185,7 @@ function BinderRow(props: RowProps): JSX.Element {
         }}
         onContextMenu={handleContextMenu}
       >
-        {collapsed ? null : showChevron ? (
+        {showChevron ? (
           <button
             type="button"
             className="chevron-button"
@@ -215,7 +206,7 @@ function BinderRow(props: RowProps): JSX.Element {
 
         <span className="node-icon">{isFolder ? <FolderIcon /> : <DocumentIcon />}</span>
 
-        {collapsed ? null : isEditing ? (
+        {isEditing ? (
           <input
             className="rename-input"
             value={nameDraft}
@@ -239,7 +230,7 @@ function BinderRow(props: RowProps): JSX.Element {
           <span className="node-name">{node.name}</span>
         )}
 
-        {node.type === 'document' && !isEditing && !collapsed && (
+        {node.type === 'document' && !isEditing && (
           <span className="binder-row-badges">
             <StatusBadge status={resolveStatus(statuses, node.statusId)} />
             <TagChips tags={resolveTags(tags, node.tagIds)} />
@@ -248,7 +239,7 @@ function BinderRow(props: RowProps): JSX.Element {
           </span>
         )}
 
-        {node.type === 'document' && !collapsed && (
+        {node.type === 'document' && (
           <button
             type="button"
             className="row-split"
@@ -262,21 +253,19 @@ function BinderRow(props: RowProps): JSX.Element {
           </button>
         )}
 
-        {!collapsed && (
-          <button
-            type="button"
-            className="row-delete"
-            title={isFolder ? 'Delete folder' : 'Delete document'}
-            onClick={handleDelete}
-          >
-            <TrashIcon />
-          </button>
-        )}
+        <button
+          type="button"
+          className="row-delete"
+          title={isFolder ? 'Delete folder' : 'Delete document'}
+          onClick={handleDelete}
+        >
+          <TrashIcon />
+        </button>
       </div>
 
       {showChevron && !node.collapsed && (
         <div className="binder-list">
-          {node.children.length === 0 && !collapsed && (
+          {node.children.length === 0 && (
             <div
               className="binder-empty-folder"
               style={{ paddingLeft: `${8 + (depth + 1) * 16}px` }}
@@ -318,7 +307,6 @@ function BinderRow(props: RowProps): JSX.Element {
               storyBibleItems={storyBibleItems}
               storyBibleTypes={storyBibleTypes}
               mentionRollup={mentionRollup}
-              collapsed={collapsed}
             />
           ))}
         </div>
@@ -339,7 +327,6 @@ function Binder(props: BinderProps): JSX.Element {
     storyBibleItems,
     storyBibleTypes,
     mentionRollup,
-    collapsed,
     ...actions
   } = props
   const [dragId, setDragId] = useState<string | null>(null)
@@ -403,7 +390,6 @@ function Binder(props: BinderProps): JSX.Element {
           storyBibleItems={storyBibleItems}
           storyBibleTypes={storyBibleTypes}
           mentionRollup={mentionRollup}
-          collapsed={collapsed}
         />
       ))}
     </div>

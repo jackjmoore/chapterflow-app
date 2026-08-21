@@ -4,10 +4,38 @@ import type { ExportFormat, ExportOptions } from '../../shared/export'
 import { htmlToBlocks } from './htmlToBlocks'
 import { blocksToPlainText } from './toPlainText'
 import { blocksToMarkdown } from './toMarkdown'
-import { blocksToDocxParagraphs, sectionsToDocxBuffer, HEADING_LEVELS } from './toDocx'
-import { blocksToHtml, escapeHtml } from './blocksToHtml'
+import {
+  blocksToDocxParagraphs,
+  createFootnoteCollector,
+  sectionsToDocxBuffer,
+  HEADING_LEVELS,
+  type DocxImage
+} from './toDocx'
+import { blocksToHtml, escapeHtml, footnotesToHtml } from './blocksToHtml'
+import { numberFootnotes } from './footnotes'
 import { htmlToPdfBuffer } from './toPdf'
 import { buildProjectContent, type ProjectContent } from './projectExport'
+import { getImageDataUris, readImageBytes } from '../documentImageStore'
+import type { Block } from './htmlToBlocks'
+
+/** Every image id a set of blocks references, in one pass — so the renderers
+ *  can resolve them all before the synchronous block walk begins. */
+function imageIdsIn(blocks: Block[]): string[] {
+  const ids = new Set<string>()
+  for (const block of blocks) {
+    if (block.kind === 'image' && block.imageId) ids.add(block.imageId)
+  }
+  return [...ids]
+}
+
+async function resolveDocxImages(blocks: Block[]): Promise<Record<string, DocxImage>> {
+  const out: Record<string, DocxImage> = {}
+  for (const id of imageIdsIn(blocks)) {
+    const bytes = await readImageBytes(id)
+    if (bytes) out[id] = bytes
+  }
+  return out
+}
 
 export type { ExportFormat }
 export { buildPrintableHtml, printHtml } from './toPdf'
@@ -28,9 +56,14 @@ export const EXPORT_FILTER_NAMES: Record<ExportFormat, string> = {
 
 /** The preset only ever changes styling inputs — every format still runs the
  *  same htmlToBlocks parse and the same renderer beneath it. */
-export function renderDocumentHtml(html: string, options: ExportOptions): string {
+export async function renderDocumentHtml(html: string, options: ExportOptions): Promise<string> {
   const manuscript = options.preset === 'manuscript'
-  return blocksToHtml(htmlToBlocks(html), { manuscriptSceneBreaks: manuscript })
+  const blocks = htmlToBlocks(html)
+  const imageSources = await getImageDataUris(imageIdsIn(blocks))
+  return (
+    blocksToHtml(blocks, { manuscriptSceneBreaks: manuscript, imageSources }) +
+    footnotesToHtml(numberFootnotes(blocks))
+  )
 }
 
 export async function renderDocumentExport(
@@ -43,9 +76,16 @@ export async function renderDocumentExport(
   if (format === 'txt') return Buffer.from(blocksToPlainText(blocks), 'utf-8')
   if (format === 'md') return Buffer.from(blocksToMarkdown(blocks), 'utf-8')
   if (format === 'docx') {
-    return sectionsToDocxBuffer([{ children: blocksToDocxParagraphs(blocks, manuscript) }], options)
+    const footnotes = createFootnoteCollector()
+    const images = await resolveDocxImages(blocks)
+    const children = blocksToDocxParagraphs(blocks, { manuscript, footnotes, images })
+    return sectionsToDocxBuffer([{ children }], options, footnotes)
   }
-  return htmlToPdfBuffer(blocksToHtml(blocks, { manuscriptSceneBreaks: manuscript }), options)
+  const imageSources = await getImageDataUris(imageIdsIn(blocks))
+  const body =
+    blocksToHtml(blocks, { manuscriptSceneBreaks: manuscript, imageSources }) +
+    footnotesToHtml(numberFootnotes(blocks))
+  return htmlToPdfBuffer(body, options)
 }
 
 function projectToPlainText(content: ProjectContent, title: string): string {
@@ -91,6 +131,12 @@ async function projectToDocxBuffer(
     )
   ]
 
+  // One collector across every section, so footnote numbering runs
+  // continuously through the whole manuscript rather than restarting per file.
+  const footnotes = createFootnoteCollector()
+  const allBlocks = content.sections.flatMap((s) => s.blocks)
+  const images = await resolveDocxImages(allBlocks)
+
   let firstSection = true
   for (const section of content.sections) {
     children.push(
@@ -101,13 +147,20 @@ async function projectToDocxBuffer(
       })
     )
     firstSection = false
-    if (section.isDocument) children.push(...blocksToDocxParagraphs(section.blocks, manuscript))
+    if (section.isDocument) {
+      children.push(...blocksToDocxParagraphs(section.blocks, { manuscript, footnotes, images }))
+    }
   }
 
-  return sectionsToDocxBuffer([{ children }], options)
+  return sectionsToDocxBuffer([{ children }], options, footnotes)
 }
 
-export function projectToPdfHtml(content: ProjectContent, title: string, options: ExportOptions): string {
+export function projectToPdfHtml(
+  content: ProjectContent,
+  title: string,
+  options: ExportOptions,
+  imageSources: Record<string, string> = {}
+): string {
   const manuscript = options.preset === 'manuscript'
   const tocItems = content.toc
     .map((e) => {
@@ -120,14 +173,20 @@ export function projectToPdfHtml(content: ProjectContent, title: string, options
     const tag = `h${Math.min(section.level, 3)}`
     const cls = section.level === 1 ? ' class="chf-section-title"' : ''
     html += `<${tag}${cls}>${escapeHtml(section.title)}</${tag}>`
-    if (section.isDocument) html += blocksToHtml(section.blocks, { manuscriptSceneBreaks: manuscript })
+    if (section.isDocument) {
+      html += blocksToHtml(section.blocks, { manuscriptSceneBreaks: manuscript, imageSources })
+    }
   }
+  // Endnotes for the whole project, numbered continuously in section order —
+  // matching how the docx path numbers its real footnotes.
+  html += footnotesToHtml(numberFootnotes(content.sections.flatMap((s) => s.blocks)))
   return html
 }
 
 export async function renderProjectHtml(tree: BinderNode[], options: ExportOptions): Promise<string> {
   const content = await buildProjectContent(tree)
-  return projectToPdfHtml(content, options.title, options)
+  const imageSources = await getImageDataUris(imageIdsIn(content.sections.flatMap((s) => s.blocks)))
+  return projectToPdfHtml(content, options.title, options, imageSources)
 }
 
 export async function renderProjectExport(
@@ -141,5 +200,6 @@ export async function renderProjectExport(
   if (format === 'txt') return Buffer.from(projectToPlainText(content, title), 'utf-8')
   if (format === 'md') return Buffer.from(projectToMarkdown(content, title), 'utf-8')
   if (format === 'docx') return projectToDocxBuffer(content, title, options)
-  return htmlToPdfBuffer(projectToPdfHtml(content, title, options), options)
+  const imageSources = await getImageDataUris(imageIdsIn(content.sections.flatMap((s) => s.blocks)))
+  return htmlToPdfBuffer(projectToPdfHtml(content, title, options, imageSources), options)
 }
