@@ -1147,9 +1147,9 @@ function App(): JSX.Element {
       // picked in: the same shadow that reads as depth over a near-black
       // chrome reads as grime over a pale one. The stylesheet's own light and
       // dark values are the two ends this interpolates between.
-      root.setProperty('--shadow-weak', dark ? '0.16' : '0.05')
-      root.setProperty('--shadow-soft', dark ? '0.22' : '0.08')
-      root.setProperty('--shadow-strong', dark ? '0.3' : '0.12')
+      root.setProperty('--shadow-weak', dark ? '0.22' : '0.08')
+      root.setProperty('--shadow-soft', dark ? '0.3' : '0.13')
+      root.setProperty('--shadow-strong', dark ? '0.4' : '0.18')
     } else {
       root.removeProperty('--chrome-bg')
       root.removeProperty('--chrome-bg-elevated')
@@ -2649,6 +2649,10 @@ function App(): JSX.Element {
         {activeRailSection === 'manuscript' && (
           <Binder
             tree={tree}
+            // The same value the panel itself is sized from, so the badges
+            // respond as the drag happens rather than on a second measurement
+            // of the width that is already known here.
+            panelWidth={sidebarWidth}
             activeDocumentId={activeDocumentId}
             selectedId={selectedId}
             editRequestId={editRequestId}

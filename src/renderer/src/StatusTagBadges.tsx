@@ -1,11 +1,26 @@
 import type { StatusDef, TagDef } from '../../shared/binder'
 
 /** Same rendering logic used everywhere a document's status/tags show up
- *  (binder, outliner, corkboard) — one place, no duplicated markup. */
-export function StatusBadge({ status }: { status: StatusDef | undefined | null }): JSX.Element | null {
+ *  (binder, outliner, corkboard) — one place, no duplicated markup.
+ *
+ *  `compact` drops the label and keeps only the colour, for when the row is
+ *  too narrow to carry both a readable title and the word "Revising". The
+ *  name moves to the tooltip rather than being lost, so the colour never has
+ *  to be decoded from memory. Only the binder passes it; the outliner and
+ *  corkboard have the room and stay as they were. */
+export function StatusBadge({
+  status,
+  compact = false
+}: {
+  status: StatusDef | undefined | null
+  compact?: boolean
+}): JSX.Element | null {
   if (!status) return null
+  if (compact) {
+    return <span className="status-dot" style={{ backgroundColor: status.color }} title={status.name} />
+  }
   return (
-    <span className="status-badge" style={{ backgroundColor: status.color }}>
+    <span className="status-badge" style={{ backgroundColor: status.color }} title={status.name}>
       {status.name}
     </span>
   )

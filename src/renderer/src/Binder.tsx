@@ -25,8 +25,33 @@ interface BinderActions {
   onContextMenu: (node: BinderNode | null, x: number, y: number) => void
 }
 
+/**
+ * Below this many pixels of usable row width, the status badge gives up its
+ * label and becomes a dot.
+ *
+ * The arithmetic it stands for: a row spends roughly 40px on the chevron and
+ * file icon, ~28px on the split-view button, and needs ~110px before a title
+ * stops being readable. A spelled-out status costs another ~60px on top of
+ * that, and the character chips beside it are not negotiable — so past this
+ * point the badge is what has to give, not the title.
+ *
+ * Usable width is the panel's width minus the row's own indent, which is why
+ * a deeply nested document compacts before a top-level one does at the same
+ * panel width.
+ */
+const STATUS_LABEL_MIN_WIDTH = 240
+
+/** Mirrors the row's own `paddingLeft: 8 + depth * 16`. */
+function usableRowWidth(panelWidth: number, depth: number): number {
+  return panelWidth - (8 + depth * 16)
+}
+
 interface BinderProps extends BinderActions {
   tree: BinderNode[]
+  /** The live resizable panel width. Deliberately the same value the panel
+   *  itself is sized from, rather than a second measurement of the same
+   *  thing — one source of truth, and it updates as the drag happens. */
+  panelWidth: number
   activeDocumentId: string | null
   selectedId: string | null
   editRequestId: { id: string; token: number } | null
@@ -41,6 +66,7 @@ interface BinderProps extends BinderActions {
 interface RowProps {
   node: BinderNode
   depth: number
+  panelWidth: number
   parentId: string | null
   index: number
   activeDocumentId: string | null
@@ -82,7 +108,8 @@ function BinderRow(props: RowProps): JSX.Element {
     spanTagRollup,
     storyBibleItems,
     storyBibleTypes,
-    mentionRollup
+    mentionRollup,
+    panelWidth
   } = props
 
   const [nameDraft, setNameDraft] = useState(node.name)
@@ -232,7 +259,10 @@ function BinderRow(props: RowProps): JSX.Element {
 
         {node.type === 'document' && !isEditing && (
           <span className="binder-row-badges">
-            <StatusBadge status={resolveStatus(statuses, node.statusId)} />
+            <StatusBadge
+              status={resolveStatus(statuses, node.statusId)}
+              compact={usableRowWidth(panelWidth, depth) < STATUS_LABEL_MIN_WIDTH}
+            />
             <TagChips tags={resolveTags(tags, node.tagIds)} />
             <SpanTagRollupChips tags={resolveTags(tags, spanTagRollup[node.id] ?? [])} />
             <SpanTagRollupChips tags={resolveMentionChips(storyBibleItems, storyBibleTypes, mentionRollup[node.id] ?? [])} />
@@ -307,6 +337,7 @@ function BinderRow(props: RowProps): JSX.Element {
               storyBibleItems={storyBibleItems}
               storyBibleTypes={storyBibleTypes}
               mentionRollup={mentionRollup}
+              panelWidth={panelWidth}
             />
           ))}
         </div>
@@ -327,6 +358,7 @@ function Binder(props: BinderProps): JSX.Element {
     storyBibleItems,
     storyBibleTypes,
     mentionRollup,
+    panelWidth,
     ...actions
   } = props
   const [dragId, setDragId] = useState<string | null>(null)
@@ -390,6 +422,7 @@ function Binder(props: BinderProps): JSX.Element {
           storyBibleItems={storyBibleItems}
           storyBibleTypes={storyBibleTypes}
           mentionRollup={mentionRollup}
+          panelWidth={panelWidth}
         />
       ))}
     </div>

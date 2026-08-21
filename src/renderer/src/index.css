@@ -43,17 +43,21 @@
      the app — every chrome elevation is deliberately quieter than it. */
   --elev-0: none;
   --elev-1: 0 1px 2px rgb(var(--shadow-rgb) / var(--shadow-weak));
-  --elev-2: 0 6px 16px rgb(var(--shadow-rgb) / var(--shadow-soft));
-  --elev-3: 0 10px 28px rgb(var(--shadow-rgb) / var(--shadow-strong));
+  --elev-2:
+    0 1px 2px rgb(var(--shadow-rgb) / var(--shadow-weak)),
+    0 8px 20px rgb(var(--shadow-rgb) / var(--shadow-soft));
+  --elev-3:
+    0 2px 4px rgb(var(--shadow-rgb) / var(--shadow-soft)),
+    0 14px 34px rgb(var(--shadow-rgb) / var(--shadow-strong));
 
   /* Shadow colour, kept as channels so opacity can vary per step. Overridden
      for light themes, and set from the palette when a custom background is
      chosen — a dark shadow that suits a near-black chrome is far too heavy
      over a pale one. */
   --shadow-rgb: 0 0 0;
-  --shadow-weak: 0.16;
-  --shadow-soft: 0.22;
-  --shadow-strong: 0.3;
+  --shadow-weak: 0.22;
+  --shadow-soft: 0.3;
+  --shadow-strong: 0.4;
 
   /* Surfaces. Cards and rows lift by tone rather than by shadow, which is
      what keeps a dense list from looking quilted. */
@@ -110,9 +114,9 @@
 
 /* True-black (OLED) variant — additive on top of dark, never touches light. */
 :root[data-theme='dark'].true-black {
-  --shadow-weak: 0.5;
-  --shadow-soft: 0.6;
-  --shadow-strong: 0.7;
+  --shadow-weak: 0.6;
+  --shadow-soft: 0.7;
+  --shadow-strong: 0.8;
   --chrome-bg: #000000;
   --chrome-bg-elevated: #0a0a0a;
   --chrome-bg-sidebar: #000000;
@@ -126,9 +130,9 @@
 }
 
 :root[data-theme='light'] {
-  --shadow-weak: 0.05;
-  --shadow-soft: 0.08;
-  --shadow-strong: 0.12;
+  --shadow-weak: 0.08;
+  --shadow-soft: 0.13;
+  --shadow-strong: 0.18;
   --chrome-bg: #f5f1e8;
   --chrome-bg-elevated: #ece6d8;
   --chrome-bg-sidebar: #efe9dc;
@@ -1096,6 +1100,18 @@ button.menubar-item:hover {
   gap: var(--space-1);
   overflow: hidden;
   max-width: 45%;
+}
+
+/* The compact form of .status-badge. Same colour, no label — used only when
+   the binder is too narrow to carry both a readable title and the status
+   word. The name lives in the title attribute so the colour never has to be
+   decoded from memory. */
+.status-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgb(var(--shadow-rgb) / 0.25);
 }
 
 .status-badge {
@@ -4108,6 +4124,7 @@ button.menubar-item:hover {
 }
 
 .story-bible-card {
+  box-shadow: var(--elev-1);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -4650,7 +4667,85 @@ button.menubar-item:hover {
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-md);
   box-shadow: var(--elev-2);
+  cursor: default;
+}
+
+/* Reading the card costs nothing; leaving the editor takes a deliberate
+   press. The two actions are visually distinct on purpose — expand is a
+   quiet text control, open is the one that has a consequence. */
+.mention-hover-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--chrome-border);
+}
+
+.mention-hover-card-expand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-05);
+  height: 22px;
+  padding: 0 var(--space-1);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--chrome-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
   cursor: pointer;
+}
+
+.mention-hover-card-expand:hover {
+  color: var(--chrome-text-heading);
+  background: var(--chrome-row-hover);
+}
+
+.mention-hover-card-expand .icon {
+  transform: rotate(90deg);
+  transition: transform var(--motion-fast);
+}
+
+.mention-hover-card-expand.is-expanded .icon {
+  transform: rotate(-90deg);
+}
+
+.mention-hover-card-open {
+  flex-shrink: 0;
+  height: 22px;
+  padding: 0 var(--space-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--chrome-text-heading);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
+}
+
+.mention-hover-card-open:hover {
+  background: var(--chrome-control-hover);
+  border-color: var(--chrome-accent);
+  color: var(--chrome-accent);
+}
+
+.mention-hover-card-list {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--chrome-text-muted);
+}
+
+.mention-hover-card-list strong {
+  color: var(--chrome-text);
+}
+
+.mention-hover-card-list ul {
+  margin: var(--space-05) 0 0;
+  padding-left: var(--space-4);
 }
 
 .mention-hover-card-header {
@@ -6194,6 +6289,7 @@ button.menubar-item:hover {
 }
 
 .timeline-card {
+  box-shadow: var(--elev-1);
   flex: 1;
   min-width: 0;
   display: flex;
