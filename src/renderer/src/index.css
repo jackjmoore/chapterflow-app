@@ -11,6 +11,17 @@
   --radius-sm: 4px;
   --radius-md: 6px;
 
+  /* Motion. Two durations, and they exist to say that something changed —
+     a selection moved, a surface appeared. Nothing here animates for its own
+     sake, and nothing moves that the writer did not just cause. */
+  --motion-fast: var(--motion-fast);
+  --motion-surface: 0.3s ease;
+
+  /* Focus ring. Drawn as a shadow rather than an outline so it follows a
+     rounded corner and never changes an element's size — a focus ring that
+     nudges the layout is worse than none. */
+  --focus-ring: 0 0 0 2px var(--chrome-bg), 0 0 0 3px var(--chrome-accent);
+
   /* Type scale — a closed set. Everything in the interface is one of these,
      so a new component cannot quietly introduce a ninth size. The manuscript
      page sets its own size and is deliberately outside this scale. */
@@ -369,7 +380,7 @@ button.menubar-item:hover {
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: color 0.12s ease, background 0.12s ease;
+  transition: color var(--motion-fast), background var(--motion-fast);
 }
 
 .nav-rail-button:hover {
@@ -381,7 +392,14 @@ button.menubar-item:hover {
   color: var(--chrome-accent);
 }
 
-/* Active marker on the rail's outer edge, VS Code style. */
+/* The selection marker.
+   ----------------------------------------------------------------------
+   The icon rail, the collapsed minimap and the hover flyout are one
+   mechanism seen at three sizes, so "this is the one you are on" has to look
+   the same in all three: a 2px accent bar on the leading edge. The minimap is
+   the exception by necessity — its rows are 2-9px bars, too small to carry a
+   marker inside them, so there the whole bar becomes the marker and fills
+   with the accent instead. */
 .nav-rail-button.is-active::before {
   content: '';
   position: absolute;
@@ -604,7 +622,7 @@ button.menubar-item:hover {
   border-radius: 999px;
   background: var(--chrome-text-muted);
   opacity: 0.85;
-  transition: background-color 0.12s ease, opacity 0.12s ease;
+  transition: background-color var(--motion-fast), opacity var(--motion-fast);
 }
 
 /* Folders span the full track and sit visibly heavier — width and weight
@@ -693,7 +711,7 @@ button.menubar-item:hover {
   padding: var(--space-2) 0;
   border-radius: var(--radius-md);
   background: var(--chrome-bg-elevated);
-  border: 1px solid var(--chrome-border-strong);
+  border: 1px solid var(--chrome-border);
   box-shadow: var(--elev-2);
   overflow: hidden;
 }
@@ -706,6 +724,7 @@ button.menubar-item:hover {
 }
 
 .binder-flyout-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -713,6 +732,7 @@ button.menubar-item:hover {
   padding-right: var(--space-2);
   border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: background var(--motion-fast);
 }
 
 .binder-flyout-row:hover {
@@ -723,8 +743,21 @@ button.menubar-item:hover {
   background: var(--chrome-row-selected);
 }
 
+/* Same marker, same 2px, same accent as the rail button — see "The
+   selection marker" above. */
+.binder-flyout-row.is-active-doc::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: var(--space-05);
+  bottom: var(--space-05);
+  width: 2px;
+  border-radius: 1px;
+  background: var(--chrome-accent);
+}
+
 .binder-flyout-row.is-active-doc .node-name {
-  color: var(--chrome-accent);
+  color: var(--chrome-text-heading);
   font-weight: 600;
 }
 
@@ -935,7 +968,7 @@ button.menubar-item:hover {
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background-color 0.12s ease, color 0.12s ease;
+  transition: background-color var(--motion-fast), color var(--motion-fast);
 }
 
 .side-panel-header button:hover {
@@ -971,7 +1004,7 @@ button.menubar-item:hover {
   border-radius: var(--radius-sm);
   cursor: pointer;
   position: relative;
-  transition: background-color 0.1s ease;
+  transition: background-color var(--motion-fast);
 }
 
 .binder-row:hover {
@@ -1033,7 +1066,7 @@ button.menubar-item:hover {
 
 .chevron {
   display: inline-flex;
-  transition: transform 0.12s ease;
+  transition: transform var(--motion-fast);
 }
 
 .chevron.expanded {
@@ -1295,7 +1328,7 @@ button.menubar-item:hover {
   opacity: 0;
   visibility: hidden;
   transform: translateX(-50%) translateY(2px);
-  transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s ease;
+  transition: opacity var(--motion-fast), transform var(--motion-fast), visibility var(--motion-fast);
   pointer-events: none;
   width: max-content;
   max-width: 260px;
@@ -1377,7 +1410,7 @@ button.menubar-item:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.12s ease, border-color 0.12s ease;
+  transition: background-color var(--motion-fast), border-color var(--motion-fast);
 }
 
 .toolbar button:hover {
@@ -1856,7 +1889,7 @@ button.menubar-item:hover {
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: border-color 0.12s ease;
+  transition: border-color var(--motion-fast);
 }
 
 .corkboard-card-badges {
@@ -2936,9 +2969,13 @@ button.menubar-item:hover {
   cursor: pointer;
 }
 
-.search-result:hover,
+.search-result:hover {
+  background: var(--chrome-row-hover);
+}
+
 .search-result:focus-visible {
   background: var(--chrome-row-hover);
+  box-shadow: var(--focus-ring);
   outline: none;
 }
 
@@ -4082,7 +4119,7 @@ button.menubar-item:hover {
   border-radius: var(--radius-md);
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.12s ease;
+  transition: border-color var(--motion-fast);
 }
 
 .story-bible-card:hover {
@@ -4590,7 +4627,7 @@ button.menubar-item:hover {
 .mention-highlight {
   border-bottom: 1px dotted transparent;
   cursor: default;
-  transition: border-color 0.1s ease;
+  transition: border-color var(--motion-fast);
 }
 
 .mention-highlight:hover {
@@ -5214,7 +5251,7 @@ button.menubar-item:hover {
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: border-color 0.12s ease;
+  transition: border-color var(--motion-fast);
 }
 
 .sprint-preset:hover {
@@ -5634,7 +5671,7 @@ button.menubar-item:hover {
   gap: var(--space-1);
   flex-shrink: 0;
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity var(--motion-fast);
 }
 
 .relationship-row:hover .relationship-row-actions {
@@ -6084,12 +6121,20 @@ button.menubar-item:hover {
   padding-top: var(--space-2);
   color: var(--chrome-text-dim);
   cursor: grab;
-  opacity: 0;
-  transition: opacity 0.12s ease;
+  opacity: 0.3;
+  transition: opacity var(--motion-fast), color var(--motion-fast);
 }
 
 .timeline-row:hover .timeline-drag-handle {
   opacity: 1;
+  color: var(--chrome-text-muted);
+}
+
+.timeline-drag-handle:focus-visible {
+  opacity: 1;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--focus-ring);
+  outline: none;
 }
 
 .timeline-drag-handle:active {
@@ -6155,7 +6200,7 @@ button.menubar-item:hover {
   background: var(--chrome-bg-elevated);
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-md);
-  transition: border-color 0.12s ease;
+  transition: border-color var(--motion-fast);
 }
 
 .timeline-card.is-linked {
@@ -6187,7 +6232,7 @@ button.menubar-item:hover {
   gap: var(--space-1);
   flex-shrink: 0;
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity var(--motion-fast);
 }
 
 .timeline-row:hover .timeline-card-actions {
@@ -6474,4 +6519,37 @@ button.menubar-item:hover {
 
 .lexicon-row:hover .lexicon-delete {
   opacity: 1;
+}
+
+/* Keyboard focus
+   ----------------------------------------------------------------------
+   :focus-visible only, so clicking never draws a ring — the ring exists for
+   people navigating by keyboard, and showing it on every mouse press is the
+   reason so many apps end up removing it altogether. Drawn as a shadow so it
+   follows rounded corners and costs no layout. */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role='button']:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Inputs already show focus by borrowing the accent on their border; a ring
+   as well would be two signals for one state. */
+.find-input:focus-visible,
+.find-input-wrap:focus-within .find-input:focus-visible {
+  box-shadow: none;
+}
+
+/* Respect the system setting. Every transition here is a state change rather
+   than decoration, so this reduces them to instant rather than removing the
+   feedback. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
