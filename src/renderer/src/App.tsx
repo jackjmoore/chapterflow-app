@@ -1138,14 +1138,25 @@ function App(): JSX.Element {
   useEffect(() => {
     const root = document.documentElement.style
     if (backgroundColor) {
-      const shift = isDarkHex(backgroundColor) ? 10 : -10
+      const dark = isDarkHex(backgroundColor)
+      const shift = dark ? 10 : -10
       root.setProperty('--chrome-bg', backgroundColor)
       root.setProperty('--chrome-bg-elevated', shadeHex(backgroundColor, shift))
       root.setProperty('--chrome-bg-sidebar', shadeHex(backgroundColor, shift * 2))
+      // Elevation has to follow the chosen background, not the theme it was
+      // picked in: the same shadow that reads as depth over a near-black
+      // chrome reads as grime over a pale one. The stylesheet's own light and
+      // dark values are the two ends this interpolates between.
+      root.setProperty('--shadow-weak', dark ? '0.16' : '0.05')
+      root.setProperty('--shadow-soft', dark ? '0.22' : '0.08')
+      root.setProperty('--shadow-strong', dark ? '0.3' : '0.12')
     } else {
       root.removeProperty('--chrome-bg')
       root.removeProperty('--chrome-bg-elevated')
       root.removeProperty('--chrome-bg-sidebar')
+      root.removeProperty('--shadow-weak')
+      root.removeProperty('--shadow-soft')
+      root.removeProperty('--shadow-strong')
     }
   }, [backgroundColor])
 
