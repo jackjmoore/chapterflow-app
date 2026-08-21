@@ -113,6 +113,27 @@ export function recordProjectOpened(path: string, name: string | null): Promise<
 }
 
 /**
+ * Adds a project to the registry if it is not already there, without touching
+ * an existing row's lastOpenedAt — being looked at is not being opened.
+ *
+ * Read paths call this so the project currently in use is always listed, even
+ * if it arrived by a route that never announced itself: the default project
+ * folder is applied by projectRoot.ts rather than by a preference, so someone
+ * who has only ever used it has `projectRoot: null` saved and nothing would
+ * otherwise register them.
+ */
+export function ensureProject(path: string, name: string | null): Promise<void> {
+  return update((file) => {
+    const existing = file.projects.find((p) => p.path === path)
+    if (existing) {
+      if (name?.trim()) existing.name = name.trim()
+      return
+    }
+    entryFor(file, path).name = name?.trim() || basename(path)
+  })
+}
+
+/**
  * Called from the save path with the total wordCountStore has just recomputed.
  * Only the project's own row changes; the lifetime total is untouched, because
  * current size and words written are different questions.

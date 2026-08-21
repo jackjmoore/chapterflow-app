@@ -309,6 +309,125 @@ async function main(): Promise<void> {
       'and the lifetime word total is carried across, not reset per project'
     )
 
+    // ---- 3b. the registry repairs itself ---------------------------------
+    // Related to, but weaker than, the bug that prompted it: a writer who had
+    // only ever used the default project folder was never registered, because
+    // registration keyed off a saved projectRoot preference and the default
+    // folder is applied by projectRoot.ts instead. They met an empty Recent
+    // list with nothing to open.
+    //
+    // That exact path cannot be automated here without reading the real
+    // Documents folder on this machine, which would make the result depend on
+    // what happens to be in it — it is covered by reproduction rather than by
+    // this suite. What this does assert is the safety net around it: delete
+    // the registry from under a running app and the project in use comes back,
+    // through the read guarantee or the save path, rather than staying lost.
+    section(report, 'the registry repairs itself if it is lost')
+
+    await rm(join(userDataDir, 'lifetime.json'), { force: true })
+    assert(report, !existsSync(join(userDataDir, 'lifetime.json')), 'the registry is gone, after startup already ran')
+
+    await cdp.evaluate(`(() => {
+      const b = [...document.querySelectorAll('.welcome-project-open')][0]
+      if (b) b.click()
+      return true
+    })()`)
+    await sleep(3000)
+    cdp.close()
+    cdp = await connect(child!)
+    await sleep(2000)
+
+    await cdp.evaluate(`(() => {
+      const item = [...document.querySelectorAll('.menubar-top-button')].find((b) => b.textContent.trim() === 'File')
+      if (item) item.click()
+      return true
+    })()`)
+    await sleep(400)
+    await cdp.evaluate(`(() => {
+      const entry = [...document.querySelectorAll('.menubar-dropdown .menubar-item-label')]
+        .find((l) => l.textContent.trim() === 'Return to Dashboard')
+      if (entry) entry.closest('.menubar-item').click()
+      return true
+    })()`)
+    await sleep(2500)
+
+    const recovered = await cdp.evaluate<string[]>(
+      `(() => [...document.querySelectorAll('.welcome-project-open')].map((b) => b.getAttribute('title') ?? ''))()`
+    )
+    note(report, `recent list after the registry was removed mid-run: ${JSON.stringify(recovered)}`)
+    assert(
+      report,
+      recovered.length > 0,
+      `the project in use is listed again without a registry (${recovered.length} row(s))`
+    )
+
+    // ---- 3c. a recent row opens the project it names ----------------------
+    section(report, 'clicking a recent project opens that project')
+
+    // Both demo projects are identical, so B is renamed to tell them apart —
+    // and the registry is seeded directly, because the only in-app route to a
+    // second project is a folder dialog this cannot drive.
+    await shutdown()
+    const binderB = JSON.parse(await readFile(join(projectB, 'binder.json'), 'utf-8')) as { projectName: string }
+    binderB.projectName = 'Second Project'
+    await writeFile(join(projectB, 'binder.json'), JSON.stringify(binderB, null, 2))
+    await writeFile(
+      join(userDataDir, 'lifetime.json'),
+      JSON.stringify({
+        version: 1,
+        stats: { words: 0, sessionMs: 0, sessions: 0 },
+        projects: [
+          { path: projectA, name: 'First Project', lastOpenedAt: new Date().toISOString(), words: 0 },
+          { path: projectB, name: 'Second Project', lastOpenedAt: new Date(Date.now() - 86_400_000).toISOString(), words: 0 }
+        ]
+      })
+    )
+    await writeFile(
+      join(userDataDir, 'preferences.json'),
+      JSON.stringify({ theme: 'dark', sidebarWidth: 260, projectRoot: projectA })
+    )
+    cdp = await launch()
+
+    const twoRows = await cdp.evaluate<{ name: string; path: string }[]>(
+      `(() => [...document.querySelectorAll('.welcome-project-open')].map((b) => ({
+        name: b.querySelector('.welcome-project-name')?.textContent?.trim() ?? '',
+        path: b.getAttribute('title') ?? ''
+      })))()`
+    )
+    note(report, `recent list: ${JSON.stringify(twoRows.map((r) => r.name))}`)
+    assert(report, twoRows.length >= 2, `both projects are offered (${twoRows.length})`)
+
+    // The one that is NOT already loaded — clicking the row for the project
+    // already open cannot tell opening from doing nothing.
+    const clicked = await cdp.evaluate<boolean>(`(() => {
+      const other = [...document.querySelectorAll('.welcome-project-open')]
+        .find((b) => (b.getAttribute('title') ?? '') === ${JSON.stringify(projectB)})
+      if (!other) return false
+      other.click()
+      return true
+    })()`)
+    assert(report, clicked, 'the row for the other project is there to click')
+
+    // Opening a different project reloads the window to resync every store.
+    await sleep(4000)
+    cdp.close()
+    cdp = await connect(child!)
+    await sleep(2500)
+
+    assert(
+      report,
+      await cdp.evaluate<boolean>(`!!document.querySelector('.app-shell')`),
+      'clicking it leaves the dashboard for the editor'
+    )
+    const nowOpen = JSON.parse(await readFile(join(userDataDir, 'preferences.json'), 'utf-8')) as {
+      projectRoot: string
+    }
+    assert(
+      report,
+      nowOpen.projectRoot === projectB,
+      `and the project it named is the one now open (${nowOpen.projectRoot === projectB ? 'B' : nowOpen.projectRoot})`
+    )
+
     // ---- 4. skip on launch ------------------------------------------------
     section(report, 'skipping the dashboard, and getting back to it')
     await cdp.evaluate(`window.api.setSkipDashboardOnLaunch(true)`)

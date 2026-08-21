@@ -272,11 +272,13 @@ app.whenReady().then(async () => {
   // this) before anything else touches the project data — must happen before
   // the window loads so every store reads/writes the right location from the start.
   const persistedRoot = await preferencesStore.getProjectRoot()
-  if (persistedRoot) {
-    setProjectRoot(persistedRoot)
+  if (persistedRoot) setProjectRoot(persistedRoot)
+
+  const startupRoot = getProjectRoot()
+  if (projectExistsAt(startupRoot)) {
     void binderStore
       .getState()
-      .then((state) => lifetimeStore.recordProjectOpened(persistedRoot, state.projectName))
+      .then((state) => lifetimeStore.recordProjectOpened(startupRoot, state.projectName))
       .catch(() => undefined)
   }
 
@@ -724,9 +726,13 @@ app.whenReady().then(async () => {
   ipcMain.handle('search:stats', () => searchIndex.stats())
 
   /** One small file, already current. Nothing is scanned or aggregated here. */
-  ipcMain.handle('dashboard:data', async () =>
-    lifetimeStore.getDashboardData(await preferencesStore.getProjectRoot())
-  )
+  ipcMain.handle('dashboard:data', async () => {
+    const root = getProjectRoot()
+    if (projectExistsAt(root)) {
+      await lifetimeStore.ensureProject(root, (await binderStore.getState()).projectName)
+    }
+    return lifetimeStore.getDashboardData(root)
+  })
 
   ipcMain.handle('dashboard:forgetProject', (_event, path: string) => lifetimeStore.forgetProject(path))
 
@@ -1051,6 +1057,8 @@ app.whenReady().then(async () => {
   ipcMain.handle('template:apply', async (_event, id: TemplateId) => {
     await applyTemplate(id)
     backupStore.markDirty()
+    const root = getProjectRoot()
+    await lifetimeStore.recordProjectOpened(root, (await binderStore.getState()).projectName)
   })
 
   ipcMain.handle('project:exists', () => projectExistsAt(getProjectRoot()))
