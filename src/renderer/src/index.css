@@ -159,6 +159,55 @@
   box-sizing: border-box;
 }
 
+/* Scrollbars
+   ----------------------------------------------------------------------
+   One styled scrollbar for the whole app — editor, binder, Story Bible,
+   search results, every modal and panel that scrolls — rather than each
+   surface's own rule, so there is exactly one place this can drift from the
+   rest. Pill-shaped (fully rounded ends, not the OS rectangle) and tinted
+   from the live --chrome-accent via color-mix(), the same mechanism already
+   used for the Story Bible type pills and the search-tier accent fills — so
+   it follows a custom accent or a whole custom palette correctly, the same
+   requirement the elevation system already meets, rather than a colour that
+   only happens to look right under the default theme.
+
+   Deliberately only the -webkit-scrollbar pseudo-elements: this Chromium
+   also understands the standard scrollbar-width/scrollbar-color properties,
+   and declaring both on the same element lets the standard pair win, which
+   has no equivalent for the border/background-clip trick that makes the
+   thumb read as a pill narrower than its own track rather than filling it
+   edge to edge. Using one system, not both, is what keeps the shape.
+
+   The binder minimap suppresses its own scrollbar entirely (see
+   .binder-minimap) — that rule is more specific and wins outright, no
+   conflict with the rule here. */
+*::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--chrome-accent) 35%, transparent);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--chrome-accent) 55%, transparent);
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background-color: color-mix(in srgb, var(--chrome-accent) 75%, transparent);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
 
 html,
 body,
