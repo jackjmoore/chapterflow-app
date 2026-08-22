@@ -11,6 +11,9 @@ interface MentionHoverCardProps {
   onOpenItem: () => void
   onMouseEnter: () => void
   onMouseLeave: () => void
+  /** Drives the entrance/exit fade — see useFadePresence, which owns the
+   *  timing. This prop only ever flips a class; it never delays a mount. */
+  fadeVisible: boolean
 }
 
 /**
@@ -49,7 +52,7 @@ function htmlToPlainText(html: string): string {
  * without leaving takes the expand control.
  */
 function MentionHoverCard(props: MentionHoverCardProps): JSX.Element {
-  const { rect, item, type, sheet, onOpenItem, onMouseEnter, onMouseLeave } = props
+  const { rect, item, type, sheet, onOpenItem, onMouseEnter, onMouseLeave, fadeVisible } = props
   const [pos, setPos] = useState({ left: rect.left, top: rect.bottom + 6 })
   const [expanded, setExpanded] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -96,7 +99,7 @@ function MentionHoverCard(props: MentionHoverCardProps): JSX.Element {
   return (
     <div
       ref={ref}
-      className="mention-hover-card"
+      className={`mention-hover-card ${fadeVisible ? 'is-visible' : ''}`}
       style={{ left: pos.left, top: pos.top }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}

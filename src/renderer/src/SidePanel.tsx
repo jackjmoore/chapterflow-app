@@ -9,6 +9,7 @@ import {
 import type { RailSection } from '../../shared/binder'
 import type { StoryBibleTypeDef } from '../../shared/storyBible'
 import { NewDocumentIcon, NewFolderIcon, PlusIcon, PanelCollapseIcon, PanelExpandIcon } from './icons'
+import { useFadePresence } from './useFadePresence'
 
 /** Width of the collapsed rail. This is reserved, in-flow width — the rail is
  *  a flex sibling of the editor, never an overlay on top of it. At narrow
@@ -21,6 +22,12 @@ export const COLLAPSED_PANEL_WIDTH = 44
 /** Hovering across the rail on the way somewhere else shouldn't summon the
  *  flyout, and clipping a corner on the way back into it shouldn't dismiss it. */
 const FLYOUT_OPEN_DELAY_MS = 120
+/** How long the flyout takes to fade in or out, once scheduleFlyout has
+ *  already decided to open or close it — this is a separate, much shorter
+ *  delay from FLYOUT_OPEN_DELAY_MS/FLYOUT_CLOSE_DELAY_MS above, which are
+ *  hover-intent timers deciding *whether* to open at all. This one just
+ *  softens the resulting appear/disappear once that decision is made. */
+const FLYOUT_FADE_MS = 120
 const FLYOUT_CLOSE_DELAY_MS = 200
 
 /** The flyout's own width — independent of the resizable sidebarWidth it
@@ -116,6 +123,10 @@ function SidePanel(props: SidePanelProps): JSX.Element {
   const newItemPickerRef = useRef<HTMLDivElement>(null)
   const [flyoutOpen, setFlyoutOpen] = useState(false)
   const flyoutTimerRef = useRef<number | null>(null)
+  // See useFadePresence: keeps the flyout mounted for one fade after
+  // flyoutOpen goes false, instead of the instant removal a plain
+  // "flyoutOpen && (...)" gives.
+  const flyoutFade = useFadePresence(flyoutOpen ? true : null, FLYOUT_FADE_MS)
 
   // Same dismiss-on-outside-click contract as the browse grid's New… popover.
   useEffect(() => {
@@ -283,9 +294,9 @@ function SidePanel(props: SidePanelProps): JSX.Element {
           <div className="side-panel-rail-spacer side-panel-rail-spacer--footer" style={{ height: FOOTER_HEIGHT }} />
         )}
 
-        {flyoutOpen && (
+        {flyoutFade.rendered && (
           <div
-            className="side-panel-flyout"
+            className={`side-panel-flyout ${flyoutFade.visible ? 'is-visible' : ''}`}
             style={{ width: FLYOUT_WIDTH }}
             onMouseEnter={clearFlyoutTimer}
             onFocus={clearFlyoutTimer}

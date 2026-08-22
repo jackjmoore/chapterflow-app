@@ -529,6 +529,75 @@ async function main(): Promise<void> {
     }
     await moveAway()
 
+    // ---- 2d. the hover card fades, and respects reduced motion ------------
+    section(report, 'the hover card fades in and out, unless reduced motion is set')
+
+    await openCard(mentionPoints[0])
+    const justOpened = await evaluate<{ opacity: string; hasVisibleClass: boolean; transitionDuration: string }>(`(() => {
+      const c = document.querySelector('.mention-hover-card')
+      const s = getComputedStyle(c)
+      return { opacity: s.opacity, hasVisibleClass: c.classList.contains('is-visible'), transitionDuration: s.transitionDuration }
+    })()`)
+    note(report, `right after opening: ${JSON.stringify(justOpened)}`)
+    assert(
+      report,
+      justOpened.transitionDuration !== '0s',
+      `the card actually declares an opacity transition (${justOpened.transitionDuration})`
+    )
+    await sleep(400)
+    const settledOpen = await evaluate<{ opacity: string }>(
+      `({ opacity: getComputedStyle(document.querySelector('.mention-hover-card')).opacity })`
+    )
+    assert(report, settledOpen.opacity === '1', `and settles fully opaque (opacity ${settledOpen.opacity})`)
+
+    // Leaving: the card must still be in the DOM immediately (mid fade-out),
+    // then gone shortly after — not instantly, not stuck. Deliberately does
+    // NOT use moveAway() here: that helper sleeps 700ms before returning,
+    // which is longer than the whole fade, so "immediately after" would
+    // really mean "long after" and could never observe the transient state.
+    await move(700, 20)
+    const midFadeOut = await evaluate<{ present: boolean; opacity: string | null }>(`(() => {
+      const c = document.querySelector('.mention-hover-card')
+      return { present: !!c, opacity: c ? getComputedStyle(c).opacity : null }
+    })()`)
+    note(report, `immediately after leaving: ${JSON.stringify(midFadeOut)}`)
+    assert(report, midFadeOut.present, 'the card is still mounted the instant the cursor leaves (fading out, not gone)')
+    await sleep(500)
+    assert(
+      report,
+      (await cardCount()) === 0,
+      'and is fully removed shortly after — the fade does not leave it stuck'
+    )
+
+    // Reduced motion: same interaction, but the card must appear and vanish
+    // synchronously, exactly like the pre-fade static behaviour — nothing
+    // should linger in the DOM waiting out a fade the writer opted out of.
+    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+    await sleep(200)
+
+    await openCard(mentionPoints[0])
+    const reducedOpen = await evaluate<{ opacity: string }>(
+      `({ opacity: getComputedStyle(document.querySelector('.mention-hover-card')).opacity })`
+    )
+    note(report, `reduced motion, right after opening: opacity ${reducedOpen.opacity}`)
+    assert(
+      report,
+      reducedOpen.opacity === '1',
+      `under reduced motion the card is fully visible immediately, no fade-in step (opacity ${reducedOpen.opacity})`
+    )
+
+    await moveAway()
+    // No settling sleep here on purpose: under reduced motion the removal is
+    // synchronous, so this has to already be true on the very next check.
+    assert(
+      report,
+      (await cardCount()) === 0,
+      'and under reduced motion, leaving removes it at once rather than after a fade delay'
+    )
+
+    await send('Emulation.setEmulatedMedia', { features: [] })
+    await sleep(200)
+
     // ---- 3. elevation is present and stepped ------------------------------
     section(report, 'elevation reads as three distinct steps')
     const elevation: { one: string; two: string; three: string; card: string } = await evaluate(`(() => {

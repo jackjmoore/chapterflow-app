@@ -2,6 +2,7 @@ import {
   Fragment,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useReducer,
   useRef,
   useState,
@@ -55,6 +56,7 @@ import EditorContextMenu from './EditorContextMenu'
 import BinderContextMenu from './BinderContextMenu'
 import MentionHoverCard from './MentionHoverCard'
 import LexiconHoverCard from './LexiconHoverCard'
+import { useFadePresence } from './useFadePresence'
 import ImportReportModal from './ImportReportModal'
 import type { ImportResult } from '../../shared/import'
 import SubmissionsView from './SubmissionsView'
@@ -252,6 +254,18 @@ const openEditorOnLoad = ((): boolean => {
  *  card vanishing, short enough that leaving feels immediate. */
 const HOVER_DISMISS_MS = 150
 
+/** How long the Story Bible hover cards take to fade in or out. Quick enough
+ *  to still feel immediate on a fast hover-past, present enough to read as a
+ *  deliberate transition rather than a static toggle. Shares the app's one
+ *  "fast" duration (see --motion-fast) rather than inventing a third value. */
+const HOVER_FADE_MS = 120
+
+/** Which of the two hover cards is showing, and its trigger's rect — see the
+ *  comment on activeHoverPopover for why this is one value, not two. */
+type HoveredPopover =
+  | { kind: 'mention'; itemId: string; rect: DOMRect }
+  | { kind: 'lexicon'; word: string; rect: DOMRect }
+
 function App(): JSX.Element {
   const [status, setStatus] = useState<Status>('idle')
   const [tree, setTree] = useState<BinderNode[]>([])
@@ -318,6 +332,31 @@ function App(): JSX.Element {
   const [sentContent, setSentContent] = useState<{ title: string; html: string | null; error: string | null } | null>(null)
   const [hoveredMention, setHoveredMention] = useState<{ itemId: string; rect: DOMRect } | null>(null)
   const [hoveredLexiconWord, setHoveredLexiconWord] = useState<{ word: string; rect: DOMRect } | null>(null)
+  /**
+   * hoveredMention and hoveredLexiconWord are mutually exclusive by
+   * construction — a word can carry both a mention decoration and Lexicon
+   * suppression on the same span (the root cause of the stuck-open-card bug
+   * fixed earlier), so the handler that sets one always clears the other in
+   * the same tick. Faded independently, that handover would mount both
+   * cards at once for up to HOVER_FADE_MS — one fading out, one fading in,
+   * stacked at the same rect. Deriving one discriminated value and feeding
+   * it through a single fade hook keeps that exclusivity: switching kinds
+   * is a same-tick swap of content (handled by useFadePresence's normal
+   * "value changed while already shown" path — a hard cut, then a fresh
+   * fade-in) rather than two cards overlapping.
+   */
+  // Memoised: without this, activeHoverPopover is a fresh object literal on
+  // every App render — which happens for reasons that have nothing to do with
+  // hovering — so useFadePresence's [value] effect (reference equality) saw a
+  // "new" value on nearly every render even while sitting still on one word,
+  // restarting the entrance animation frame before setVisible(true) ever
+  // committed. The card mounted but stayed stuck near opacity 0.
+  const activeHoverPopover: HoveredPopover | null = useMemo(() => {
+    if (hoveredMention) return { kind: 'mention', itemId: hoveredMention.itemId, rect: hoveredMention.rect }
+    if (hoveredLexiconWord) return { kind: 'lexicon', word: hoveredLexiconWord.word, rect: hoveredLexiconWord.rect }
+    return null
+  }, [hoveredMention, hoveredLexiconWord])
+  const popoverFade = useFadePresence(activeHoverPopover, HOVER_FADE_MS)
   /** Mirrors hoveredLexiconWord for the mousemove rule, which must not re-run
    *  its effect every time the hovered word changes. */
   const hoveredLexiconWordRef = useRef<string | null>(null)
@@ -3204,16 +3243,16 @@ function App(): JSX.Element {
             />
           )}
 
-          {hoveredLexiconWord &&
+          {popoverFade.rendered?.kind === 'lexicon' &&
             (() => {
-              const entry = lexiconEntries.find(
-                (e) => e.word.trim().toLowerCase() === hoveredLexiconWord.word
-              )
+              const hovered = popoverFade.rendered as Extract<HoveredPopover, { kind: 'lexicon' }>
+              const entry = lexiconEntries.find((e) => e.word.trim().toLowerCase() === hovered.word)
               if (!entry) return null
               return (
                 <LexiconHoverCard
-                  rect={hoveredLexiconWord.rect}
+                  rect={hovered.rect}
                   entry={entry}
+                  fadeVisible={popoverFade.visible}
                   onOpenEntry={() => {
                     setHoveredLexiconWord(null)
                     handleViewChange('lexicon')
@@ -3225,17 +3264,19 @@ function App(): JSX.Element {
               )
             })()}
 
-          {hoveredMention &&
+          {popoverFade.rendered?.kind === 'mention' &&
             (() => {
-              const item = storyBibleItems.find((i) => i.id === hoveredMention.itemId)
+              const hovered = popoverFade.rendered as Extract<HoveredPopover, { kind: 'mention' }>
+              const item = storyBibleItems.find((i) => i.id === hovered.itemId)
               if (!item) return null
               const type = storyBibleTypes.find((t) => t.id === item.typeId) ?? null
               return (
                 <MentionHoverCard
-                  rect={hoveredMention.rect}
+                  rect={hovered.rect}
                   item={item}
                   type={type}
                   sheet={hoveredMentionSheet}
+                  fadeVisible={popoverFade.visible}
                   onOpenItem={() => handleOpenMentionItem(item.id)}
                   onMouseEnter={clearHoverHideTimer}
                   onMouseLeave={scheduleHoverDismiss}

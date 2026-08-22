@@ -14,7 +14,7 @@
   /* Motion. Two durations, and they exist to say that something changed —
      a selection moved, a surface appeared. Nothing here animates for its own
      sake, and nothing moves that the writer did not just cause. */
-  --motion-fast: var(--motion-fast);
+  --motion-fast: 0.12s ease;
   --motion-surface: 0.3s ease;
 
   /* Focus ring. Drawn as a shadow rather than an outline so it follows a
@@ -158,6 +158,7 @@
 * {
   box-sizing: border-box;
 }
+
 
 html,
 body,
@@ -701,6 +702,11 @@ button.menubar-item:hover {
    only ceiling — a sensible absolute cap, and never more than the rail
    actually has room for — past which the list scrolls internally instead of
    growing further. Centered vertically in the space that leaves. */
+/* Same fade contract as .mention-hover-card: starts transparent, .is-visible
+   flips it to opaque a frame after mount, and the element is only removed
+   once the exit fade finishes (useFadePresence's job). The vertical centring
+   transform stays untouched by the fade, which only ever animates opacity —
+   adding a transform here as well would fight translateY(-50%). */
 .side-panel-flyout {
   position: absolute;
   top: 50%;
@@ -714,10 +720,16 @@ button.menubar-item:hover {
   max-height: min(480px, calc(100% - var(--space-4)));
   padding: var(--space-2) 0;
   border-radius: var(--radius-md);
+  opacity: 0;
+  transition: opacity var(--motion-fast);
   background: var(--chrome-bg-elevated);
   border: 1px solid var(--chrome-border);
   box-shadow: var(--elev-2);
   overflow: hidden;
+}
+
+.side-panel-flyout.is-visible {
+  opacity: 1;
 }
 
 .binder-flyout-list {
@@ -4975,6 +4987,11 @@ button.menubar-item:hover {
   border-bottom-color: var(--chrome-accent);
 }
 
+/* Starts transparent and fades to full opacity once useFadePresence flips
+   the .is-visible class a frame after mount — never later, so the card is
+   never left invisible-but-present. The reverse (losing .is-visible while
+   still mounted) is the exit fade; the element is only removed from the DOM
+   once that finishes, which is also useFadePresence's job, not this rule's. */
 .mention-hover-card {
   position: fixed;
   z-index: 40;
@@ -4988,6 +5005,12 @@ button.menubar-item:hover {
   border-radius: var(--radius-md);
   box-shadow: var(--elev-2);
   cursor: default;
+  opacity: 0;
+  transition: opacity var(--motion-fast);
+}
+
+.mention-hover-card.is-visible {
+  opacity: 1;
 }
 
 /* Reading the card costs nothing; leaving the editor takes a deliberate

@@ -7,6 +7,9 @@ interface LexiconHoverCardProps {
   onOpenEntry: () => void
   onMouseEnter: () => void
   onMouseLeave: () => void
+  /** Drives the entrance/exit fade — see useFadePresence, which owns the
+   *  timing. This prop only ever flips a class; it never delays a mount. */
+  fadeVisible: boolean
 }
 
 /**
@@ -16,7 +19,7 @@ interface LexiconHoverCardProps {
  * one behaviour rather than two lookalikes.
  */
 function LexiconHoverCard(props: LexiconHoverCardProps): JSX.Element {
-  const { rect, entry, onOpenEntry, onMouseEnter, onMouseLeave } = props
+  const { rect, entry, onOpenEntry, onMouseEnter, onMouseLeave, fadeVisible } = props
   const [pos, setPos] = useState({ left: rect.left, top: rect.bottom + 6 })
   const ref = useRef<HTMLDivElement>(null)
 
@@ -33,7 +36,7 @@ function LexiconHoverCard(props: LexiconHoverCardProps): JSX.Element {
   return (
     <div
       ref={ref}
-      className="mention-hover-card"
+      className={`mention-hover-card ${fadeVisible ? 'is-visible' : ''}`}
       style={{ left: pos.left, top: pos.top }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
