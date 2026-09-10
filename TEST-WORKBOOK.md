@@ -16,7 +16,7 @@ runner's results JSON under `test-results/` plus one summary line per run in `TE
 
 | Day | Shift | Work | Needs Jack |
 |---|---|---|---|
-| 1 | A | Commit the working tree as the baseline. Run every suite through the runner once. Record status and duration per suite. | Done: commit permission given. |
+| 1 | A | Done 2026-09-10. Baseline `3e416c5`; 17 of 21 suites passed; see `FINDINGS/2026-09-10-baseline-run.md`. | No |
 | 1 | B | Fix only what stops the runner completing. Two concurrent `--no-prepare` runs to prove the port fix. Correct the structure suite's stale header. Find what wrote the mangled-path folder in the repo root. | No |
 | 2 | A | Filesystem integration, part one: write ordering under contention, observer failure never failing a save, the unreadable-binder guard, the same guard on the Story Bible index and every other store that has one. | No |
 | 2 | B | Part two: delete cascade leaves nothing in `documents/`, snapshots or span tags. Duplicate yields fresh ids with copied content. Random valid moves preserve node count and every id. Bulk insert refuses duplicates and protected ids. Four legacy binder shapes open and round-trip. | No |

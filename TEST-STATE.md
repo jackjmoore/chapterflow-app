@@ -6,51 +6,52 @@ Four sentences per section, six for What's in progress. Anything needing more te
 detail than two sentences goes in a `FINDINGS/` file and gets one plain sentence here
 pointing at it.
 
-Last updated: 2026-09-09 by Jack, by hand. No shifts have run yet.
+Last updated: 2026-09-10 at the close of shift 1A.
 
 ## Where it stands
 
-The test suite work has just started, and no scheduled routine has run against the repo.
-A blind spot pass on 2026-09-09 established what can and can't run in a cloud routine, and
-its findings are written up in `FINDINGS/2026-09-09-headless-viability.md`. The main result
-is that Electron does run in the cloud under a virtual display, so the limits are about
-fonts, timing and system libraries rather than about displays. Nothing has been built yet
-beyond that map.
+The working tree is committed as `3e416c5`, so for the first time a cloud routine would test
+the same app that runs on this machine. The runner completes all twenty-one suites in just
+under eighteen minutes and writes a record per suite; seventeen passed with 867 assertions in
+total. The seven-day plan is in `TEST-WORKBOOK.md` and shift 1A is ticked. Fonts, Scrivener
+and where recorded numbers live are settled, as noted at the top of the workbook.
 
 ## What happened last shift
 
-No shift has run. This file was written by hand to establish the format.
+Shift 1A committed the baseline, wrote the workbook, and ran every suite once. Four suites did
+not pass: freshness and lexicon for the same reasons as on 2026-09-09, searchui on three
+assertions of the intermittent kind, and polish on eight assertions in the Story Bible hover
+card and Lexicon alphabet strip. Per-suite table and failure text are in
+`FINDINGS/2026-09-10-baseline-run.md`.
 
 ## What's in progress
 
-The test runner is being reworked so an unattended routine can use it, which is the first
-piece of work and blocks everything else. The three problems being fixed are: suites chained
-with `&&` so one failure stops the run, about ten rebuilds of the app inside a single `npm test`,
-and four CDP suites binding fixed ports (9345, 9347, 9359, 9367) that collide if two runs
-share a machine. No suite's assertions are changing, only how they are invoked and how results
-come back. Awaiting the implementation plan.
+Shift 1B is next: fix only what stops the runner completing, which today is nothing, so the
+shift goes to the rest of its list. Two concurrent `--no-prepare` runs to prove the dynamic
+port fix. Rerun polish and searchui to sort timing from regression, since the hover card was
+the subject of the two commits before the baseline. Correct the structure suite's header,
+which still cites the deleted `run-electron-test.mjs`. Delete the mangled-path folder in the
+repo root, which is an empty binder from 2026-08-20 and cannot be reproduced by current
+suites. Record a second bookrender duration against the 420 seconds seen today.
 
 ## What's waiting on Jack
 
-Whether to bundle the serif fonts with the app. The PDF and Book View stylesheets in
-`toPdf.ts:75` and `bookPdf.ts:56` request Iowan Old Style, Palatino Linotype, Georgia and
-Times New Roman, none of which are bundled, so page counts differ by machine and page layout
-cannot be tested anywhere except Jack's own. The repo also has 84 modified files and about
-16,000 changed lines uncommitted against a last commit dated 2026-08-22, and cloud routines
-test the commit rather than the working tree, so nothing scheduled is meaningful until that
-lands.
+Nothing blocks the next shift. Whether to fix the eight polish failures if 1B confirms them
+is a renderer change and needs visual confirmation, so it waits for Jack. Whether the
+freshness assertion should skip when no installed app exists, as it will on a cloud runner.
 
 ## What's been ruled out
 
 Windows Task Scheduler and headless `claude -p` as the scheduling mechanism, replaced by
-Claude Code Routines, which run on Anthropic's cloud and need no local machine. Pixel-diff
-comparison for compile output, because page breaks depend on fonts that are not guaranteed
-to exist. Asserting page counts or layout numbers in any cloud test, for the same reason.
+Claude Code Routines. Pixel-diff comparison for compile output and any page-count or layout
+assertion outside Times New Roman on this machine, since that is the one unbundled font.
+Committing the Scrivener corpus, which is git-ignored apart from its README. The
+`FINDINGS/2026-09-09-headless-viability.md` file earlier entries cite was never written and
+is not being reconstructed.
 
 ## What's next
 
-Finish the runner rework and confirm it with two suites running concurrently, one of them
-failing. Then fix the font check in the hidden-window suite, which currently reads the
-requested font family rather than the resolved one and therefore passes on a fallback.
-Then begin the fixture corpus. The 1M-word ceiling fixture waits until the corpus is proven
-at a smaller size.
+Shift 1B as above. Then day 2: filesystem integration for the data-loss and binder-corruption
+invariants, starting with atomicWrite ordering and the unreadable-binder guard, none of which
+has a test today. Day 3 replaces the demo generator's fresh UUIDs with a fully seeded fixture
+so days 4 and 5 have known word counts to assert against.

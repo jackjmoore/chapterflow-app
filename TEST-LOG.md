@@ -41,3 +41,27 @@ Baseline shift. The working tree is committed as it stands (last commit before t
 2026-08-22), `TEST-WORKBOOK.md` is written from the agreed seven-day plan, and every suite is
 run once through `scripts/run-tests.mjs` to record per-suite status and duration. Nothing is
 fixed this shift beyond what stops the runner completing. In flight: the full suite run.
+
+## 2026-09-10 — shift 1A close
+
+Baseline established. The working tree was committed as `3e416c5` (everything since
+2026-08-22, about 115 files), then `TEST-WORKBOOK.md` was written from the agreed seven-day plan
+and `TEST-STATE.md` rewritten. The runner ran all twenty-one suites to completion in just under
+eighteen minutes: seventeen passed, 867 assertions in total. Per-suite table and the
+text of every failure in `FINDINGS/2026-09-10-baseline-run.md`.
+
+Four suites did not pass. freshness and lexicon fail as they did on 2026-09-09 and for the
+same reasons, so neither is new. searchui failed three assertions of the kind the 2026-09-09
+note already called intermittent. polish failed eight, all in the Story Bible hover card and the
+Lexicon alphabet strip; the hover card was the subject of the two commits before the baseline,
+so these may be real and are the first thing shift 1B should rerun.
+
+Two things noted on the way. The folder `UsersjackmOneDriveDocumentsChapterFlow Demo` in the
+repo root is an empty binder created on 2026-08-20; its name is a Windows path with the
+backslashes eaten by a JavaScript string literal, and the surviving `C:` prefix made it
+drive-relative, so it landed in the current directory. Current suites pass paths through
+JSON.stringify and cannot reproduce it; it is safe to delete. And bookrender took 420 seconds,
+which has no earlier number to compare against.
+
+The `FINDINGS/2026-09-09-headless-viability.md` file the earlier entries point at does not exist
+on disk and was never committed. Nothing in this shift depended on it.
