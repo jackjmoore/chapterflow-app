@@ -107,10 +107,14 @@ export function recoverOpenSession(): Promise<WritingSession | null> {
     if (!open) return null
     const sealed = sealSession(open)
     file.openSession = null
-    if (sealed.durationMs > 0 && !file.sessions.some((s) => s.id === sealed.id)) {
-      file.sessions.push(sealed)
-    }
+    // Returned only when this call is what actually sealed it. The caller adds
+    // its delta to the lifetime total, and that addition is irreversible — a
+    // session already present here (a checkpoint that raced a close) must not
+    // be handed over a second time and counted twice.
+    const alreadySealed = file.sessions.some((s) => s.id === sealed.id)
+    const isNew = sealed.durationMs > 0 && !alreadySealed
+    if (isNew) file.sessions.push(sealed)
     await persistIndex(file)
-    return sealed.durationMs > 0 ? sealed : null
+    return isNew ? sealed : null
   })
 }

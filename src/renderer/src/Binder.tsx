@@ -1,9 +1,11 @@
-import { useEffect, useState, type DragEvent, type MouseEvent } from 'react'
-import type { BinderNode, StatusDef, TagDef } from '../../shared/binder'
+import { useEffect, useMemo, useState, type CSSProperties, type DragEvent, type MouseEvent } from 'react'
+import { DRAFT_FOLDER_ID, draftChildren, isStructuralFolderId } from '../../shared/binder'
+import type { BinderNode, DocumentNode, StatusDef, TagDef } from '../../shared/binder'
 import type { StoryBibleItem, StoryBibleTypeDef } from '../../shared/storyBible'
-import { ChevronIcon, DocumentIcon, FolderIcon, SplitViewIcon, TrashIcon } from './icons'
-import { RowChips, StatusBadge, chipCapFor, resolveStatus, resolveTags, type RowChip } from './StatusTagBadges'
+import { ChevronIcon, SplitViewIcon, TrashIcon } from './icons'
+import { SpanTagRollupChips, TagChips, resolveStatus, resolveTags } from './StatusTagBadges'
 import { resolveMentionChips } from './mentionUtils'
+import { usePresence, presenceClass } from './usePresence'
 
 type DropMode = 'before' | 'after' | 'inside'
 
@@ -14,44 +16,34 @@ interface DropTarget {
   mode: DropMode
 }
 
+/** Where the status edge under the pointer is, and whose card to raise. */
+interface EdgeHover {
+  node: DocumentNode
+  left: number
+  top: number
+}
+
 interface BinderActions {
   onSelect: (id: string | null) => void
   onOpenDocument: (id: string) => void
+  /** Clicking any folder — structural or ordinary, at any depth — opens the
+   *  merged read-only view of its contents: the same traversal, pagination,
+   *  and Flat/3D book rendering the old dedicated draft entry used, now
+   *  scoped to whatever folder was clicked. */
+  onOpenFolderView: (id: string) => void
   onToggleCollapse: (id: string) => void
   onRename: (id: string, name: string) => void
   onDelete: (id: string) => void
   onMove: (id: string, targetParentId: string | null, targetIndex: number) => void
   onOpenSplitView: (id: string) => void
   onContextMenu: (node: BinderNode | null, x: number, y: number) => void
-}
-
-/**
- * Below this many pixels of usable row width, the status badge gives up its
- * label and becomes a dot.
- *
- * The arithmetic it stands for: a row spends roughly 40px on the chevron and
- * file icon, ~28px on the split-view button, and needs ~110px before a title
- * stops being readable. A spelled-out status costs another ~60px on top of
- * that, and the character chips beside it are not negotiable — so past this
- * point the badge is what has to give, not the title.
- *
- * Usable width is the panel's width minus the row's own indent, which is why
- * a deeply nested document compacts before a top-level one does at the same
- * panel width.
- */
-const STATUS_LABEL_MIN_WIDTH = 240
-
-/** Mirrors the row's own `paddingLeft: 8 + depth * 16`. */
-function usableRowWidth(panelWidth: number, depth: number): number {
-  return panelWidth - (8 + depth * 16)
+  /** A manually assigned chapter number, independent of tree position — see
+   *  DocumentNode.chapterNumber. null clears it. */
+  onEditChapterNumber: (id: string, value: number | null) => void
 }
 
 interface BinderProps extends BinderActions {
   tree: BinderNode[]
-  /** The live resizable panel width. Deliberately the same value the panel
-   *  itself is sized from, rather than a second measurement of the same
-   *  thing — one source of truth, and it updates as the drag happens. */
-  panelWidth: number
   activeDocumentId: string | null
   selectedId: string | null
   editRequestId: { id: string; token: number } | null
@@ -61,66 +53,86 @@ interface BinderProps extends BinderActions {
   storyBibleItems: StoryBibleItem[]
   storyBibleTypes: StoryBibleTypeDef[]
   mentionRollup: Record<string, string[]>
+  /** Live per-document word counts — the same record the Outliner and the
+   *  Progress page read, so the binder can never disagree with them. */
+  wordCounts: Record<string, number>
 }
 
 interface RowProps {
   node: BinderNode
-  depth: number
-  panelWidth: number
   parentId: string | null
   index: number
+  /** Whether this node lives inside Draft — counts are manuscript-only, so
+   *  Notes and Matter rows never show one. The Draft folder itself shows the
+   *  roll-up of everything it holds. */
+  inDraft: boolean
   activeDocumentId: string | null
   selectedId: string | null
   editingId: string | null
   setEditingId: (id: string | null) => void
   dragId: string | null
+  /** Whether the node currently being dragged is a folder. Only folders may
+   *  land at the binder root, so a document drag must not be offered
+   *  before/after positions on a root row that it can never occupy. */
+  dragIsFolder: boolean
   setDragId: (id: string | null) => void
   dropTarget: DropTarget | null
   setDropTarget: (t: DropTarget | null) => void
   onDropCommit: () => void
+  setEdgeHover: (hover: EdgeHover | null) => void
   actions: BinderActions
   statuses: StatusDef[]
   tags: TagDef[]
   spanTagRollup: Record<string, string[]>
-  storyBibleItems: StoryBibleItem[]
-  storyBibleTypes: StoryBibleTypeDef[]
   mentionRollup: Record<string, string[]>
+  wordCounts: Record<string, number>
+  subtreeWords: Map<string, number>
 }
 
 function BinderRow(props: RowProps): JSX.Element {
   const {
     node,
-    depth,
     parentId,
     index,
+    inDraft,
     activeDocumentId,
     selectedId,
     editingId,
     setEditingId,
     dragId,
+    dragIsFolder,
     setDragId,
     dropTarget,
     setDropTarget,
     onDropCommit,
+    setEdgeHover,
     actions,
     statuses,
     tags,
     spanTagRollup,
-    storyBibleItems,
-    storyBibleTypes,
     mentionRollup,
-    panelWidth
+    wordCounts,
+    subtreeWords
   } = props
 
   const [nameDraft, setNameDraft] = useState(node.name)
   const isFolder = node.type === 'folder'
-  const isEditing = editingId === node.id
+  // Draft/Notes/Matter/Archive/Trash: fixed rows. No drag, no rename, no
+  // delete — only their contents behave like ordinary binder items.
+  // binderStore refuses all three operations too; hiding the affordances
+  // keeps the UI honest. A custom top-level folder is NOT one of these: it
+  // sits at the same level and is otherwise an ordinary row.
+  const isStructural = isStructuralFolderId(node.id)
+  const atRoot = parentId === null
+  const isEditing = editingId === node.id && !isStructural
   const isSelected = selectedId === node.id
   const isActiveDoc = node.type === 'document' && node.id === activeDocumentId
   const isDropHighlight = dropTarget?.overId === node.id
   // Folders always show their expand affordance; a document only grows one
-  // once it actually has children, so plain leaf documents stay uncluttered.
+  // once it actually has children — and with the file icons gone, a plain
+  // leaf document spends nothing at all on the disclosure column.
   const showChevron = isFolder || node.children.length > 0
+  const childPresence = usePresence(node.collapsed ? null : true)
 
   useEffect(() => {
     if (isEditing) setNameDraft(node.name)
@@ -142,12 +154,22 @@ function BinderRow(props: RowProps): JSX.Element {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', node.id)
     setDragId(node.id)
+    setEdgeHover(null)
   }
 
   function handleDragOver(e: DragEvent<HTMLDivElement>): void {
     if (!dragId || dragId === node.id) return
     e.preventDefault()
     e.stopPropagation()
+
+    // A structural row's own position is fixed, so the only drop it offers is
+    // into itself — which for Archive and Trash is the whole point of them.
+    // The same applies to any root row while a document is being dragged: the
+    // root takes folders only, so before/after there would be a dead drop.
+    if (isStructural || (atRoot && !dragIsFolder)) {
+      setDropTarget({ overId: node.id, parentId: node.id, index: node.children.length, mode: 'inside' })
+      return
+    }
 
     const rect = e.currentTarget.getBoundingClientRect()
     const ratio = (e.clientY - rect.top) / rect.height
@@ -183,17 +205,38 @@ function BinderRow(props: RowProps): JSX.Element {
     'binder-row',
     isSelected ? 'is-selected' : '',
     isActiveDoc ? 'is-active-doc' : '',
+    isStructural ? 'is-structural' : '',
     isDropHighlight ? `drop-${dropTarget?.mode}` : ''
   ]
     .filter(Boolean)
     .join(' ')
 
+  // The status/tags edge. Rendered whenever the row has anything to say —
+  // status colours it; a statusless row with tags gets a neutral bar so its
+  // tags stay discoverable. The card itself is raised by the root, outside
+  // this scroller.
+  const status = node.type === 'document' ? resolveStatus(statuses, node.statusId) : undefined
+  const hasEdge =
+    node.type === 'document' &&
+    (status != null ||
+      node.tagIds.length > 0 ||
+      (spanTagRollup[node.id]?.length ?? 0) > 0 ||
+      (mentionRollup[node.id]?.length ?? 0) > 0)
+
+  // Manuscript words, always visible where they mean something: a document's
+  // own count inside Draft; a folder's roll-up (Draft itself included).
+  const countsAsDraft = inDraft || node.id === DRAFT_FOLDER_ID
+  const wordCount = !countsAsDraft
+    ? null
+    : node.type === 'document'
+      ? (wordCounts[node.id] ?? 0)
+      : (subtreeWords.get(node.id) ?? 0)
+
   return (
     <div className="binder-node">
       <div
         className={rowClasses}
-        style={{ paddingLeft: `${8 + depth * 16}px` }}
-        draggable={!isEditing}
+        draggable={!isEditing && !isStructural}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
@@ -204,15 +247,35 @@ function BinderRow(props: RowProps): JSX.Element {
         onClick={(e) => {
           e.stopPropagation()
           actions.onSelect(node.id)
+          // Documents open in the editor exactly as always; a folder click —
+          // any folder, any depth — opens the merged view of its contents.
           if (node.type === 'document') actions.onOpenDocument(node.id)
+          else actions.onOpenFolderView(node.id)
         }}
         onDoubleClick={(e) => {
           e.stopPropagation()
-          startEditing()
+          if (!isStructural) startEditing()
         }}
         onContextMenu={handleContextMenu}
       >
-        {showChevron ? (
+        {hasEdge && (
+          <span
+            className="binder-status-edge"
+            aria-label={status ? `Status: ${status.name}` : 'Tags'}
+            style={{ '--edge-color': status?.color ?? 'var(--chrome-border-strong)' } as CSSProperties}
+            onMouseEnter={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect()
+              setEdgeHover({
+                node: node as DocumentNode,
+                left: rect.right + 6,
+                top: Math.min(Math.max(rect.top + rect.height / 2, 48), window.innerHeight - 48)
+              })
+            }}
+            onMouseLeave={() => setEdgeHover(null)}
+          />
+        )}
+
+        {showChevron && (
           <button
             type="button"
             className="chevron-button"
@@ -227,11 +290,44 @@ function BinderRow(props: RowProps): JSX.Element {
               <ChevronIcon />
             </span>
           </button>
-        ) : (
-          <span className="chevron-spacer" />
         )}
 
-        <span className="node-icon">{isFolder ? <FolderIcon /> : <DocumentIcon />}</span>
+        {/* A manual label, not a computed one — deliberately independent of
+            this row's actual position in the tree (that position already
+            shows via ordering/indent). Document-only: a folder has no
+            chapter of its own to number. With the file icons gone this is
+            the document's leading mark; the placeholder stays invisible
+            until the row is hovered, so unnumbered rows read clean. */}
+        {node.type === 'document' && !isEditing && (
+          <input
+            key={node.chapterNumber ?? 'unset'}
+            type="number"
+            min={0}
+            step={1}
+            className="chapter-number-input"
+            defaultValue={node.chapterNumber ?? ''}
+            placeholder="#"
+            title="Chapter number (manual label — does not affect ordering, search, or export)"
+            onClick={(e) => e.stopPropagation()}
+            onBlur={(e) => {
+              const raw = e.target.value.trim()
+              const next = raw ? Math.max(0, Math.round(Number(raw))) : null
+              if (next !== node.chapterNumber) actions.onEditChapterNumber(node.id, next)
+            }}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                e.currentTarget.blur()
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                e.currentTarget.value = node.chapterNumber !== null ? String(node.chapterNumber) : ''
+                e.currentTarget.blur()
+              }
+            }}
+          />
+        )}
 
         {isEditing ? (
           <input
@@ -257,27 +353,8 @@ function BinderRow(props: RowProps): JSX.Element {
           <span className="node-name">{node.name}</span>
         )}
 
-        {node.type === 'document' && !isEditing && (
-          <span className="binder-row-badges">
-            <StatusBadge
-              status={resolveStatus(statuses, node.statusId)}
-              compact={usableRowWidth(panelWidth, depth) < STATUS_LABEL_MIN_WIDTH}
-            />
-            {/* One capped list rather than three unbounded ones: the cap has to
-                apply across all of them, or a row with one tag and four
-                mentions is just as crowded as before. The status circle sits
-                outside it and is not counted. */}
-            <RowChips
-              cap={chipCapFor(usableRowWidth(panelWidth, depth))}
-              chips={[
-                ...resolveTags(tags, node.tagIds).map((t) => ({ ...t, filled: true }) as RowChip),
-                ...resolveTags(tags, spanTagRollup[node.id] ?? []).map((t) => ({ ...t, filled: false }) as RowChip),
-                ...resolveMentionChips(storyBibleItems, storyBibleTypes, mentionRollup[node.id] ?? []).map(
-                  (t) => ({ ...t, filled: false }) as RowChip
-                )
-              ]}
-            />
-          </span>
+        {wordCount != null && !isEditing && (
+          <span className="binder-row-count">{wordCount.toLocaleString()}</span>
         )}
 
         {node.type === 'document' && (
@@ -294,22 +371,27 @@ function BinderRow(props: RowProps): JSX.Element {
           </button>
         )}
 
-        <button
-          type="button"
-          className="row-delete"
-          title={isFolder ? 'Delete folder' : 'Delete document'}
-          onClick={handleDelete}
-        >
-          <TrashIcon />
-        </button>
+        {!isStructural && (
+          <button
+            type="button"
+            className="row-delete"
+            title={isFolder ? 'Delete folder' : 'Delete document'}
+            onClick={handleDelete}
+          >
+            <TrashIcon />
+          </button>
+        )}
       </div>
 
-      {showChevron && !node.collapsed && (
-        <div className="binder-list">
+      {/* Held open through usePresence for one exit rather than unmounted on
+          the click, so the children fade and settle instead of blinking out.
+          Per row, so only the folder actually toggled animates — its
+          siblings never re-enter. */}
+      {showChevron && childPresence.rendered && (
+        <div className={`binder-list ${presenceClass(childPresence.visible)}`}>
           {node.children.length === 0 && (
             <div
               className="binder-empty-folder"
-              style={{ paddingLeft: `${8 + (depth + 1) * 16}px` }}
               onDragOver={(e) => {
                 if (!dragId || dragId === node.id) return
                 e.preventDefault()
@@ -329,26 +411,27 @@ function BinderRow(props: RowProps): JSX.Element {
             <BinderRow
               key={child.id}
               node={child}
-              depth={depth + 1}
               parentId={node.id}
               index={childIndex}
+              inDraft={countsAsDraft}
               activeDocumentId={activeDocumentId}
               selectedId={selectedId}
               editingId={editingId}
               setEditingId={setEditingId}
               dragId={dragId}
+              dragIsFolder={dragIsFolder}
               setDragId={setDragId}
               dropTarget={dropTarget}
               setDropTarget={setDropTarget}
               onDropCommit={onDropCommit}
+              setEdgeHover={setEdgeHover}
               actions={actions}
               statuses={statuses}
               tags={tags}
               spanTagRollup={spanTagRollup}
-              storyBibleItems={storyBibleItems}
-              storyBibleTypes={storyBibleTypes}
               mentionRollup={mentionRollup}
-              panelWidth={panelWidth}
+              wordCounts={wordCounts}
+              subtreeWords={subtreeWords}
             />
           ))}
         </div>
@@ -369,17 +452,48 @@ function Binder(props: BinderProps): JSX.Element {
     storyBibleItems,
     storyBibleTypes,
     mentionRollup,
-    panelWidth,
+    wordCounts,
     ...actions
   } = props
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [edgeHover, setEdgeHover] = useState<EdgeHover | null>(null)
 
   useEffect(() => {
     if (editRequestId) setEditingId(editRequestId.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editRequestId?.token])
+
+  // Only folders may sit at the binder root, so rows there offer before/after
+  // positions to a folder drag and "into me" to everything else. Resolved
+  // once here rather than per row.
+  const dragIsFolder = useMemo(() => {
+    if (!dragId) return false
+    const find = (nodes: BinderNode[]): BinderNode | null => {
+      for (const node of nodes) {
+        if (node.id === dragId) return node
+        const hit = find(node.children)
+        if (hit) return hit
+      }
+      return null
+    }
+    return find(tree)?.type === 'folder'
+  }, [dragId, tree])
+
+  // Folder roll-ups, one walk per tree/counts change. Every folder's entry is
+  // the sum of the documents anywhere beneath it — display filters to Draft.
+  const subtreeWords = useMemo(() => {
+    const totals = new Map<string, number>()
+    const walk = (node: BinderNode): number => {
+      let sum = node.type === 'document' ? (wordCounts[node.id] ?? 0) : 0
+      for (const child of node.children) sum += walk(child)
+      if (node.type === 'folder') totals.set(node.id, sum)
+      return sum
+    }
+    for (const node of tree) walk(node)
+    return totals
+  }, [tree, wordCounts])
 
   function handleDropCommit(): void {
     if (dragId && dropTarget) {
@@ -388,6 +502,34 @@ function Binder(props: BinderProps): JSX.Element {
     setDragId(null)
     setDropTarget(null)
   }
+
+  // The card the status edge raises: status plus every kind of chip the row
+  // used to wear inline — own tags filled, contained span tags and Story
+  // Bible mentions outlined. Fixed-position because the binder scrolls, and
+  // pointer-inert so it can overlap neighbouring rows without stealing them.
+  const edgeCard = edgeHover && (
+    <div className="binder-edge-card" style={{ left: edgeHover.left, top: edgeHover.top }}>
+      {(() => {
+        const status = resolveStatus(statuses, edgeHover.node.statusId)
+        const contained = [
+          ...resolveTags(tags, spanTagRollup[edgeHover.node.id] ?? []),
+          ...resolveMentionChips(storyBibleItems, storyBibleTypes, mentionRollup[edgeHover.node.id] ?? [])
+        ]
+        return (
+          <>
+            {status && (
+              <div className="binder-edge-card-status">
+                <span className="status-dot" style={{ backgroundColor: status.color }} />
+                {status.name}
+              </div>
+            )}
+            <TagChips tags={resolveTags(tags, edgeHover.node.tagIds)} />
+            <SpanTagRollupChips tags={contained} />
+          </>
+        )
+      })()}
+    </div>
+  )
 
   return (
     <div
@@ -402,7 +544,14 @@ function Binder(props: BinderProps): JSX.Element {
       onDragOver={(e) => {
         if (e.target === e.currentTarget && dragId) {
           e.preventDefault()
-          setDropTarget({ overId: '__root__', parentId: null, index: tree.length, mode: 'after' })
+          // Empty space below the tree means "end of the manuscript" — the
+          // root itself permanently holds only the structural folders.
+          setDropTarget({
+            overId: '__root__',
+            parentId: DRAFT_FOLDER_ID,
+            index: draftChildren(tree).length,
+            mode: 'after'
+          })
         }
       }}
       onDrop={(e) => {
@@ -414,28 +563,30 @@ function Binder(props: BinderProps): JSX.Element {
         <BinderRow
           key={node.id}
           node={node}
-          depth={0}
           parentId={null}
           index={index}
+          inDraft={false}
           activeDocumentId={activeDocumentId}
           selectedId={selectedId}
           editingId={editingId}
           setEditingId={setEditingId}
           dragId={dragId}
+          dragIsFolder={dragIsFolder}
           setDragId={setDragId}
           dropTarget={dropTarget}
           setDropTarget={setDropTarget}
           onDropCommit={handleDropCommit}
+          setEdgeHover={setEdgeHover}
           actions={actions}
           statuses={statuses}
           tags={tags}
           spanTagRollup={spanTagRollup}
-          storyBibleItems={storyBibleItems}
-          storyBibleTypes={storyBibleTypes}
           mentionRollup={mentionRollup}
-          panelWidth={panelWidth}
+          wordCounts={wordCounts}
+          subtreeWords={subtreeWords}
         />
       ))}
+      {edgeCard}
     </div>
   )
 }

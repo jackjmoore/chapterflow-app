@@ -17,6 +17,25 @@
   --motion-fast: 0.12s ease;
   --motion-surface: 0.3s ease;
 
+  /* Presence: appearing and disappearing. Faster to close than to open —
+     something arriving deserves a moment to be seen arriving, something
+     leaving should get out of the way. The two -ms numbers are the single
+     source of truth: usePresence reads them straight off :root to know how
+     long to hold a closing element mounted, so the timing is never written
+     down twice. Change them here and both the CSS and the JS follow.
+
+     Only transform and opacity are ever animated with these. Width, height,
+     top and left are not compositor properties: animating them relayouts on
+     every frame, which is visible jank in Electron specifically. The cost is
+     that surrounding layout snaps to its new size while the element itself
+     moves — accepted deliberately. */
+  --motion-enter-ms: 180;
+  --motion-exit-ms: 150;
+  --motion-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --motion-enter: calc(var(--motion-enter-ms) * 1ms) var(--motion-ease-out);
+  --motion-exit: calc(var(--motion-exit-ms) * 1ms) var(--motion-ease-in);
+
   /* Focus ring. Drawn as a shadow rather than an outline so it follows a
      rounded corner and never changes an element's size — a focus ring that
      nudges the layout is worse than none. */
@@ -33,6 +52,10 @@
   --text-xl: 20px;
   --text-2xl: 26px;
   --text-display: 32px;
+  /* One deliberate step above the scale: the Progress page's hero figure,
+     set in the page's serif — closer to the manuscript than to chrome.
+     Not for any other component. */
+  --text-hero: 56px;
 
   /* Elevation.
      Four steps and no more. This interface was built against the glassy,
@@ -63,6 +86,24 @@
      what keeps a dense list from looking quilted. */
   --surface-raised: var(--chrome-bg-elevated);
 
+  /* The page frame.
+     Every section that takes the panel's width — the two dashboards, Compile,
+     the Story Bible, the Continuity Board, the Query Tracker and the Lexicon —
+     lays its content out in this one column, with these paddings. Before this
+     existed each of those pages had picked its own: four different paddings
+     and six different measures between 660 and 1120, so clicking down the nav
+     rail moved the left edge of the content on every single step. The measure
+     is the widest of them, because it is the one the compile assembly's
+     two-column proof needs; pages whose content is prose cap the *text*
+     inside the column rather than narrowing the column, so the page still
+     starts and ends where every other page does. */
+  --page-measure: 1120px;
+  --page-pad-x: var(--space-5);
+  --page-pad-top: var(--space-5);
+  --page-pad-bottom: var(--space-6);
+  /* A comfortable line for running prose inside the page column. */
+  --page-prose: 72ch;
+
   /* Typography — sans for chrome, serif for the page. */
   --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-editor: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
@@ -88,6 +129,12 @@
   --editor-highlight-default: #e8c468;
   --editor-match-bg: #ffe999;
   --editor-match-current-bg: #ff9d4d;
+  /* Revision mode. Editor tokens rather than the chrome accents the Compare
+     Snapshots modal uses, because this markup sits on the paper itself — and
+     muted ink versions of the same green/red, since a whole manuscript marked
+     up in signal colours is unreadable. */
+  --editor-revision-add: #3f7a4a;
+  --editor-revision-del: #a24a3e;
 
   /* Chrome tokens — dark, the default */
   --chrome-bg: #1c1a17;
@@ -110,23 +157,6 @@
   --chrome-accent-saving: #c9a227;
   --chrome-accent-saved: #7a9b6e;
   --chrome-accent-error: #c26a5a;
-}
-
-/* True-black (OLED) variant — additive on top of dark, never touches light. */
-:root[data-theme='dark'].true-black {
-  --shadow-weak: 0.6;
-  --shadow-soft: 0.7;
-  --shadow-strong: 0.8;
-  --chrome-bg: #000000;
-  --chrome-bg-elevated: #0a0a0a;
-  --chrome-bg-sidebar: #000000;
-  --chrome-border: #1a1a1a;
-  --chrome-border-strong: #262626;
-  --chrome-control-bg: #0d0d0d;
-  --chrome-control-hover: #161616;
-  --chrome-control-active-bg: #1f1f1f;
-  --chrome-row-hover: #0a0a0a;
-  --chrome-row-selected: #131313;
 }
 
 :root[data-theme='light'] {
@@ -240,6 +270,12 @@ body {
   -webkit-app-region: drag;
 }
 
+.titlebar-mark {
+  display: inline-flex;
+  margin-right: var(--space-2);
+  color: var(--chrome-text-heading);
+}
+
 .titlebar-title {
   font-size: var(--text-sm);
   font-weight: 600;
@@ -327,12 +363,35 @@ button.menubar-item:hover {
   background: var(--chrome-control-hover);
 }
 
+/* An item that cannot be taken right now. Dimmed rather than hidden, so the
+   menu keeps its shape; its tooltip carries the reason. */
+button.menubar-item:disabled,
+button.menubar-item:disabled:hover {
+  color: var(--chrome-text-dim);
+  background: transparent;
+  cursor: default;
+}
+
 .menubar-item-label {
   flex: 1;
 }
 
 .menubar-item--checkable {
   padding-left: var(--space-1);
+}
+
+/* One left edge per menu.
+   A checkable item reserves a 14px gutter for its tick; a plain one does not,
+   so a menu holding both used to alternate between two left edges down the
+   list — most visibly in View, six times over ten items. Where a list has any
+   checkable item it is flagged, and its plain items are indented by exactly
+   the gutter and the flex gap so every label starts in the same place. */
+.menubar-dropdown--checkable > .menubar-item {
+  padding-left: var(--space-1);
+}
+
+.menubar-dropdown--checkable > .menubar-item:not(.menubar-item--checkable) {
+  padding-left: calc(var(--space-1) + 14px + var(--space-4));
 }
 
 .menubar-item-check {
@@ -397,6 +456,18 @@ button.menubar-item:hover {
   flex-direction: column;
 }
 
+/* The box every manuscript/tool pane is drawn into. Takes exactly the shape
+   the panes used to have as direct children of .app — flex column, filling
+   the space left by the toolbar and footer — so introducing it changed no
+   layout. It exists only to give the view switch a single element to fade,
+   instead of ten panes each fading themselves. */
+.view-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .empty-state {
   flex: 1;
   display: flex;
@@ -422,6 +493,14 @@ button.menubar-item:hover {
   border-right: 1px solid var(--chrome-border);
 }
 
+/* Rail icon states — three named states with exact values:
+   IDLE   — icon only: color var(--chrome-text-muted), background none.
+   HOVER  — icon color UNCHANGED from idle; a low-opacity fill appears:
+            color-mix(in srgb, var(--chrome-text-heading) 8%, transparent).
+   ACTIVE — filled background var(--chrome-control-active-bg), icon in
+            var(--chrome-accent) using the icon's filled variant, plus a 3px
+            accent bar on the rail's left edge spanning the full 36px height
+            of the icon's row. */
 .nav-rail-button {
   position: relative;
   display: flex;
@@ -438,31 +517,116 @@ button.menubar-item:hover {
 }
 
 .nav-rail-button:hover {
-  color: var(--chrome-text-heading);
-  background: var(--chrome-control-bg);
+  background: color-mix(in srgb, var(--chrome-text-heading) 8%, transparent);
 }
 
-.nav-rail-button.is-active {
-  color: var(--chrome-accent);
+/* The active icon wears heading ink, not accent: a preset is free to choose
+   a near-neutral accent (Nightfall Ledger's taupe), and accent-on-fill can't
+   be guaranteed legible across arbitrary palettes. The accent's job in this
+   state is the edge bar — a non-text mark, held to the 3:1 non-text bar. */
+.nav-rail-button.is-active,
+.nav-rail-button.is-active:hover {
+  color: var(--chrome-text-heading);
+  background: var(--chrome-control-active-bg);
 }
 
 /* The selection marker.
    ----------------------------------------------------------------------
    The icon rail, the collapsed minimap and the hover flyout are one
    mechanism seen at three sizes, so "this is the one you are on" has to look
-   the same in all three: a 2px accent bar on the leading edge. The minimap is
+   the same in all three: an accent bar on the leading edge. The minimap is
    the exception by necessity — its rows are 2-9px bars, too small to carry a
    marker inside them, so there the whole bar becomes the marker and fills
-   with the accent instead. */
+   with the accent instead. left:-6px lands the bar at the rail's own left
+   edge (the 36px button sits centered in the 48px rail); top/bottom 0 make
+   it the full height of the icon's row. */
 .nav-rail-button.is-active::before {
   content: '';
   position: absolute;
   left: -6px;
-  top: 6px;
-  bottom: 6px;
-  width: 2px;
-  border-radius: 1px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 0;
   background: var(--chrome-accent);
+}
+
+/* Hover reveal — the icon lifts, then its name pops out to the right.
+   ----------------------------------------------------------------------
+   Same timing and the same discipline as the presence work (see
+   --motion-enter/--motion-exit and .motion-presence): 180ms ease-out in,
+   150ms ease-in out, transform and opacity only.
+
+   Driven by CSS :hover rather than usePresence, and that is not a shortcut.
+   The hook exists to hold a *conditionally rendered* element in the DOM long
+   enough to play its exit. These labels are rendered unconditionally for
+   every button (see NavRail.tsx), so there is nothing to hold — the element
+   is always there and only its class state changes, which is the condition
+   the hook was written to manufacture. Reaching for it here would add React
+   state on every mouse move across the rail to reproduce what the element
+   already has. */
+
+.nav-rail-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--motion-exit);
+}
+
+.nav-rail-button:hover .nav-rail-icon {
+  transform: scale(1.12);
+  transition: transform var(--motion-enter);
+}
+
+/* The lift under the icon. A separate layer faded with opacity, because a
+   box-shadow cannot be animated on the compositor — ::before is already the
+   active section's edge bar, so this is ::after. */
+.nav-rail-button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--elev-2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-exit);
+}
+
+.nav-rail-button:hover::after {
+  opacity: 1;
+  transition: opacity var(--motion-enter);
+}
+
+/* The name, out to the right of the rail. Absolutely positioned so it costs
+   the rail no width and never reflows it, and z-indexed over the side panel,
+   which follows the rail in the DOM and would otherwise paint on top of it.
+   pointer-events: none so crossing the label cannot re-enter or block hover.
+   translateY(-50%) is the centring; only the X component moves. */
+.nav-rail-label {
+  position: absolute;
+  left: calc(100% + var(--space-2));
+  top: 50%;
+  z-index: 45;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-bg-elevated);
+  border: 1px solid var(--chrome-border);
+  box-shadow: var(--elev-2);
+  color: var(--chrome-text-heading);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-50%) translateX(-4px);
+  transition: opacity var(--motion-exit), transform var(--motion-exit);
+}
+
+.nav-rail-button:hover .nav-rail-label {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+  transition: opacity var(--motion-enter), transform var(--motion-enter);
 }
 
 .nav-rail-expand {
@@ -487,6 +651,23 @@ button.menubar-item:hover {
   align-items: center;
   gap: var(--space-1);
   padding: var(--space-3) var(--space-2) var(--space-2) var(--space-4);
+}
+
+/* Everything in the panel that swaps when it collapses — header and body,
+   but not the resize handle (absolutely positioned, and dragging it must not
+   fade) and not the flyout (out of flow, with its own presence). Wearing the
+   motion classes here rather than on .side-panel itself matters: fading the
+   panel element would fade its background too and show the editor through it.
+
+   The panel's width is not animated — see the note on --motion-enter. It
+   snaps, but it snaps at the moment this content has finished leaving and
+   before the new content arrives, so nothing is ever seen squeezed into the
+   wrong width. */
+.side-panel-contents {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .side-panel-static-title {
@@ -756,10 +937,18 @@ button.menubar-item:hover {
    once the exit fade finishes (useFadePresence's job). The vertical centring
    transform stays untouched by the fade, which only ever animates opacity —
    adding a transform here as well would fight translateY(-50%). */
+/* The flyout grows out of the collapsed strip, so their meeting edge shares
+   IDENTICAL values with the strip's — not similar, the same:
+     background:            var(--chrome-bg-elevated)  (strip: the same token)
+     left-edge radius:      0                          (strip: 0 — it's a strip)
+     left-edge border/gap:  none / flush (left: 100%)  (strip: border-right none)
+   The right/top/bottom keep the popover treatment (radius-md, hairline,
+   elevation) because those edges float over content the way the strip's
+   right edge never does. */
 .side-panel-flyout {
   position: absolute;
   top: 50%;
-  left: calc(100% + 6px);
+  left: 100%;
   transform: translateY(-50%);
   z-index: 35;
   display: flex;
@@ -768,18 +957,15 @@ button.menubar-item:hover {
   max-width: calc(100vw - 160px);
   max-height: min(480px, calc(100% - var(--space-4)));
   padding: var(--space-2) 0;
-  border-radius: var(--radius-md);
-  opacity: 0;
-  transition: opacity var(--motion-fast);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  /* Fade owned by .motion-presence — see presenceClass in usePresence.ts. */
   background: var(--chrome-bg-elevated);
   border: 1px solid var(--chrome-border);
+  border-left: none;
   box-shadow: var(--elev-2);
   overflow: hidden;
 }
 
-.side-panel-flyout.is-visible {
-  opacity: 1;
-}
 
 .binder-flyout-list {
   flex: 1;
@@ -881,13 +1067,14 @@ button.menubar-item:hover {
   margin-top: var(--space-3);
 }
 
+/* Sentence case, per DESIGN.md — all-caps labels are a rejected convention,
+   corrected here for every section's panel nav at once. */
 .panel-nav-group-label {
   padding: var(--space-1) var(--space-2);
   font-family: var(--font-ui);
   font-size: var(--text-2xs);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--chrome-text-dim);
 }
 
@@ -1055,7 +1242,9 @@ button.menubar-item:hover {
 }
 
 .binder-empty-folder {
-  padding: var(--space-1) var(--space-2);
+  /* Fixed left inset (the guide line carries the depth), sized to sit under
+     a sibling row's title. */
+  padding: var(--space-1) var(--space-2) var(--space-1) 26px;
   font-size: var(--text-sm);
   color: var(--chrome-text-dim);
 }
@@ -1064,12 +1253,27 @@ button.menubar-item:hover {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  height: 30px;
+  /* 24px (6 × 4 on the app's 4px scale, down from 26): the minimum that
+     still seats the 18px title line and 16px icons with breathing room.
+     Anything below 22 starts clipping the chapter input's hover border. */
+  height: 24px;
+  /* Fixed, not depth-computed: nesting is drawn by the guide lines below,
+     and the 6px also seats the status edge's 4px pill. */
+  padding-left: 6px;
   padding-right: var(--space-2);
   border-radius: var(--radius-sm);
   cursor: pointer;
   position: relative;
   transition: background-color var(--motion-fast);
+}
+
+/* Indent guides: the tree is drawn, not padded. Each nested list is offset
+   8px and carries a hairline; with the row's fixed 6px a nesting step costs
+   14px — about what the old per-row padding spent, but the line makes the
+   level readable without the file icons that used to anchor it. */
+.binder-node > .binder-list {
+  margin-left: 8px;
+  border-left: 1px solid var(--chrome-border);
 }
 
 .binder-row:hover {
@@ -1078,6 +1282,16 @@ button.menubar-item:hover {
 
 .binder-row.is-selected {
   background: var(--chrome-row-selected);
+}
+
+/* Draft / Notes / Matter: fixed structural rows. Read as section headings —
+   slightly raised weight and tracking — with their fixedness expressed by
+   absent affordances (no drag, no rename, no delete), not by lock badges.
+   Clickable like any folder: a click opens the merged read-only view. */
+.binder-row.is-structural .node-name {
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--chrome-text-heading);
 }
 
 .binder-row.is-active-doc .node-name {
@@ -1144,52 +1358,145 @@ button.menubar-item:hover {
   color: var(--chrome-text-dim);
 }
 
+/* PRIMARY CONTENT — one fixed rule everywhere a row's main text appears
+   (binder titles, Story Bible card names, timeline event titles):
+     font-size:   var(--text-md)  = 13px
+     font-weight: 500
+     line-height: 18px            (fixed px — the baseline the chip cap is
+                                   measured against, and what keeps titles on
+                                   one baseline regardless of siblings)
+     color:       var(--chrome-text-heading)
+   METADATA (dates, counts, secondary labels) is one step down:
+     font-size:   var(--text-sm)  = 12px
+     font-weight: 400
+     color:       var(--chrome-text-dim)  = #6b6558 dark / #948c78 light */
 .node-name {
   flex: 1;
   min-width: 0;
   font-size: var(--text-md);
+  font-weight: 500;
+  line-height: 18px;
   color: var(--chrome-text-heading);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.binder-row-badges {
+/* Manuscript word counts, always visible where they mean something (Draft
+   rows and roll-ups). METADATA register per the primary-content rule above.
+   The right edge is a timeshare: at rest the count, under the pointer the
+   row's actions — the buttons take the same spot rather than pushing the
+   count around. */
+.binder-row-count {
   flex-shrink: 0;
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.binder-row:hover .binder-row-count {
+  display: none;
+}
+
+/* Structural rows keep their roll-up on hover — they have no row actions to
+   make room for. */
+.binder-row.is-structural:hover .binder-row-count {
+  display: inline;
+}
+
+/* The status/tags edge. The hover target is deliberately wider (10px) than
+   the visible 4px pill, so it can be hit without the mark getting loud; the
+   pill firms up under the pointer the way the chapter input's border does. */
+.binder-status-edge {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+}
+
+.binder-status-edge::before {
+  content: '';
+  position: absolute;
+  left: 1px;
+  top: 50%;
+  width: 4px;
+  height: 14px;
+  margin-top: -7px;
+  border-radius: 2px;
+  background: var(--edge-color);
+  transition: width var(--motion-fast);
+}
+
+.binder-status-edge:hover::before {
+  width: 6px;
+}
+
+/* The card the edge raises: status plus every chip the row used to wear
+   inline. Fixed-position because the binder scrolls (same reason as the
+   chip overflow list); pointer-inert so it can overlap neighbouring rows
+   without stealing their hover or clicks. */
+.binder-edge-card {
+  position: fixed;
+  z-index: 45;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 260px;
+  padding: var(--space-2);
+  background: var(--chrome-bg-elevated);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-2);
+  pointer-events: none;
+}
+
+.binder-edge-card-status {
   display: flex;
   align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--chrome-text);
+}
+
+.binder-edge-card .tag-chip-row,
+.binder-edge-card .span-tag-rollup-row {
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-1);
 }
 
 .row-chip-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-1);
   min-width: 0;
 }
 
-/* The name gets the row's remaining width and a floor it cannot be pushed
-   below. Chips are already bounded by the cap, so the two cannot fight. */
-.binder-row .node-name {
-  flex: 1 1 auto;
-  min-width: 60px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* RowChips' hidden measuring twins: the [chip +N] pair and the bare count at
+   natural width, off to the side, invisible — what the fit decision is
+   measured against. */
+.row-chip-twin {
+  position: absolute;
+  top: 0;
+  left: -9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  visibility: hidden;
+  pointer-events: none;
   white-space: nowrap;
 }
 
-/* A chip's text is capped so one long character name cannot push the title
-   out on its own. Two of these plus the circle is the row's whole budget. */
-/* A panel wide enough for two chips is wide enough to spell them out. The
-   narrow ceiling exists to protect the title, and on a wide panel the title is
-   not under threat. */
-.row-chip-row.is-roomy > .tag-chip,
-.row-chip-row.is-roomy > .span-tag-rollup-chip {
-  max-width: 108px;
-}
-
+/* A chip's text is capped so one long character name cannot claim the whole
+   chip slot on its own. One of these plus the circle is the row's budget. */
 .row-chip-row > .tag-chip,
-.row-chip-row > .span-tag-rollup-chip {
+.row-chip-row > .span-tag-rollup-chip,
+.row-chip-twin > .tag-chip,
+.row-chip-twin > .span-tag-rollup-chip {
   max-width: 64px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1245,6 +1552,24 @@ button.menubar-item:hover {
    the binder is too narrow to carry both a readable title and the status
    word. The name lives in the title attribute so the colour never has to be
    decoded from memory. */
+/* THE CHIP CAP — true by construction, not by inspection: every badge,
+   pill, and chip that can sit beside primary text is hard-capped at 16px,
+   two below the primary line-height (18px), so no row's title can ever be
+   displaced or out-sized by its own metadata. Each class also sets
+   height: 16px explicitly; this cap is the invariant that holds even if a
+   future variant forgets to. */
+.status-badge,
+.tag-chip,
+.span-tag-rollup-chip,
+.row-chip-overflow,
+.timeline-item-chip,
+.timeline-scene-chip,
+.timeline-broken-chip,
+.story-bible-type-pill,
+.story-bible-card-type-pill {
+  max-height: 16px;
+}
+
 .status-dot {
   flex-shrink: 0;
   width: 8px;
@@ -1300,6 +1625,57 @@ button.menubar-item:hover {
   border: 1px solid var(--chrome-accent);
   border-radius: var(--radius-sm);
   padding: 0 var(--space-1);
+}
+
+/* Manual chapter-number label. Quiet by default — a border-less number
+   among dozens of rows would be pure clutter — and only firms up under
+   interaction, the same idle/hover/focus restraint the rest of the chrome
+   uses. Fixed narrow width: it holds a label, not a value someone reads at
+   length. */
+.chapter-number-input {
+  flex-shrink: 0;
+  /* 20px (5 × 4 on the 4px scale, down from 26): sized to the actual range —
+     three digits at the 10px font measure ~17px, plus the 2px hover border. */
+  width: 20px;
+  height: 18px;
+  font-size: var(--text-2xs);
+  font-family: var(--font-ui);
+  color: var(--chrome-text-dim);
+  text-align: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0;
+  -moz-appearance: textfield;
+}
+
+.chapter-number-input::-webkit-inner-spin-button,
+.chapter-number-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.chapter-number-input:hover {
+  border-color: var(--chrome-border);
+}
+
+/* With the file icons gone this input is the document's leading mark, so an
+   unnumbered document must read as nothing at rest — the "#" placeholder
+   only surfaces when its row is hovered. */
+.chapter-number-input::placeholder {
+  color: transparent;
+  transition: color var(--motion-fast);
+}
+
+.binder-row:hover .chapter-number-input::placeholder {
+  color: var(--chrome-text-dim);
+}
+
+.chapter-number-input:focus {
+  color: var(--chrome-text-heading);
+  background: var(--chrome-bg);
+  border-color: var(--chrome-accent);
+  outline: none;
 }
 
 .row-delete {
@@ -1465,7 +1841,7 @@ button.menubar-item:hover {
   font-size: var(--text-sm);
   color: var(--chrome-text-muted);
   white-space: nowrap;
-  cursor: default;
+  cursor: inherit;
 }
 
 .footer-word-count-popover {
@@ -1489,7 +1865,23 @@ button.menubar-item:hover {
   max-width: 260px;
 }
 
-.footer-word-count-container:hover .footer-word-count-popover {
+.footer-word-count-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+/* focus-within, not hover alone: clicking or tabbing to the trigger now opens
+   the totals, which were previously reachable with a mouse and no other way. */
+.footer-word-count-container:hover .footer-word-count-popover,
+.footer-word-count-container:focus-within .footer-word-count-popover {
   opacity: 1;
   visibility: visible;
   transform: translateX(-50%) translateY(0);
@@ -1527,14 +1919,30 @@ button.menubar-item:hover {
 
 /* Toolbar */
 
+/* One row at every width, by construction: nowrap means a second row cannot
+   exist; a measuring twin (below) decides how many sections stay inline and
+   the rest move to the right-hand overflow menu. */
 .toolbar {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--space-1);
   padding: var(--space-2) var(--space-3);
   background: var(--chrome-bg-elevated);
   border-bottom: 1px solid var(--chrome-border);
+  overflow: hidden;
+}
+
+/* The off-screen twin the compaction measures. Same classes, same gap, laid
+   out at natural width; never visible, never interactive. */
+.toolbar.toolbar-measure {
+  position: absolute;
+  left: -99999px;
+  top: 0;
+  width: max-content;
+  visibility: hidden;
+  pointer-events: none;
+  border: none;
 }
 
 .toolbar-group {
@@ -1551,7 +1959,11 @@ button.menubar-item:hover {
   flex-shrink: 0;
 }
 
-.toolbar button {
+/* The controls themselves are shared with the overflow popover, which is
+   portalled to <body> and so is NOT inside .toolbar — scoping these to
+   .toolbar alone left every control in that menu falling back to raw UA
+   chrome. :is() keeps the specificity identical to the old selector. */
+:is(.toolbar, .toolbar-overflow-popover) button {
   min-width: 28px;
   height: 28px;
   padding: 0 var(--space-2);
@@ -1568,30 +1980,30 @@ button.menubar-item:hover {
   transition: background-color var(--motion-fast), border-color var(--motion-fast);
 }
 
-.toolbar button:hover {
+:is(.toolbar, .toolbar-overflow-popover) button:hover {
   background: var(--chrome-control-hover);
 }
 
-.toolbar button.is-active {
+:is(.toolbar, .toolbar-overflow-popover) button.is-active {
   background: var(--chrome-control-active-bg);
   border-color: var(--chrome-border-strong);
   color: var(--chrome-accent);
 }
 
-.toolbar button:disabled {
+:is(.toolbar, .toolbar-overflow-popover) button:disabled {
   opacity: 0.35;
   cursor: default;
 }
 
-.toolbar button:disabled:hover {
+:is(.toolbar, .toolbar-overflow-popover) button:disabled:hover {
   background: transparent;
 }
 
-.toolbar .icon {
+:is(.toolbar, .toolbar-overflow-popover) .icon {
   display: block;
 }
 
-.toolbar select {
+:is(.toolbar, .toolbar-overflow-popover) select {
   height: 28px;
   padding: 0 var(--space-1);
   font-family: var(--font-ui);
@@ -1603,7 +2015,7 @@ button.menubar-item:hover {
   cursor: pointer;
 }
 
-.toolbar select:hover {
+:is(.toolbar, .toolbar-overflow-popover) select:hover {
   background: var(--chrome-control-hover);
 }
 
@@ -1709,9 +2121,11 @@ button.menubar-item:hover {
   color: var(--chrome-text-heading);
 }
 
+/* Heading ink on the active fill, same reasoning as the rail: text on a
+   fill must survive any preset's accent, including near-neutral ones. */
 .view-switcher-button.is-active {
   background: var(--chrome-control-active-bg);
-  color: var(--chrome-accent);
+  color: var(--chrome-text-heading);
 }
 
 /* Outliner */
@@ -1770,6 +2184,28 @@ button.menubar-item:hover {
   border-collapse: collapse;
   font-family: var(--font-ui);
   font-size: var(--text-md);
+  /* The column widths come from the colgroup, not from the content. With auto
+     layout the widest cell in a column sets that column, so one chapter with a
+     dozen Story Bible mentions stretched the tags column past the window and
+     squeezed the synopsis to a few characters. */
+  table-layout: fixed;
+}
+
+/* Prose columns share what is left after the three fixed ones. Synopsis gets
+   the most: it is the column people actually read across. */
+.outliner-col-title { width: 26%; }
+.outliner-col-synopsis { width: 40%; }
+.outliner-col-notes { width: 34%; }
+/* Known-size content, so these do not need to flex. */
+.outliner-col-status { width: 116px; }
+.outliner-col-words { width: 104px; }
+.outliner-col-tags { width: 168px; }
+
+/* Every cell clips rather than pushing its column wider — the inputs and chip
+   rows handle their own ellipsis and capping within it. */
+.outliner-table td,
+.outliner-table th {
+  overflow: hidden;
 }
 
 .outliner-table thead {
@@ -1796,7 +2232,7 @@ button.menubar-item:hover {
   font-size: var(--text-sm);
   font-weight: 600;
   letter-spacing: 0.03em;
-  text-transform: uppercase;
+  /* Sentence case, never all-caps — DESIGN.md, Tier 1. */
   color: var(--chrome-text-muted);
   background: transparent;
   border: none;
@@ -1817,6 +2253,11 @@ button.menubar-item:hover {
   border-bottom: 1px solid var(--chrome-border);
   padding: 0 var(--space-2);
   vertical-align: middle;
+  /* Fixed row height (acts as a minimum in table layout, and every cell's
+     content is capped below it), so the title sits at the same vertical
+     position in every row — a row with four tags and a row with none may
+     not differ by even a pixel. */
+  height: 38px;
 }
 
 /* Numbers in a column have to line up. Proportional figures drift by a pixel
@@ -2047,12 +2488,20 @@ button.menubar-item:hover {
   transition: border-color var(--motion-fast);
 }
 
+/* One line, same fold rule as the binder rows: status, at most one chip,
+   "+N" for the rest — RowChips measures the card's width and folds rather
+   than wrapping onto a second line. */
 .corkboard-card-badges {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: var(--space-1);
+  min-width: 0;
   min-height: 16px;
+  overflow: hidden;
+}
+
+.corkboard-card-badges .document-badge-editor {
+  flex-shrink: 0;
 }
 
 .corkboard-card-wordcount {
@@ -2086,13 +2535,14 @@ button.menubar-item:hover {
   box-shadow: -3px 0 0 var(--chrome-accent);
 }
 
+/* Never truncates: the card is a vertical layout, so a long title wraps to
+   further lines instead of losing its tail — same title-first priority as
+   the binder rows, achieved by the means this shape allows. */
 .corkboard-card-title {
   font-size: var(--text-md);
   font-weight: 600;
   color: var(--chrome-text-heading);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .corkboard-title-input {
@@ -2124,6 +2574,59 @@ button.menubar-item:hover {
 
 .corkboard-card-synopsis:hover {
   background: var(--chrome-control-hover);
+}
+
+/* The back of the card. Notes read as the writer's own remarks rather than as
+   part of the manuscript, so they step back a shade from the synopsis. */
+.corkboard-card-notes {
+  color: var(--chrome-text-dim);
+  font-style: italic;
+}
+
+/* The flip control. Quiet enough to ignore on a board where nobody uses
+   notes, present enough to be found — it is always rendered, never revealed
+   only once notes exist. */
+.corkboard-card-flip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  padding: 2px 4px;
+  font-family: var(--font-ui);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.03em;
+  color: var(--chrome-text-dim);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  opacity: 0.65;
+  transition: opacity var(--motion-enter), color var(--motion-enter);
+}
+
+.corkboard-card:hover .corkboard-card-flip,
+.corkboard-card-flip:focus-visible {
+  opacity: 1;
+}
+
+.corkboard-card-flip:hover {
+  color: var(--chrome-text);
+  background: var(--chrome-control-hover);
+}
+
+/* A card carrying notes says so without being flipped, so a glance across the
+   board finds them. */
+.corkboard-card-flip-mark {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--chrome-accent);
+}
+
+/* A card whose notes are showing stays legible as such even unhovered. */
+.corkboard-card-flip[aria-pressed='true'] {
+  opacity: 1;
+  color: var(--chrome-accent);
 }
 
 .corkboard-card-synopsis:focus {
@@ -2223,6 +2726,12 @@ button.menubar-item:hover {
   width: 10px;
   height: 10px;
   border-radius: 50%;
+}
+
+/* Holds the swatch column open for "None", which has no colour of its own, so
+   its label starts where the named statuses' labels do. */
+.tag-status-filter-swatch--none {
+  background: none;
 }
 
 .tag-status-filter-empty {
@@ -2344,6 +2853,19 @@ button.menubar-item:hover {
   flex: 1;
   overflow-y: auto;
   background: var(--editor-bg);
+}
+
+/* Sits below the single toolbar and holds the main editor pane plus, when
+   split view is open, the reference pane beside it — the toolbar and footer
+   stay full-width above/below this row rather than being duplicated per pane. */
+.editor-split-row {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.editor-split-row .editor {
+  min-width: 0;
 }
 
 /* Pages sit on a surface: the scroll area takes the surround tone and each
@@ -2684,25 +3206,117 @@ button.menubar-item:hover {
   min-width: 0;
 }
 
+/* The way in, and it should look like it: a lifted field on a plain strip,
+   with the accent down its leading edge and on its glyph. It was previously
+   an inset control the same tone as the strip around it, which is why it
+   read as furniture rather than as the thing you reach for. */
 .find-input-wrap {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  height: 28px;
-  padding: 0 var(--space-2);
-  background: var(--chrome-control-bg);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
+  height: 38px;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  background: var(--chrome-bg-elevated);
+  border: 1px solid var(--chrome-border-strong);
+  border-left: 3px solid var(--chrome-accent);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-1);
   color: var(--chrome-text-dim);
   cursor: text;
+  transition: box-shadow var(--motion-fast);
 }
 
 .find-input-wrap:focus-within {
-  border-color: var(--chrome-accent);
+  box-shadow: var(--elev-2);
 }
 
 .find-input-wrap .icon {
   flex-shrink: 0;
+}
+
+.find-input-wrap > .icon:first-child {
+  color: var(--chrome-accent);
+}
+
+.find-input-wrap .find-input {
+  font-size: var(--text-lg);
+}
+
+/* The scope, stated in the field: the bar says what it will search without
+   anything being opened. */
+.find-scope-pill {
+  flex-shrink: 0;
+  height: 24px;
+  padding: 0 var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--chrome-text);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: 12px;
+  cursor: pointer;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.find-scope-pill:hover {
+  background: var(--chrome-control-hover);
+  color: var(--chrome-text-heading);
+}
+
+/* While the matches are docked, the field carries the walk instead. */
+.find-navigator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.find-navigator-count {
+  font-size: var(--text-xs);
+  color: var(--chrome-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.find-navigator-step {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  line-height: 1;
+  color: var(--chrome-text-muted);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.find-navigator-step:hover {
+  background: var(--chrome-control-hover);
+  color: var(--chrome-text-heading);
+}
+
+.find-navigator-text {
+  padding: 3px var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--chrome-text-muted);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.find-navigator-text:hover {
+  background: var(--chrome-control-hover);
+  color: var(--chrome-text-heading);
 }
 
 .find-input-wrap .find-input {
@@ -2736,18 +3350,140 @@ button.menubar-item:hover {
    otherwise, rather than crowding the bar itself. */
 .find-options-popover {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   left: 0;
   right: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
   background: var(--chrome-bg-elevated);
-  border: 1px solid var(--chrome-border);
+  border: 1px solid var(--chrome-border-strong);
   border-radius: var(--radius-md);
-  padding: var(--space-3);
-  box-shadow: var(--elev-2);
+  box-shadow: var(--elev-3);
+  overflow: hidden;
   z-index: 20;
+}
+
+/* The rail beside the results: narrowing is spatial and always visible,
+   rather than a row of chips above the answers. */
+.find-panel {
+  display: grid;
+  grid-template-columns: 124px minmax(0, 1fr);
+}
+
+.find-rail {
+  border-right: 1px solid var(--chrome-border);
+  padding: var(--space-2) var(--space-1);
+}
+
+.find-rail-label {
+  padding: 2px var(--space-2) var(--space-1);
+  font-family: var(--font-ui);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+}
+
+.find-rail-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  padding: 3px var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--chrome-text-muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.find-rail-item:hover:not(:disabled) {
+  background: var(--chrome-row-hover);
+  color: var(--chrome-text);
+}
+
+.find-rail-item.is-active {
+  background: var(--chrome-row-selected);
+  color: var(--chrome-text-heading);
+}
+
+.find-rail-item .nm {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.find-rail-item .n {
+  margin-left: auto;
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A kind with nothing in it stays listed: "the Lexicon has none" is worth
+   knowing, and hiding it would make the list jump as you type. */
+.find-rail-item:disabled,
+.find-rail-item.is-empty {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.find-results-pane {
+  min-width: 0;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.find-document-matches {
+  display: flex;
+  flex-direction: column;
+}
+
+.search-history-item.is-current {
+  background: var(--chrome-row-selected);
+  color: var(--chrome-text-heading);
+}
+
+/* Replace, always present rather than behind a toggle nobody found, and
+   honest about how far it reaches. */
+.find-replace-strip {
+  border-top: 1px solid var(--chrome-border);
+  padding: var(--space-2) var(--space-3);
+  background: var(--chrome-bg);
+}
+
+.find-replace-note {
+  margin-top: var(--space-1);
+  font-family: var(--font-ui);
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+  line-height: 1.5;
+}
+
+.find-replace-warn {
+  color: var(--chrome-accent-saving);
+}
+
+.find-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--chrome-border);
+  font-family: var(--font-ui);
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+}
+
+.find-foot-spacer {
+  flex: 1;
+}
+
+.find-foot-hint {
+  white-space: nowrap;
 }
 
 /* Scope, options, match count/nav, and the Replace toggle all sit on one
@@ -2820,8 +3556,7 @@ button.menubar-item:hover {
 .find-options-popover-label {
   font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   color: var(--chrome-text-dim);
 }
 
@@ -2831,16 +3566,21 @@ button.menubar-item:hover {
   flex-shrink: 0;
 }
 
+/* These carry words now rather than the old Aa / ab / .* glyphs, which read
+   as nothing at all unless you already knew them. The fixed square sizing
+   they used to have crushed the labels on top of each other. */
 .find-options button {
-  width: 26px;
-  height: 26px;
-  padding: 0;
+  height: 24px;
+  padding: 0 var(--space-2);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
-  border: 1px solid transparent;
+  white-space: nowrap;
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
   border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
   color: var(--chrome-text-muted);
   cursor: pointer;
 }
@@ -3029,15 +3769,24 @@ button.menubar-item:hover {
   gap: 1px;
 }
 
+/* The rows a group holds, as one box so the whole set can be faded together
+   by .motion-presence rather than each row animating independently. Inherits
+   the group's own column flow, so introducing it changed no layout. */
+.search-result-group-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* Sentence case, per DESIGN.md — these tier names are labels, not shouting. */
 .search-result-group-label {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   padding: 0 var(--space-2) var(--space-1);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   color: var(--chrome-text-dim);
 }
 
@@ -3238,6 +3987,176 @@ button.menubar-item:hover {
 
 /* --- recent searches ----------------------------------------------- */
 
+/* The match dock: the found matches stood beside the manuscript rather than
+   over it, in the side panel's place, so the page keeps the rest of the
+   window while they are walked through. */
+.search-dock-slot {
+  display: contents;
+}
+
+.search-dock {
+  flex-shrink: 0;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--chrome-bg-sidebar);
+  border-right: 1px solid var(--chrome-border);
+}
+
+.search-dock-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.search-dock-title {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--chrome-text-heading);
+}
+
+.search-dock-sub {
+  font-family: var(--font-ui);
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-dock-close {
+  margin-left: auto;
+  padding: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--chrome-border-strong);
+}
+
+.search-dock-close:hover {
+  color: var(--chrome-text);
+}
+
+.search-dock-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.search-dock-match {
+  display: flex;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-ui);
+}
+
+.search-dock-match:hover {
+  background: var(--chrome-row-hover);
+}
+
+.search-dock-match.is-current {
+  background: var(--chrome-row-selected);
+  box-shadow: inset 2px 0 0 var(--chrome-accent);
+}
+
+.search-dock-match-number {
+  flex-shrink: 0;
+  width: 18px;
+  padding-top: 1px;
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.search-dock-match-snippet {
+  min-width: 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--chrome-text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.search-dock-match-snippet mark {
+  background: color-mix(in srgb, var(--chrome-accent) 30%, transparent);
+  color: var(--chrome-text-heading);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.search-dock-match.is-current .search-dock-match-snippet mark {
+  background: color-mix(in srgb, var(--editor-match-current-bg) 42%, transparent);
+}
+
+.search-dock-replace {
+  flex-shrink: 0;
+  padding: var(--space-2);
+  border-top: 1px solid var(--chrome-border);
+  background: var(--chrome-bg);
+}
+
+/* The panel is 300px wide, which is not enough for a field and two buttons
+   on one line — the buttons ended up crushed against its edge. */
+.search-dock-replace-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.search-dock-replace-input {
+  flex: 1 0 100%;
+  min-width: 0;
+}
+
+/* The borrowed class is a bare text button; in a panel footer these need to
+   read as the actions they are. */
+.search-dock-replace-row .outliner-open-button {
+  flex: 1;
+  height: 26px;
+  padding: 0 var(--space-2);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--chrome-text);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+}
+
+.search-dock-replace-row .outliner-open-button:hover:not(:disabled) {
+  background: var(--chrome-control-hover);
+  color: var(--chrome-text-heading);
+}
+
+.search-dock-replace-row .outliner-open-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.search-dock-replace-note {
+  margin-top: var(--space-1);
+  font-family: var(--font-ui);
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+}
+
 .search-history {
   display: flex;
   flex-direction: column;
@@ -3250,11 +4169,10 @@ button.menubar-item:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--space-2) var(--space-1);
-  font-size: var(--text-2xs);
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   color: var(--chrome-text-dim);
 }
 
@@ -3806,12 +4724,15 @@ button.menubar-item:hover {
 .toolbar-overflow-container {
   position: relative;
   margin-left: auto;
+  flex-shrink: 0;
 }
 
+/* Portalled to <body> and pinned in viewport coordinates by App.tsx — see the
+   note on toolbarOverflowAnchor. It cannot live inside .toolbar, whose
+   overflow:hidden clipped it away entirely. z-index sits above the toolbar's
+   own chrome but below .modal-overlay's 50, which should still cover it. */
 .toolbar-overflow-popover {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
+  position: fixed;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -4171,6 +5092,23 @@ button.menubar-item:hover {
   text-decoration-color: var(--chrome-text-dim);
 }
 
+/* A manual document link: a thin dotted accent underline — deliberately
+   distinct from a span tag's solid 2px colored one, so a cross-reference
+   never reads as a tag. Ctrl+click follows it (see documentLink.ts). */
+.doc-link-mark {
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--chrome-accent);
+}
+
+/* The Link to Document flyout can hold a whole manuscript's documents. */
+.context-menu-doc-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
 @keyframes span-tag-jump-flash {
   0%,
   100% {
@@ -4369,13 +5307,49 @@ button.menubar-item:hover {
   flex-direction: column;
 }
 
-.story-bible-browse-toolbar {
-  flex-shrink: 0;
-  display: flex;
+
+/* Appearance and Progress put labelled controls in their bars. Those labels
+   stack above their control everywhere else on those pages, which is right in
+   a settings list and wrong in a slim bar — stacked, three of them make the
+   bar half again as tall as every other section's. Laid on their side here,
+   and only here. */
+.appearance-toolbar .appearance-select,
+.progress-toolbar .progress-target-row label {
+  flex-direction: row;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--chrome-border);
+  white-space: nowrap;
+}
+
+.progress-toolbar .progress-target-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: 0;
+}
+
+/* The bar is the whole row: no centring, no reading measure. */
+.progress-toolbar .progress-controls,
+.appearance-toolbar .appearance-row {
+  margin-top: 0;
+}
+
+.appearance-sections-picker {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Wider than the Story Bible's type list it borrows its shell from — these
+   labels are whole phrases, and wrapping them would defeat the point of
+   moving them out of the settings list. */
+.appearance-sections-popover {
+  min-width: 260px;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.appearance-sections-popover .progress-hint {
+  margin: 0 0 var(--space-1);
 }
 
 .story-bible-new-item {
@@ -4446,131 +5420,293 @@ button.menubar-item:hover {
   border-radius: 50%;
 }
 
-.story-bible-browse-scroll {
-  flex: 1;
+/* The section has no side panel, so the wall is the navigation. The scroller
+   spans the whole width, which keeps the scrollbar at the window edge rather
+   than stranded beside a capped column, and the wall inside it holds the same
+   page column every other panel-less section holds — it used to run edge to
+   edge, which put its first card 137px left of where every other page starts. */
+.story-bible-browse {
   overflow-y: auto;
-  padding: var(--space-3);
+  padding: var(--page-pad-top) var(--page-pad-x) var(--page-pad-bottom);
+  /* Reserved whether or not this page scrolls: without it a scrolling
+     page centres its content half a scrollbar to the left of one that
+     does not, and stepping between them twitches. */
+  scrollbar-gutter: stable;
 }
 
-/* Composed only because this view is empty for one reason — no items exist
-   — and the writer needs to know that is the reason, not that something
-   failed to load. Deliberately no illustration and no button: the "New…"
-   control it names is already a few pixels away in the header. */
-.story-bible-browse-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-1);
-  max-width: 320px;
-  margin: var(--space-6) auto 0;
-  padding: var(--space-4);
+/* The page column itself. A section whose scroller spans the window puts one
+   of these inside it; prose then caps its own width within the column instead
+   of centring itself independently, which is what pushed the Story Bible's
+   opening line into the middle of the page. */
+.page-column {
+  /* Explicit, because auto margins on a flex item switch off the default
+     stretch: without it the column shrink-wraps to its widest card and the
+     page is as wide as whatever happens to be on it. */
+  width: 100%;
+  max-width: var(--page-measure);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.story-bible-detail > * {
+  width: 100%;
+  max-width: var(--page-measure);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.story-bible-lead {
+  max-width: var(--page-prose);
+  margin-bottom: var(--space-4);
   font-family: var(--font-ui);
   font-size: var(--text-md);
-  line-height: 1.5;
-  text-align: center;
   color: var(--chrome-text-muted);
 }
 
-.story-bible-browse-empty .icon {
-  color: var(--chrome-text-dim);
-  opacity: 0.7;
-}
-
-.story-bible-browse-empty-title {
-  font-size: var(--text-lg);
-  font-weight: 600;
-  color: var(--chrome-text);
-}
-
 .story-bible-group {
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-5);
 }
 
 .story-bible-group-label {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
   font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   color: var(--chrome-text-dim);
 }
 
+.story-bible-group-count {
+  color: var(--chrome-text-dim);
+  font-weight: 400;
+}
+
 .story-bible-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: var(--space-3);
 }
 
 .story-bible-card {
-  box-shadow: var(--elev-1);
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-1);
-  width: 220px;
-  padding: var(--space-2) var(--space-3);
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: var(--space-3);
   background: var(--chrome-bg-elevated);
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-md);
+  /* Kept from the pre-redesign card: the elevation decision says a card sits
+     on a surface, and the wall is not a reason to reverse that. */
+  box-shadow: var(--elev-1);
   text-align: left;
   cursor: pointer;
-  transition: border-color var(--motion-fast);
+  transition: border-color var(--motion-fast), background-color var(--motion-fast);
 }
 
 .story-bible-card:hover {
   border-color: var(--chrome-border-strong);
+  background: var(--chrome-row-hover);
 }
 
-/* The type is metadata, and the group heading above already says it — so the
-   pill carries its colour as a tint rather than a fill. A saturated block of
-   colour per card was competing with the name it labels, and white text on an
-   arbitrary user-chosen type colour was never reliably legible either. */
-.story-bible-card-type-pill {
-  display: inline-flex;
+/* The portrait carries the type's colour as a tint, so a wall of cards reads
+   by group at a glance without a saturated block of colour per card. Initials
+   stand in until image blocks can supply a picture. */
+.story-bible-card-portrait {
+  display: flex;
   align-items: center;
-  height: 16px;
-  padding: 0 var(--space-1);
-  font-size: var(--text-2xs);
-  font-weight: 600;
+  justify-content: center;
+  height: 88px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-editor);
+  font-size: 28px;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--pill-color);
-  background: color-mix(in srgb, var(--pill-color) 16%, transparent);
-  border-radius: var(--radius-sm);
+  color: var(--chrome-text-heading);
+  background: color-mix(in oklab, var(--card-color) 22%, var(--chrome-bg-elevated));
+  border: 1px solid color-mix(in oklab, var(--card-color) 40%, var(--chrome-bg-elevated));
 }
 
+/* The primary-content rule (13px / 500 / 18px) — same tier as a binder
+   title; the card's border does the framing, the name doesn't need to shout. */
 .story-bible-card-name {
   font-family: var(--font-ui);
-  font-size: var(--text-lg);
+  font-size: var(--text-md);
   font-weight: 600;
+  line-height: 18px;
   color: var(--chrome-text-heading);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .story-bible-card-summary {
-  font-family: var(--font-editor);
-  font-size: var(--text-sm);
-  line-height: 1.4;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  line-height: 1.45;
   color: var(--chrome-text-muted);
   display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
+.story-bible-card-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+/* Spelled out rather than a bare figure: a number alone on a card reads as a
+   quantity of nothing in particular. */
+.story-bible-card-mentions {
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+  white-space: nowrap;
+}
+
+/* Where an item appears across the manuscript: one cell per document in
+   reading order, shaded by how often it is mentioned there. Every strip is
+   drawn against the same document list, so two items can be compared. */
+.story-bible-presence {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.story-bible-presence i {
+  display: block;
+  width: 10px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--chrome-control-bg);
+}
+
+.story-bible-presence i.is-l1 {
+  background: color-mix(in oklab, var(--chrome-accent) 28%, var(--chrome-bg));
+}
+
+.story-bible-presence i.is-l2 {
+  background: color-mix(in oklab, var(--chrome-accent) 52%, var(--chrome-bg));
+}
+
+.story-bible-presence i.is-l3 {
+  background: color-mix(in oklab, var(--chrome-accent) 76%, var(--chrome-bg));
+}
+
+.story-bible-presence i.is-l4 {
+  background: var(--chrome-accent);
+}
+
+/* Deliberately not named "is-sm": the card summary owns a clamp rule, and a
+   shared modifier name would win on specificity and stack the strip. */
+.story-bible-presence.is-small i {
+  width: 6px;
+  height: 10px;
+  border-radius: 1px;
+}
+
 /* Sheet detail */
 
+/* Like the wall, the sheet scrolls at full width; its columns cap their own
+   measure rather than the scroller capping everything. */
 .story-bible-detail {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-4) var(--space-4) var(--space-5);
-  max-width: 720px;
-  margin: 0 auto;
+  padding: var(--page-pad-top) var(--page-pad-x) var(--page-pad-bottom);
+  /* Reserved whether or not this page scrolls: without it a scrolling
+     page centres its content half a scrollbar to the left of one that
+     does not, and stepping between them twitches. */
+  scrollbar-gutter: stable;
   width: 100%;
+}
+
+/* The portrait beside the identity, as on the card that opened it. */
+.story-bible-detail-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.story-bible-detail-portrait {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 112px;
+  height: 112px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-editor);
+  font-size: 34px;
+  letter-spacing: 0.04em;
+  color: var(--chrome-text-heading);
+  background: color-mix(in oklab, var(--card-color) 22%, var(--chrome-bg-elevated));
+  border: 1px solid color-mix(in oklab, var(--card-color) 40%, var(--chrome-bg-elevated));
+}
+
+/* Capped to the reading measure: at full width an identity row would
+   otherwise stretch its delete action to the far edge of the window. */
+.story-bible-detail-id {
+  flex: 1;
+  min-width: 0;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* The blocks take the measure; the evidence rail sits beside them. */
+.story-bible-detail-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--space-5) 44px;
+  align-items: start;
+}
+
+.story-bible-detail-main {
+  min-width: 0;
+  max-width: 720px;
+}
+
+.story-bible-detail-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.story-bible-rail-label {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--chrome-text-dim);
+}
+
+.story-bible-rail-line {
+  margin-top: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--chrome-text);
+}
+
+.story-bible-rail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+@media (max-width: 1080px) {
+  .story-bible-detail-body {
+    grid-template-columns: 1fr;
+  }
 }
 
 .story-bible-back {
@@ -4591,8 +5727,7 @@ button.menubar-item:hover {
 .story-bible-detail-header {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-2);
+  gap: var(--space-2);
 }
 
 .story-bible-detail-type {
@@ -4600,18 +5735,20 @@ button.menubar-item:hover {
   flex-shrink: 0;
 }
 
+/* Under the chip cap like every other pill: 16px tall, always smaller than
+   the 18px primary line-height in the same row. */
 .story-bible-type-pill {
   display: inline-flex;
   align-items: center;
-  height: 24px;
-  padding: 0 var(--space-3);
+  height: 16px;
+  padding: 0 var(--space-2);
   font-family: var(--font-ui);
-  font-size: var(--text-sm);
+  font-size: var(--text-2xs);
   font-weight: 600;
   color: #fff;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
   border: none;
-  border-radius: 12px;
+  border-radius: 8px;
   cursor: pointer;
 }
 
@@ -5054,12 +6191,10 @@ button.menubar-item:hover {
   border-radius: var(--radius-md);
   box-shadow: var(--elev-2);
   cursor: default;
-  opacity: 0;
-  transition: opacity var(--motion-fast);
-}
-
-.mention-hover-card.is-visible {
-  opacity: 1;
+  /* Entrance and exit come from .motion-presence (see presenceClass in
+     usePresence.ts) rather than being declared here — this card was the
+     first thing in the app to fade, and it now uses the same mechanism as
+     every panel and pane instead of its own private copy of it. */
 }
 
 /* Reading the card costs nothing; leaving the editor takes a deliberate
@@ -5239,8 +6374,7 @@ button.menubar-item:hover {
   font-family: var(--font-ui);
   font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   color: var(--chrome-text-dim);
 }
 
@@ -5304,41 +6438,17 @@ button.menubar-item:hover {
    (var(--chrome-border) track, var(--chrome-accent) fill) for visual
    consistency rather than introducing a new chart palette. */
 
-.story-bible-appearances {
-  margin-top: var(--space-5);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--chrome-border);
-}
-
-.story-bible-appearances-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: var(--space-3);
-}
-
-.story-bible-appearances-title {
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--chrome-text-heading);
-}
-
-.story-bible-appearances-total {
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  color: var(--chrome-text-dim);
-}
-
+/* In the rail, so it sits under its own label rather than behind a rule. */
 .story-bible-appearances-chapters {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
+  margin-top: var(--space-3);
 }
 
 .story-bible-appearances-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 2fr auto;
+  grid-template-columns: minmax(0, 1fr) 1.4fr auto;
   align-items: center;
   gap: var(--space-2);
 }
@@ -5346,7 +6456,7 @@ button.menubar-item:hover {
 .story-bible-appearances-doc-name {
   min-width: 0;
   font-family: var(--font-ui);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--chrome-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5370,18 +6480,9 @@ button.menubar-item:hover {
 .story-bible-appearances-count {
   font-family: var(--font-ui);
   font-variant-numeric: tabular-nums;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--chrome-text-dim);
   text-align: right;
-}
-
-.story-bible-appearances-footer {
-  display: flex;
-  justify-content: space-between;
-  margin-top: var(--space-3);
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  color: var(--chrome-text-dim);
 }
 
 /* Import report */
@@ -5490,6 +6591,367 @@ button.menubar-item:hover {
   align-items: center;
   gap: var(--space-1);
   white-space: nowrap;
+}
+
+/* The Query Tracker board. One column per status, plain by design — the same
+   reasoning that keeps SubmissionStatus name-only: state is a fact to read,
+   so columns are labelled, counted, and nothing more. */
+
+/* The Query Tracker as a waiting list. What the record knows about every
+   query, whatever its status, is how long ago it went out, so the open ones
+   are bars against a shared scale and the ones that came back are not on that
+   list at all. */
+
+.submissions-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--page-pad-top) var(--page-pad-x) var(--page-pad-bottom);
+  /* Reserved whether or not this page scrolls: without it a scrolling
+     page centres its content half a scrollbar to the left of one that
+     does not, and stepping between them twitches. */
+  scrollbar-gutter: stable;
+}
+
+.submissions-measure {
+  /* Sentences, so one reading measure, centred — the same treatment the
+     Continuity Board takes now that it has the panel's width. */
+  max-width: var(--page-measure);
+  margin: 0 auto;
+}
+
+.submissions-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 120px auto 0;
+  max-width: 460px;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  line-height: 1.6;
+  color: var(--chrome-text-dim);
+  text-align: center;
+}
+
+.submissions-empty p {
+  margin: 0;
+}
+
+.submission-lead {
+  max-width: var(--page-prose);
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-xl);
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--chrome-text-heading);
+}
+
+.submission-sub {
+  max-width: var(--page-prose);
+  margin: 0 0 var(--space-5);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  line-height: 1.6;
+  color: var(--chrome-text-muted);
+}
+
+.submission-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: var(--space-5) 0 var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.submission-section-name {
+  font-family: var(--font-ui);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--chrome-text-heading);
+}
+
+.submission-section-note {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--chrome-text-dim);
+}
+
+.submission-wait-row,
+.submission-closed-row {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) 74px 300px;
+  align-items: center;
+  column-gap: var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.submission-wait-row:hover,
+.submission-closed-row:hover {
+  background: var(--chrome-row-hover);
+}
+
+/* While its status menu is open the row paints above the rows below it, which
+   would otherwise cover the menu simply by coming later in the document. */
+.submission-wait-row.is-menu-open,
+.submission-closed-row.is-menu-open,
+.submission-request.is-menu-open {
+  position: relative;
+  z-index: 30;
+}
+
+.submission-wait-row.is-menu-open .submission-actions,
+.submission-closed-row.is-menu-open .submission-actions,
+.submission-request.is-menu-open .submission-actions {
+  opacity: 1;
+}
+
+.submission-wait-who {
+  min-width: 0;
+}
+
+.submission-wait-name {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  color: var(--chrome-text-heading);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.submission-wait-meta {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--chrome-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.submission-wait-track {
+  position: relative;
+  height: 18px;
+  background: var(--chrome-control-bg);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+/* Tinted from the live accent rather than given a colour of its own, the same
+   mechanism the scrollbars and the search tiers use, so a custom palette
+   carries through. */
+.submission-wait-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--wait-pct, 0%);
+  background: color-mix(in srgb, var(--chrome-accent) 42%, transparent);
+  border-right: 2px solid var(--chrome-accent);
+  border-radius: 9px 0 0 9px;
+}
+
+.submission-wait-days {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--chrome-text-muted);
+  text-align: right;
+}
+
+.submission-closed-date {
+  grid-column: 2 / 4;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--chrome-text-dim);
+  text-align: right;
+}
+
+/* Where the typical reply falls, drawn through every bar so a wait can be
+   read against the replies that already came back. Only present once enough
+   replies have actually been dated — see MIN_REPLIES_FOR_MEDIAN. */
+.submission-wait-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--mark-pct, 0%);
+  width: 1px;
+  /* Has to read against both the fill and the empty track, since a query that
+     has not reached the typical reply yet is exactly the case worth seeing. */
+  background: var(--chrome-text-muted);
+  opacity: 0.7;
+}
+
+/* The scale the bars share, on the same grid as a row so its labels sit under
+   the track rather than under the page. */
+.submission-axis {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) 74px 300px;
+  column-gap: var(--space-3);
+  margin: var(--space-1) 0 0;
+  padding: 0 var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--chrome-text-dim);
+}
+
+.submission-axis-scale {
+  position: relative;
+  display: block;
+  height: 16px;
+}
+
+.submission-axis-mark {
+  position: absolute;
+  left: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.submission-axis-end {
+  position: absolute;
+  right: 0;
+}
+
+/* Reserved rather than overlaid, so hovering a row never covers what it says. */
+.submission-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  opacity: 0;
+  transition: opacity var(--motion-fast);
+}
+
+/* The column is sized for these labels; wrapping one would change the row's
+   height on hover, which is the thing the reserved column exists to avoid. */
+.submission-actions button {
+  white-space: nowrap;
+}
+
+.submission-wait-row:hover .submission-actions,
+.submission-wait-row:focus-within .submission-actions,
+.submission-closed-row:hover .submission-actions,
+.submission-closed-row:focus-within .submission-actions,
+.submission-request:hover .submission-actions,
+.submission-request:focus-within .submission-actions {
+  opacity: 1;
+}
+
+.submission-delete-action:hover {
+  color: var(--chrome-accent-error);
+}
+
+/* Changing a status was the board's drag. It is this menu now. */
+.submission-status-menu-wrap {
+  position: relative;
+}
+
+.submission-status-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-1));
+  z-index: 20;
+  min-width: 160px;
+  padding: var(--space-1);
+  background: var(--chrome-bg-elevated);
+  border: 1px solid var(--chrome-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-2);
+}
+
+.submission-status-menu-row {
+  display: block;
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  text-align: left;
+  color: var(--chrome-text);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.submission-status-menu-row:hover {
+  background: var(--chrome-control-hover);
+  color: var(--chrome-text-heading);
+}
+
+.submission-status-menu-row.is-current {
+  color: var(--chrome-text-dim);
+}
+
+/* A query that came back reads as a sentence: it is not waiting on anything,
+   so a bar would be measuring nothing. */
+.submission-request {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: baseline;
+  column-gap: var(--space-3);
+  padding: var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.submission-request-line {
+  max-width: var(--page-prose);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  line-height: 20px;
+  color: var(--chrome-text);
+}
+
+.submission-request-line b {
+  font-weight: 600;
+  color: var(--chrome-text-heading);
+}
+
+.submission-request-notes {
+  grid-column: 1;
+  margin-top: 2px;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: 18px;
+  color: var(--chrome-text-dim);
+}
+
+.submission-request .submission-actions {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.submission-sent-label {
+  color: var(--chrome-text-dim);
+}
+
+.submission-field-hint {
+  margin-top: var(--space-1);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--chrome-text-dim);
+}
+
+.submission-disclosure {
+  margin-top: var(--space-4);
+  padding: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  color: var(--chrome-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.submission-disclosure:hover {
+  color: var(--chrome-accent);
+  text-decoration: underline;
 }
 
 .submission-notes-input {
@@ -5744,6 +7206,99 @@ button.menubar-item:hover {
   border-radius: 2px;
 }
 
+/* Revision mode — what changed since the last snapshot.
+
+   Both treatments are washes in the same register as read-aloud's and the
+   find bar's, because this markup can cover a whole manuscript at once: it
+   has to be readable as prose first and diff second. The text itself keeps
+   its own colour, so a marked-up passage still reads as writing. */
+.editor .chf-revision-add {
+  background: color-mix(in srgb, var(--editor-revision-add) 18%, transparent);
+  border-radius: 2px;
+}
+
+/* Deleted text is a widget carrying words the document no longer contains.
+   Inert on every axis a real span would not be — the caret must not land in
+   it, a drag must not select it, and a copy must not carry it off the page. */
+.editor .chf-revision-del {
+  background: color-mix(in srgb, var(--editor-revision-del) 16%, transparent);
+  border-radius: 2px;
+  color: color-mix(in srgb, var(--editor-revision-del) 70%, var(--editor-text));
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--editor-revision-del) 60%, transparent);
+  user-select: none;
+  pointer-events: none;
+}
+
+.revision-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--chrome-bg-elevated);
+  border-bottom: 1px solid var(--chrome-border);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+.revision-bar-title {
+  font-weight: 600;
+  color: var(--chrome-text);
+}
+
+.revision-bar-reference {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--chrome-text-dim);
+}
+
+.revision-bar-counts {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.revision-bar-clean {
+  color: var(--chrome-text-dim);
+}
+
+.revision-bar-count {
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+}
+
+.revision-bar-count--add {
+  background: color-mix(in srgb, var(--chrome-accent-saved) 18%, transparent);
+  color: var(--chrome-accent-saved);
+}
+
+.revision-bar-count--del {
+  background: color-mix(in srgb, var(--chrome-accent-error) 18%, transparent);
+  color: var(--chrome-accent-error);
+}
+
+.revision-bar-button {
+  flex-shrink: 0;
+  padding: var(--space-1) var(--space-3);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.revision-bar-button:hover {
+  background: var(--chrome-control-hover);
+}
+
 /* Sprint timer */
 
 .sprint-modal {
@@ -5841,6 +7396,60 @@ button.menubar-item:hover {
 .sprint-countdown-time {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+
+/* The save status and the Hemingway indicator share the footer's first grid
+   cell, so turning the mode on never adds a grid child. */
+.footer-status-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* Hemingway mode's one indicator. Same footer pill shape as the sprint
+   countdown, but inert — there is nothing to click, because the mode cannot
+   be ended from here. It brightens briefly each time a deletion is refused,
+   so a Backspace that did nothing reads as declined rather than broken. */
+.hemingway-indicator {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--chrome-text-dim);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.hemingway-indicator.is-pulsing {
+  animation: hemingway-refused 0.7s ease-out;
+}
+
+@keyframes hemingway-refused {
+  from {
+    color: var(--chrome-accent);
+    border-color: var(--chrome-accent);
+  }
+  to {
+    color: var(--chrome-text-dim);
+    border-color: var(--chrome-border);
+  }
+}
+
+/* In distraction-free mode the footer is gone, so the indicator sits in the
+   corner beside the exit pill, matched to its height and offset. */
+.hemingway-indicator--floating {
+  position: fixed;
+  top: calc(env(titlebar-area-height, 32px) + var(--space-2));
+  right: calc(var(--space-3) + 108px);
+  z-index: 60;
+  height: 26px;
+  background: color-mix(in srgb, var(--chrome-bg-elevated) 82%, transparent);
 }
 
 .sprint-countdown-stop {
@@ -6094,10 +7703,10 @@ button.menubar-item:hover {
 
 /* Relationships — Story Bible sheet section */
 
+/* It sits in the sheet's rail now, under its own label, so it no longer
+   needs a rule above it to separate it from the blocks. */
 .story-bible-relationships {
-  margin-top: var(--space-4);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--chrome-border);
+  min-width: 0;
 }
 
 .relationship-add-button {
@@ -6231,16 +7840,177 @@ button.menubar-item:hover {
   margin: 0;
 }
 
-.relationship-map {
+/* The board reads one entry at a time: the web shows the shape, and the links
+   for whichever name is being read are written out underneath as sentences. */
+.relationship-board {
   flex: 1;
   min-height: 0;
+  overflow: auto;
   display: flex;
-  padding: var(--space-3);
+  flex-direction: column;
+  padding: var(--page-pad-top) var(--page-pad-x) var(--page-pad-bottom);
+  /* Reserved whether or not this page scrolls: without it a scrolling
+     page centres its content half a scrollbar to the left of one that
+     does not, and stepping between them twitches. */
+  scrollbar-gutter: stable;
+}
+
+/* Both faces of the board hold to one measure, so the toolbar, the banner,
+   the thread, and the sentences all start on the same line down the page. */
+.relationship-board > * {
+  width: 100%;
+  max-width: var(--continuity-measure);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.relationship-focus-head {
+  max-width: var(--page-prose);
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  line-height: 1.6;
+  color: var(--chrome-text-muted);
+}
+
+.relationship-focus-head b {
+  font-weight: 600;
+  color: var(--chrome-text-heading);
+}
+
+/* Fixed size, deliberately. The web is a place you learn the shape of, so it
+   holds still: the same 640 by 360 whichever entry is being read, however
+   many names are on it, and whatever the window is doing. Nothing below it
+   moves when the focus changes. */
+.relationship-map {
+  display: flex;
+  justify-content: center;
+  flex: none;
+  height: 360px;
+  overflow: hidden;
 }
 
 .relationship-map-svg {
-  width: 100%;
-  height: 100%;
+  flex: none;
+  width: 640px;
+  height: 360px;
+}
+
+/* Every name on the web is also a plain button underneath it, so choosing an
+   entry never depends on hitting a seven-pixel circle. */
+.relationship-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+.relationship-picker-chip {
+  height: 24px;
+  padding: 0 var(--space-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+  background: transparent;
+  border: 1px solid var(--chrome-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: color var(--motion-fast), border-color var(--motion-fast);
+}
+
+.relationship-picker-chip:hover {
+  color: var(--chrome-text-heading);
+  border-color: var(--chrome-border-strong);
+}
+
+.relationship-picker-chip.is-active {
+  color: var(--chrome-accent-contrast);
+  background: var(--chrome-accent);
+  border-color: var(--chrome-accent);
+}
+
+.relationship-readings {
+  display: flex;
+  flex-direction: column;
+}
+
+.relationship-reading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.relationship-reading:last-child {
+  border-bottom: none;
+}
+
+.relationship-reading-line {
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  line-height: 20px;
+  color: var(--chrome-text);
+}
+
+.relationship-reading-self {
+  font-weight: 600;
+  color: var(--chrome-text-heading);
+}
+
+/* The other name is the way to move along the web, so it looks like a name
+   you can follow rather than like a word in a sentence. */
+.relationship-reading-other {
+  padding: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--chrome-accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.relationship-reading-other:hover {
+  text-decoration: underline;
+}
+
+/* The stored reverse wording, which the old labels on the lines had nowhere
+   to show at all. */
+.relationship-reading-back {
+  grid-column: 1;
+  margin-top: 2px;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: 18px;
+  color: var(--chrome-text-dim);
+}
+
+.relationship-reading-edit {
+  grid-row: 1;
+  grid-column: 2;
+  opacity: 0;
+  transition: opacity var(--motion-fast);
+}
+
+.relationship-reading:hover .relationship-reading-edit,
+.relationship-reading:focus-within .relationship-reading-edit {
+  opacity: 1;
+}
+
+.relationship-reading-note {
+  margin: 0;
+  padding: var(--space-3) 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  color: var(--chrome-text-dim);
+}
+
+.relationship-board-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
 }
 
 .relationship-map-empty {
@@ -6262,48 +8032,43 @@ button.menubar-item:hover {
   max-width: 420px;
 }
 
-.relationship-edge line {
+/* The lines carry no labels any more. A word floating between two names never
+   said which way it read, and the sentences below say it properly. */
+.relationship-edge {
   stroke: var(--chrome-border-strong);
   stroke-width: 1.5;
+  transition: stroke var(--motion-fast), opacity var(--motion-fast);
 }
 
-.relationship-edge rect {
-  fill: var(--chrome-bg);
-  stroke: var(--chrome-border);
-  stroke-width: 1;
-}
-
-.relationship-edge text {
-  font-family: var(--font-ui);
-  font-size: var(--text-xs);
-  fill: var(--chrome-text-muted);
-  pointer-events: none;
-}
-
-.relationship-edge {
-  cursor: pointer;
-}
-
-.relationship-edge:hover line {
+.relationship-edge.is-lit {
   stroke: var(--chrome-accent);
+  stroke-width: 2;
 }
 
-.relationship-edge:hover text {
-  fill: var(--chrome-text-heading);
+.relationship-edge.is-dim {
+  opacity: 0.35;
 }
 
 /* A relationship whose item was deleted: kept on disk, drawn as broken. */
-.relationship-edge.is-broken line {
+.relationship-edge.is-broken {
   stroke: var(--chrome-text-dim);
-}
-
-.relationship-edge.is-broken text {
-  fill: var(--chrome-text-dim);
-  font-style: italic;
 }
 
 .relationship-node {
   cursor: pointer;
+}
+
+.relationship-node.is-dim {
+  opacity: 0.4;
+}
+
+.relationship-node.is-focus text {
+  fill: var(--chrome-accent);
+}
+
+.relationship-node.is-focus circle {
+  stroke: var(--chrome-accent);
+  stroke-width: 3;
 }
 
 .relationship-node circle {
@@ -6553,6 +8318,10 @@ button.menubar-item:hover {
 /* Continuity board (Timeline) */
 
 .timeline {
+  /* The board takes the whole width now that its side panel is gone, but its
+     content is sentences, so it holds to one reading measure and centres it
+     rather than running events the full width of a large window. */
+  --continuity-measure: var(--page-measure);
   flex: 1;
   min-height: 0;
   display: flex;
@@ -6577,15 +8346,50 @@ button.menubar-item:hover {
   border-color: var(--chrome-border-strong);
 }
 
+/* Dead links are kept rather than scrubbed, so the reason is stated once at
+   the top of the board instead of being inferred from scattered chips. */
+.timeline-broken-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: min(var(--continuity-measure), calc(100% - var(--space-5) * 2));
+  margin: var(--space-3) auto 0;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--chrome-text-muted);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+}
+
+.timeline-broken-spacer {
+  flex: 1;
+  min-width: var(--space-2);
+}
+
+.timeline-broken-banner .timeline-cleanup-button {
+  flex-shrink: 0;
+  background: var(--chrome-bg-elevated);
+}
+
 .timeline-scroll {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: var(--space-4);
+  padding: var(--page-pad-top) var(--page-pad-x) var(--page-pad-bottom);
+  /* Reserved whether or not this page scrolls: without it a scrolling
+     page centres its content half a scrollbar to the left of one that
+     does not, and stepping between them twitches. */
+  scrollbar-gutter: stable;
 }
 
 .timeline-empty {
-  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
   margin: var(--space-5) auto;
   font-family: var(--font-ui);
   font-size: var(--text-md);
@@ -6594,17 +8398,27 @@ button.menubar-item:hover {
   text-align: center;
 }
 
+.timeline-empty p {
+  max-width: 460px;
+  margin: 0;
+}
+
+/* The thread: one column of in-story dates, the spine, and the events. The
+   dates get a column of their own so the board can be read down its dates as
+   well as down its events, which a date buried in each card never allowed. */
 .timeline-list {
   display: flex;
   flex-direction: column;
-  max-width: 760px;
+  max-width: var(--continuity-measure);
+  margin: 0 auto;
 }
 
 .timeline-row {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: 18px 140px 26px minmax(0, 1fr);
   align-items: stretch;
-  gap: var(--space-2);
+  column-gap: var(--space-2);
 }
 
 .timeline-row.is-dragging {
@@ -6616,7 +8430,7 @@ button.menubar-item:hover {
 .timeline-row.drop-after::after {
   content: '';
   position: absolute;
-  left: 34px;
+  left: 26px;
   right: 0;
   height: 2px;
   background: var(--chrome-accent);
@@ -6633,8 +8447,9 @@ button.menubar-item:hover {
 
 .timeline-drag-handle {
   display: flex;
-  align-items: center;
-  padding-top: var(--space-2);
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: calc(var(--space-3) + 2px);
   color: var(--chrome-text-dim);
   cursor: grab;
   opacity: 0.3;
@@ -6678,16 +8493,16 @@ button.menubar-item:hover {
 }
 
 .timeline-row:first-child .timeline-rail::before {
-  top: 18px;
+  top: 22px;
 }
 
 .timeline-row:last-child .timeline-rail::before {
-  bottom: calc(100% - 18px);
+  bottom: calc(100% - 22px);
 }
 
 .timeline-dot {
   position: relative;
-  margin-top: var(--space-3);
+  margin-top: calc(var(--space-3) + 5px);
   width: 9px;
   height: 9px;
   border-radius: 50%;
@@ -6705,60 +8520,51 @@ button.menubar-item:hover {
   padding: 1px 0;
 }
 
-.timeline-card {
-  box-shadow: var(--elev-1);
-  flex: 1;
+/* Each event is a card. A hairline between events was quieter but left them
+   reading as one block of text; a card makes it obvious where one event ends
+   and the next begins, which is what this board is for. The date and the
+   spine stay outside the card so both still read as continuous columns. */
+.timeline-body {
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  margin-bottom: var(--space-2);
-  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
   background: var(--chrome-bg-elevated);
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-md);
+  box-shadow: var(--elev-1);
   transition: border-color var(--motion-fast);
 }
 
-.timeline-card.is-linked {
-  cursor: pointer;
-}
-
-.timeline-card:hover {
+.timeline-row:hover .timeline-body {
   border-color: var(--chrome-border-strong);
 }
 
-.timeline-card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-
+/* The primary-content rule (13px / 500 / 18px). */
 .timeline-description {
+  max-width: var(--page-prose);
   font-family: var(--font-ui);
   font-size: var(--text-md);
-  font-weight: 600;
-  line-height: 1.35;
+  font-weight: 500;
+  line-height: 18px;
   color: var(--chrome-text-heading);
 }
 
-.timeline-card-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex-shrink: 0;
-  opacity: 0;
-  transition: opacity var(--motion-fast);
-}
-
-.timeline-row:hover .timeline-card-actions {
-  opacity: 1;
-}
-
+/* The date column, set in the editor face so the in-story dates read as
+   the writer's own words rather than as interface data. */
 .timeline-when {
+  padding-top: calc(var(--space-3) + 1px);
   font-family: var(--font-editor);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
+  line-height: 18px;
+  color: var(--chrome-text-muted);
+  text-align: right;
+  overflow-wrap: break-word;
+}
+
+.timeline-when-unset {
   font-style: italic;
   color: var(--chrome-text-dim);
 }
@@ -6770,28 +8576,51 @@ button.menubar-item:hover {
   gap: var(--space-1);
 }
 
+.timeline-card-meta:empty {
+  display: none;
+}
+
+/* The actions sit under the event rather than over it, so nothing the entry
+   says is covered while the pointer is on the row. */
+.timeline-row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  opacity: 0;
+  transition: opacity var(--motion-fast);
+}
+
+.timeline-row:hover .timeline-row-actions,
+.timeline-row:focus-within .timeline-row-actions {
+  opacity: 1;
+}
+
+.timeline-delete-action:hover {
+  color: var(--chrome-accent-error);
+}
+
 .timeline-item-chip {
   display: inline-flex;
   align-items: center;
-  height: 19px;
+  height: 16px;
   padding: 0 var(--space-2);
   font-family: var(--font-ui);
   font-size: var(--text-xs);
   font-weight: 500;
   border: 1px solid;
-  border-radius: 9px;
+  border-radius: 8px;
 }
 
 .timeline-scene-chip {
   display: inline-flex;
   align-items: center;
-  height: 19px;
+  height: 16px;
   padding: 0 var(--space-2);
   font-family: var(--font-ui);
   font-size: var(--text-xs);
   color: var(--chrome-text-muted);
   background: var(--chrome-control-bg);
-  border-radius: 9px;
+  border-radius: 8px;
 }
 
 /* A reference whose target no longer exists. Deliberately loud rather than
@@ -6799,14 +8628,14 @@ button.menubar-item:hover {
 .timeline-broken-chip {
   display: inline-flex;
   align-items: center;
-  height: 19px;
+  height: 16px;
   padding: 0 var(--space-2);
   font-family: var(--font-ui);
   font-size: var(--text-xs);
   color: var(--chrome-text-dim);
   background: transparent;
   border: 1px dashed var(--chrome-border-strong);
-  border-radius: 9px;
+  border-radius: 8px;
 }
 
 /* Entry modal */
@@ -6937,105 +8766,293 @@ button.menubar-item:hover {
   color: var(--chrome-accent-contrast);
 }
 
+/* The Lexicon as a glossary: a reference to read down, with the alphabet
+   across the top as the way to move through it. */
+
 .lexicon-view {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--chrome-bg);
-  overflow-y: auto;
 }
 
-.lexicon-header {
-  flex-shrink: 0;
-  padding: var(--space-5) var(--space-5) var(--space-3);
-  border-bottom: 1px solid var(--chrome-border);
-}
-
-.lexicon-title {
-  margin: 0 0 var(--space-1);
-  font-size: var(--text-xl);
-  color: var(--chrome-text-heading);
-}
-
-.lexicon-intro {
-  margin: 0 0 var(--space-4);
-  max-width: 60ch;
-  font-size: var(--text-sm);
-  line-height: 1.5;
-  color: var(--chrome-text-muted);
-}
-
-.lexicon-add {
-  display: flex;
-  gap: var(--space-2);
-  max-width: 420px;
-}
-
-.lexicon-add input {
-  flex: 1;
-}
-
-.lexicon-filter {
-  margin: var(--space-3) 0 0;
-  max-width: 420px;
-}
-
-.lexicon-list {
-  flex: 1;
-  min-height: 0;
-  padding: var(--space-3) var(--space-5) var(--space-6);
-}
-
-/* Word, pronunciation, meaning, delete — the meaning gets the remaining
-   width because it is the field that actually runs long. */
-.lexicon-row {
-  display: grid;
-  grid-template-columns: 180px 160px 1fr 26px;
-  align-items: start;
-  gap: var(--space-2);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--chrome-border);
-}
-
-.lexicon-row.is-revealed {
-  background: var(--chrome-row-selected);
-}
-
-.lexicon-word,
-.lexicon-field {
-  padding: var(--space-1) var(--space-2);
+.lexicon-add-input,
+.lexicon-filter-input {
+  height: 28px;
+  padding: 0 var(--space-3);
   font-family: var(--font-ui);
-  font-size: var(--text-md);
+  font-size: var(--text-sm);
   color: var(--chrome-text);
   background: var(--chrome-control-bg);
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-sm);
 }
 
-.lexicon-word {
-  font-weight: 600;
-  color: var(--chrome-text-heading);
-}
+.lexicon-add-input { width: 240px; }
+.lexicon-filter-input { width: 160px; }
 
-.lexicon-word:focus,
-.lexicon-field:focus {
+.lexicon-add-input:focus,
+.lexicon-filter-input:focus {
   outline: none;
   border-color: var(--chrome-accent);
 }
 
-.lexicon-meaning {
-  min-height: 30px;
-  resize: vertical;
-  line-height: 1.5;
+/* Hovering a letter takes the page to it. A letter with no words under it is
+   inert: dimmed, no hover state, nothing to press. Deliberately not buttons,
+   which is why nothing here has a cursor or a pressed state. */
+.lexicon-alphabet {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  gap: 1px;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--chrome-border);
+  user-select: none;
 }
 
-.lexicon-delete {
+.lexicon-alphabet-letter {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 20px;
+  font-family: var(--font-editor);
+  font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+  border-radius: var(--radius-sm);
+  transition: color var(--motion-fast), background var(--motion-fast);
+}
+
+.lexicon-alphabet-letter.is-empty {
+  /* Reads as a gap in the alphabet rather than as a control that does nothing. */
+  color: var(--chrome-text-dim);
+  opacity: 0.4;
+}
+
+.lexicon-alphabet-letter:not(.is-empty):hover {
+  color: var(--chrome-accent-contrast);
+  background: var(--chrome-accent);
+}
+
+/* Where the glossary is now, so the strip reads as a position as well as a
+   way of moving. */
+.lexicon-alphabet-letter.is-current:not(:hover) {
+  color: var(--chrome-text-heading);
+  background: var(--chrome-control-active-bg);
+}
+
+.lexicon-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--page-pad-top) var(--page-pad-x) var(--page-pad-bottom);
+  /* Reserved whether or not this page scrolls: without it a scrolling
+     page centres its content half a scrollbar to the left of one that
+     does not, and stepping between them twitches. */
+  scrollbar-gutter: stable;
+}
+
+/* A page's measure rather than the window's: this is a thing you read down. */
+.lexicon-measure {
+  max-width: var(--page-measure);
+  margin: 0 auto;
+}
+
+.lexicon-lead {
+  max-width: var(--page-prose);
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-xl);
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--chrome-text-heading);
+}
+
+.lexicon-sub {
+  max-width: var(--page-prose);
+  margin: 0 0 var(--space-5);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  line-height: 1.6;
+  color: var(--chrome-text-muted);
+}
+
+.lexicon-empty {
+  margin: 120px auto 0;
+  max-width: 480px;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  line-height: 1.6;
+  color: var(--chrome-text-dim);
+  text-align: center;
+}
+
+.lexicon-empty p { margin: 0; }
+
+.lexicon-group {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  column-gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+
+.lexicon-group-letter {
+  font-family: var(--font-editor);
+  font-size: var(--text-2xl);
+  line-height: 1;
+  color: var(--chrome-text-dim);
+  padding-top: 2px;
+}
+
+.lexicon-entry {
+  padding: var(--space-2) var(--space-2) var(--space-3) 0;
+  border-radius: var(--radius-sm);
+}
+
+.lexicon-entry:hover { background: var(--chrome-row-hover); }
+
+.lexicon-entry.is-revealed { background: var(--chrome-row-selected); }
+
+.lexicon-entry-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+/* The word is set in the page's serif, because it is a word from the book
+   rather than a piece of interface. */
+.lexicon-word {
+  font-family: var(--font-editor);
+  font-size: var(--text-xl);
+  color: var(--chrome-text-heading);
+}
+
+.lexicon-pron {
+  font-family: var(--font-editor);
+  font-style: italic;
+  font-size: var(--text-lg);
+  color: var(--chrome-text-dim);
+}
+
+.lexicon-entry-actions {
+  margin-left: auto;
+  display: flex;
+  gap: var(--space-2);
   opacity: 0;
+  transition: opacity var(--motion-fast);
 }
 
-.lexicon-row:hover .lexicon-delete {
+.lexicon-entry:hover .lexicon-entry-actions,
+.lexicon-entry:focus-within .lexicon-entry-actions {
   opacity: 1;
+}
+
+.lexicon-delete-action:hover { color: var(--chrome-accent-error); }
+
+.lexicon-meaning {
+  max-width: var(--page-prose);
+  margin-top: var(--space-1);
+  font-family: var(--font-editor);
+  font-size: var(--text-lg);
+  line-height: 1.6;
+  color: var(--chrome-text);
+}
+
+.lexicon-unset {
+  color: var(--chrome-text-dim);
+  font-style: italic;
+}
+
+/* Editing in place. The fields commit as you type, the same as they always
+   have — opening them changes what is on screen, not when it saves. */
+.lexicon-entry.is-editing { background: var(--chrome-row-hover); }
+
+.lexicon-edit-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.lexicon-edit-word,
+.lexicon-edit-pron,
+.lexicon-edit-meaning {
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-editor);
+  font-size: var(--text-lg);
+  color: var(--chrome-text);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.lexicon-edit-word { flex: 1; min-width: 0; color: var(--chrome-text-heading); }
+.lexicon-edit-pron { width: 150px; font-style: italic; }
+
+.lexicon-edit-meaning {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  margin-top: var(--space-2);
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.lexicon-edit-word:focus,
+.lexicon-edit-pron:focus,
+.lexicon-edit-meaning:focus {
+  outline: none;
+  border-color: var(--chrome-accent);
+}
+
+/* The other half of the suppression list: words the editor leaves alone
+   because a Story Bible name uses them. */
+.lexicon-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: var(--space-6) 0 var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.lexicon-section-name {
+  font-family: var(--font-ui);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--chrome-text-heading);
+}
+
+.lexicon-section-note {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--chrome-text-dim);
+}
+
+.lexicon-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.lexicon-name-chip {
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+  background: var(--chrome-control-bg);
+  border-radius: 11px;
+}
+
+/* Registered by both features at once. Saying so matters: deleting the
+   lexicon entry would not un-suppress the name, and vice versa. */
+.lexicon-name-chip.is-both {
+  color: var(--chrome-text-heading);
+  border: 1px solid var(--chrome-border-strong);
 }
 
 /* Keyboard focus
@@ -7061,6 +9078,1951 @@ textarea:focus-visible,
   box-shadow: none;
 }
 
+/* Book View — the manuscript as a physical book. Read-only; pages reuse the
+   editor's own page tokens so a book page and an editor sheet are visibly the
+   same paper. */
+
+.book-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--editor-surround);
+}
+
+.book-view-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  background: var(--chrome-bg-elevated);
+  border-bottom: 1px solid var(--chrome-border);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--chrome-text);
+}
+
+/* Same pill shape as the main view switcher — it is the same kind of control,
+   one level down. */
+.book-mode-switch {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+}
+
+.book-mode-switch button {
+  padding: 2px var(--space-3);
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-sm) - 2px);
+  color: var(--chrome-text-dim);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.book-mode-switch button.is-active {
+  background: var(--chrome-control-active-bg);
+  color: var(--chrome-text-heading);
+}
+
+.book-view-readout {
+  color: var(--chrome-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.book-view-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+.book-view-nav button {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  font-size: var(--text-lg);
+  cursor: pointer;
+}
+
+.book-view-nav button:hover:not(:disabled) {
+  background: var(--chrome-control-hover);
+}
+
+.book-view-nav button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.book-jump {
+  width: 56px;
+  padding: 2px var(--space-2);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The at-a-glance answer to "early, middle, or late?" — always visible in
+   both modes, clickable to jump. */
+.book-progress {
+  flex-shrink: 0;
+  height: 5px;
+  background: color-mix(in srgb, var(--chrome-border) 60%, transparent);
+  cursor: pointer;
+}
+
+.book-progress-fill {
+  height: 100%;
+  background: var(--chrome-accent);
+}
+
+.book-view-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  align-items: safe center;
+  justify-content: safe center;
+  padding: var(--space-5);
+}
+
+/* Neutralizes the .editor class's own scroll-panel box (flex, overflow,
+   background) while keeping it in the tree — the pages need it there purely
+   so the `.editor .ProseMirror` typography rules match, exactly like the
+   measurement rig. */
+.book-view .book-page-typography {
+  display: contents;
+}
+
+.book-flat {
+  display: contents;
+}
+
+.book-page {
+  flex-shrink: 0;
+  background: var(--editor-bg);
+  /* The editor sheet's own edge treatment — same paper, same depth. */
+  box-shadow:
+    0 0 0 1px var(--editor-page-edge),
+    0 1px 3px var(--editor-page-shadow);
+}
+
+/* clip-path rather than overflow, deliberately: overflow:hidden makes this a
+   block formatting context, which traps the first block's escaping top margin
+   (an H1's 0.6em, say) BETWEEN the clip and the content — shifting every
+   window down by a margin the pagination coordinates know nothing about, and
+   slicing the last line off every page. clip-path clips without creating a
+   BFC, so that margin collapses on through into the page's own margin and the
+   window's top edge stays exactly where paginate() measured it. */
+.book-page-clip {
+  clip-path: inset(0);
+}
+
+.book-view .ProseMirror.book-page-content {
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  will-change: transform;
+}
+
+/* Must out-rank .book-page-typography's display:contents — the spread needs
+   a real box to carry its perspective transform. */
+.book-view .book-spread {
+  display: flex;
+  transform-origin: center center;
+}
+
+.book-spread .book-page + .book-page {
+  border-left: 1px solid var(--editor-page-edge);
+}
+
+/* The spread is read at a reduced projected scale, where the editor's warm
+   ink loses too much contrast — near-black recovers it. Ink only: metrics are
+   untouched, so line wrapping (and therefore page content) stays identical
+   to the editor's sheets. */
+.book-spread .ProseMirror.book-page-content {
+  color: #1a1510;
+}
+
+.book-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.book-scene-gl {
+  position: absolute;
+  inset: 0;
+}
+
+/* The readable spread, centered over the canvas. The 3D spread is for
+   looking, not selecting — reading interaction lives in the flat mode. */
+.book-spread-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.book-view-loading {
+  margin: auto;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--editor-muted);
+}
+
+/* Binder names inside the book's pages — synthesized into the stitched HTML
+   so pagination flows them like print. Styled as quiet UI labels, not prose,
+   so a document's own headings can't be mistaken for binder structure.
+
+   Scoped to `.editor .ProseMirror`, NOT `.book-view`, and this is
+   load-bearing: pagination measures the stitched HTML in the offscreen
+   measure host, which is an `.editor` but not a `.book-view`. Scoping these
+   narrower once let the measure host lay the headings out as full-size prose
+   headings while the book rendered them as small labels — every page window
+   after a heading drifted by the difference, slicing text at page bottoms.
+   Measurement and render must see identical metrics. (The stitched HTML
+   never enters the live editor, so the wider scope leaks nowhere.) */
+.editor .ProseMirror .chf-draft-heading {
+  margin: 1.6em 0 0.7em;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--editor-muted);
+  line-height: 1.3;
+}
+
+.editor .ProseMirror h1.chf-draft-heading {
+  font-size: var(--text-md);
+}
+
+.editor .ProseMirror h2.chf-draft-heading,
+.editor .ProseMirror h3.chf-draft-heading {
+  font-size: var(--text-sm);
+  color: var(--editor-dim);
+}
+
+.editor .ProseMirror h1.chf-draft-heading:first-child {
+  margin-top: 0;
+}
+
+/* The rail's bottom group: dashboards about the work and the workspace,
+   anchored below the section destinations. Same buttons, different shelf. */
+.nav-rail-bottom {
+  margin-top: auto;
+  margin-bottom: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Progress and Appearance panels — consolidated homes for controls that used
+   to live in menus and modals. Same handlers, one place. */
+
+/* The scroller spans the whole section, so the scrollbar belongs to the
+   window edge and the flanks scroll with the page. The readable measure is
+   capped on the content instead — capping the scroller itself stranded the
+   scrollbar mid-window with dead space either side of it. */
+.progress-view,
+.appearance-view {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--page-pad-top) var(--page-pad-x) var(--page-pad-bottom);
+  /* Reserved whether or not this page scrolls: without it a scrolling
+     page centres its content half a scrollbar to the left of one that
+     does not, and stepping between them twitches. */
+  scrollbar-gutter: stable;
+  width: 100%;
+  font-family: var(--font-ui);
+  color: var(--chrome-text);
+}
+
+.progress-view > *,
+.appearance-view > * {
+  max-width: var(--page-measure);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* The Progress panel reads as a page — one statement, one hero chart, a
+   writing calendar, quiet facts, a compact document list. It used to hold a
+   narrower measure of its own, which is exactly what made stepping down the
+   nav rail feel like seven different apps; the reading width is now applied
+   to its sentences instead of to the page. */
+.progress-hero-sub,
+.progress-view p {
+  max-width: var(--page-prose);
+}
+
+.progress-view .progress-hint {
+  text-align: center;
+}
+
+.progress-section {
+  margin-bottom: var(--space-6);
+}
+
+/* Sentence case, per DESIGN.md — this panel's all-caps labels are the
+   baseline that rule was written to correct. */
+.progress-section-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--chrome-text-dim);
+}
+
+.progress-target-row,
+.appearance-row {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.progress-target-row label,
+.appearance-select,
+.appearance-color {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+}
+
+.progress-target-row input,
+.appearance-select select {
+  height: 28px;
+  padding: 0 var(--space-2);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+.appearance-color input {
+  width: 56px;
+  height: 28px;
+  padding: 2px;
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+}
+
+.progress-save-button,
+.progress-clear-button,
+.progress-doc-edit {
+  height: 28px;
+  padding: 0 var(--space-3);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.progress-save-button:hover,
+.progress-clear-button:hover,
+.progress-doc-edit:hover {
+  background: var(--chrome-control-hover);
+}
+
+.progress-hint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--chrome-text-dim);
+}
+
+/* The hero: the live total in the page's serif, with everything it stands
+   against — target, today, pace, deadline — in one muted line under it. */
+.progress-hero {
+  padding-top: var(--space-4);
+  margin-bottom: var(--space-6);
+  text-align: center;
+}
+
+.progress-hero-count {
+  display: block;
+  font-family: var(--font-editor);
+  font-size: var(--text-hero);
+  font-weight: 400;
+  line-height: 1.1;
+  color: var(--chrome-text-heading);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.progress-hero-sub {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-md);
+  color: var(--chrome-text-muted);
+}
+
+.progress-hero-sub > span + span::before {
+  content: '·';
+  margin: 0 var(--space-2);
+  color: var(--chrome-text-dim);
+}
+
+.progress-hero-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--chrome-text-dim);
+}
+
+.progress-hero-dot--good {
+  background: var(--chrome-accent-saved);
+}
+
+.progress-hero-dot--bad {
+  background: var(--chrome-accent-error);
+}
+
+/* The target track — thinner than the footer's ambient bar, with a tick at
+   the current position and the two ends of the journey labeled under it. */
+.progress-track {
+  position: relative;
+  height: 4px;
+  margin-top: var(--space-5);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--chrome-border) 60%, transparent);
+}
+
+.progress-track-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 2px;
+  background: var(--chrome-accent);
+}
+
+.progress-track-tick {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: var(--chrome-text-dim);
+}
+
+.progress-track-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-2);
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-section-title--centered {
+  text-align: center;
+}
+
+/* Four quiet facts, derived from the same session record as the charts. */
+.progress-facts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.progress-fact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.progress-fact-label {
+  font-size: var(--text-2xs);
+  letter-spacing: 0.02em;
+  color: var(--chrome-text-dim);
+}
+
+.progress-fact-value {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--chrome-text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-fact-sub {
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+}
+
+.progress-spark {
+  width: 100px;
+  height: 26px;
+  margin-top: 2px;
+}
+
+.progress-spark polyline {
+  fill: none;
+  stroke: var(--chrome-accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+/* Target & deadline controls collapse to one quiet link; the row that opens
+   is the same three inputs and the same saves the old section had. */
+.progress-centered {
+  text-align: center;
+}
+
+.progress-edit-link {
+  display: inline-block;
+  margin-top: var(--space-3);
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--chrome-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--chrome-border-strong);
+  cursor: pointer;
+}
+
+.progress-edit-link:hover {
+  color: var(--chrome-text);
+}
+
+.progress-controls {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+
+.progress-controls .progress-target-row {
+  justify-content: center;
+  margin-bottom: 0;
+}
+
+/* Documents as two columns of compact rows: name, count against target, a
+   thin bar, and an edit affordance that only speaks up on hover. */
+.progress-docs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 var(--space-5);
+}
+
+.progress-doc-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+.progress-doc-row:hover {
+  background: var(--chrome-row-hover);
+}
+
+.progress-doc-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress-doc-count {
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.progress-doc-input {
+  width: 80px;
+  height: 24px;
+  padding: 0 var(--space-2);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  font-size: var(--text-sm);
+}
+
+.progress-doc-bar {
+  flex-shrink: 0;
+  width: 64px;
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--chrome-border) 60%, transparent);
+  overflow: hidden;
+}
+
+.progress-doc-bar.is-empty {
+  background: transparent;
+}
+
+.progress-doc-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--chrome-accent);
+}
+
+.progress-docs .progress-doc-edit {
+  height: 22px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-muted);
+  opacity: 0;
+}
+
+.progress-doc-row:hover .progress-doc-edit,
+.progress-docs .progress-doc-edit:focus-visible {
+  opacity: 1;
+}
+
+@media (max-width: 720px) {
+  .progress-facts {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .progress-docs {
+    grid-template-columns: 1fr;
+  }
+}
+
+.appearance-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+  cursor: pointer;
+}
+
+/* The theme wall.
+   Each option is the app wearing that theme — search bar, rail, binder, a
+   manuscript page with words on it, the accent on a control — rather than a
+   swatch of its colours. There is no line under the heading because the cards
+   say what it would have said. Hovering one wears it for the whole window;
+   only a click keeps it. */
+
+.appearance-themes-title {
+  margin-bottom: var(--space-3);
+}
+
+.appearance-themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.appearance-theme {
+  display: block;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  background: var(--chrome-bg-elevated);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color var(--motion-fast);
+}
+
+.appearance-theme:hover {
+  border-color: var(--chrome-border-strong);
+}
+
+.appearance-theme.is-active {
+  border-color: var(--chrome-accent);
+  box-shadow: inset 0 0 0 1px var(--chrome-accent);
+}
+
+.appearance-theme-meta {
+  display: block;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+}
+
+.appearance-theme-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--chrome-text-heading);
+}
+
+.appearance-theme-tick {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--chrome-accent);
+}
+
+.appearance-theme-desc {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--chrome-text-dim);
+}
+
+/* A theme of your own: the same card, with its edit control in the corner
+   of the meta strip. */
+.appearance-theme--yours {
+  position: relative;
+}
+
+.appearance-theme-edit {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  height: 22px;
+  padding: 0 var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--chrome-text-muted);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.appearance-theme-edit:hover {
+  color: var(--chrome-text-heading);
+  background: var(--chrome-control-hover);
+}
+
+/* The way in: a dashed card at the end of the wall, worded as an offer. Not
+   an .appearance-theme, because it is not one: nothing on it is a specimen. */
+.appearance-theme-make {
+  width: 100%;
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  text-align: center;
+  background: transparent;
+  border: 1px dashed var(--chrome-border-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color var(--motion-fast);
+}
+
+.appearance-theme-make:hover {
+  border-color: var(--chrome-accent);
+}
+
+.appearance-theme-make-title {
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--chrome-text-heading);
+}
+
+.appearance-theme-make-desc {
+  max-width: 220px;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--chrome-text-muted);
+}
+
+/* The editing card: the specimen, then the name and the four wells. Spans
+   the row and holds to a width, rather than spanning two columns, so it
+   never asks the grid for a column it does not have. */
+.appearance-theme--editing {
+  grid-column: 1 / -1;
+  max-width: 640px;
+  cursor: default;
+  border-color: var(--chrome-accent);
+  box-shadow: inset 0 0 0 1px var(--chrome-accent);
+}
+
+.appearance-theme--editing .appearance-spec {
+  height: 150px;
+}
+
+.appearance-theme-form {
+  padding: var(--space-3);
+}
+
+.appearance-theme-name-input {
+  margin-bottom: var(--space-3);
+}
+
+.appearance-wells {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2) var(--space-4);
+}
+
+.appearance-well {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--chrome-text);
+}
+
+.appearance-well input[type='color'] {
+  width: 30px;
+  height: 26px;
+  padding: 2px;
+  flex-shrink: 0;
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.appearance-well-label {
+  min-width: 78px;
+}
+
+.appearance-well-hex {
+  width: 84px;
+  height: 24px;
+  padding: 0 var(--space-2);
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: var(--text-xs);
+  color: var(--chrome-text-muted);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+}
+
+.appearance-well-hex:focus {
+  outline: none;
+  border-color: var(--chrome-accent);
+  color: var(--chrome-text-heading);
+}
+
+.appearance-theme-hint {
+  margin: var(--space-3) 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--chrome-text-dim);
+}
+
+.appearance-theme-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.appearance-theme-actions-spacer {
+  flex: 1;
+}
+
+.appearance-theme-delete {
+  color: var(--chrome-text-muted);
+}
+
+/* The specimen. Every colour comes from --tp-* custom properties set on this
+   element from the same derivation that paints the window, so a card cannot
+   show something the app would not do. */
+.appearance-spec {
+  display: block;
+  height: 118px;
+  overflow: hidden;
+  background: var(--tp-bg);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.appearance-spec-top {
+  display: flex;
+  align-items: center;
+  height: 12px;
+  padding: 0 6px;
+  font-family: var(--font-ui);
+  font-size: 7px;
+  color: var(--tp-text-dim);
+  background: var(--tp-bg);
+  border-bottom: 1px solid var(--tp-border);
+}
+
+.appearance-spec-main {
+  display: flex;
+  height: calc(100% - 13px);
+}
+
+.appearance-spec-rail {
+  flex: none;
+  width: 10px;
+  background: var(--tp-sidebar);
+  border-right: 1px solid var(--tp-border);
+}
+
+.appearance-spec-binder {
+  flex: none;
+  width: 78px;
+  padding: 6px;
+  background: var(--tp-sidebar);
+  border-right: 1px solid var(--tp-border);
+}
+
+.appearance-spec-binder i {
+  display: block;
+  height: 5px;
+  margin-bottom: 5px;
+  border-radius: 2px;
+  background: var(--tp-text);
+  opacity: 0.28;
+}
+
+.appearance-spec-binder i.is-active {
+  background: var(--tp-accent);
+  opacity: 1;
+}
+
+.appearance-spec-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px;
+  background: var(--tp-surround);
+}
+
+.appearance-spec-page {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px 10px;
+  background: var(--tp-page);
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+}
+
+.appearance-spec-h {
+  display: block;
+  margin-bottom: 5px;
+  font-family: var(--font-editor);
+  font-size: 11px;
+  color: var(--tp-ink);
+}
+
+/* Clamped rather than clipped: a miniature page should end on a whole line. */
+.appearance-spec-p {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-family: var(--font-editor);
+  font-size: 9px;
+  line-height: 1.5;
+  color: var(--tp-ink-muted);
+}
+
+.appearance-spec-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.appearance-spec-btn {
+  display: grid;
+  place-items: center;
+  height: 13px;
+  padding: 0 7px;
+  font-family: var(--font-ui);
+  font-size: 8px;
+  border-radius: 2px;
+  background: var(--tp-accent);
+  color: var(--tp-accent-contrast);
+}
+
+.appearance-spec-status {
+  font-family: var(--font-ui);
+  font-size: 8px;
+  color: var(--tp-text-dim);
+}
+
+.appearance-toolbar-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* The global mode switch, first thing on the Appearance page — larger than
+   the in-chart pills because it's the panel's headline control. */
+.appearance-mode-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.appearance-mode-switch button {
+  padding: var(--space-1) var(--space-5);
+  font-size: var(--text-md);
+}
+
+/* Progress charts — plain SVG, theme tokens only: accent series, muted
+   dashed reference, recessive grid, ink-token text. Nothing celebratory. */
+
+.progress-chart {
+  margin: 0;
+}
+
+.progress-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.progress-chart-grid {
+  stroke: color-mix(in srgb, var(--chrome-border) 55%, transparent);
+  stroke-width: 1;
+}
+
+.progress-chart-zero {
+  stroke: var(--chrome-border);
+  stroke-width: 1;
+}
+
+.progress-chart-area {
+  fill: var(--chrome-accent);
+  opacity: 0.08;
+}
+
+.progress-chart-line {
+  stroke: var(--chrome-accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.progress-chart-reference {
+  stroke: var(--chrome-text-dim);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+
+.progress-chart-crosshair {
+  stroke: color-mix(in srgb, var(--chrome-text-dim) 50%, transparent);
+  stroke-width: 1;
+}
+
+.progress-chart-dot {
+  fill: var(--chrome-accent);
+  stroke: var(--chrome-bg);
+  stroke-width: 2;
+}
+
+.progress-chart-axis {
+  fill: var(--chrome-text-dim);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-chart-tooltip {
+  fill: var(--chrome-text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The writing calendar — a sequential ramp of the one accent hue, defined
+   once here so the SVG cells and the HTML legend swatches can't drift.
+   The negative step is the same muted red the revision markup uses for
+   deletion: a cutting day is history, not an error. */
+.progress-calendar {
+  --cal-l1: color-mix(in oklab, var(--chrome-accent) 28%, var(--chrome-bg));
+  --cal-l2: color-mix(in oklab, var(--chrome-accent) 48%, var(--chrome-bg));
+  --cal-l3: color-mix(in oklab, var(--chrome-accent) 72%, var(--chrome-bg));
+  --cal-l4: var(--chrome-accent);
+  --cal-neg: color-mix(in oklab, var(--chrome-accent-error) 55%, var(--chrome-bg));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+}
+
+.progress-cal-cell {
+  fill: var(--chrome-control-bg);
+}
+
+.progress-cal-cell.is-l1 {
+  fill: var(--cal-l1);
+}
+
+.progress-cal-cell.is-l2 {
+  fill: var(--cal-l2);
+}
+
+.progress-cal-cell.is-l3 {
+  fill: var(--cal-l3);
+}
+
+.progress-cal-cell.is-l4 {
+  fill: var(--cal-l4);
+}
+
+.progress-cal-cell.is-negative {
+  fill: var(--cal-neg);
+}
+
+.progress-cal-cell.is-hover {
+  stroke: var(--chrome-text-muted);
+  stroke-width: 1;
+}
+
+.progress-cal-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+}
+
+.progress-cal-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--chrome-control-bg);
+}
+
+.progress-cal-swatch.is-l1 {
+  background: var(--cal-l1);
+}
+
+.progress-cal-swatch.is-l2 {
+  background: var(--cal-l2);
+}
+
+.progress-cal-swatch.is-l3 {
+  background: var(--cal-l3);
+}
+
+.progress-cal-swatch.is-l4 {
+  background: var(--cal-l4);
+}
+
+/* The way out of distraction-free — quiet, but always visible: the mode
+   hides every other control that could end it. */
+.distraction-exit {
+  position: fixed;
+  /* Below the Windows caption-button overlay (titleBarOverlay, 32px tall,
+     pinned to the top-right corner at every window width) — a top-aligned
+     pill sits behind it and can't be clicked. env() tracks the real overlay
+     height where exposed; the fallback mirrors main/index.ts. */
+  top: calc(env(titlebar-area-height, 32px) + var(--space-2));
+  right: var(--space-3);
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 26px;
+  padding: 0 var(--space-2);
+  background: color-mix(in srgb, var(--chrome-bg-elevated) 82%, transparent);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text-dim);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: color var(--motion-fast), border-color var(--motion-fast);
+}
+
+.distraction-exit:hover {
+  color: var(--chrome-text-heading);
+  border-color: var(--chrome-border-strong);
+}
+
+/* Same 26px bordered square as the nav buttons beside it — one bar, one
+   button treatment (the split-pane header established this shape). */
+.book-view-toolbar .icon-close-button {
+  flex-shrink: 0;
+  margin-left: var(--space-2);
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  cursor: pointer;
+}
+
+.book-view-toolbar .icon-close-button:hover {
+  background: var(--chrome-control-hover);
+}
+
+/* Compile section — the assembly: preset chips, a hero sentence, hairline
+   steps beside a proof of the title page, checks inline below the steps,
+   and the stored drafts as a filmstrip. Whitespace and hairlines carry the
+   structure; nothing sits in a bordered card. */
+
+/* The personal-details bar: the Continuity Board's slim toolbar treatment
+   (.outliner-toolbar carries the layout), fixed above the scrolling
+   assembly rather than scrolling with it. */
+.compile-details-summary {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+}
+
+.compile-details-spacer {
+  flex: 1;
+  min-width: var(--space-2);
+}
+
+.compile-details-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+}
+
+.compile-details-field .outliner-filter-input {
+  width: 100%;
+}
+
+.compile-details-address {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.compile-assembly {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--page-pad-top) var(--page-pad-x) var(--page-pad-bottom);
+  /* Reserved whether or not this page scrolls: without it a scrolling
+     page centres its content half a scrollbar to the left of one that
+     does not, and stepping between them twitches. */
+  scrollbar-gutter: stable;
+  /* The split collapses on the assembly's own width, not the window's — the
+     side panel and rail take a share of the viewport that a media query
+     can't see. */
+  container-type: inline-size;
+}
+
+.compile-presets {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  max-width: var(--page-measure);
+  margin: 0 auto var(--space-4);
+}
+
+.compile-presets-label {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--chrome-text-dim);
+}
+
+.compile-preset-chip {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: 12px;
+  padding: 3px 12px;
+  cursor: pointer;
+}
+
+.compile-preset-chip:hover {
+  background: var(--chrome-control-hover);
+}
+
+.compile-preset-chip.is-active {
+  color: var(--chrome-text-heading);
+  border-color: var(--chrome-accent);
+}
+
+.compile-preset-chip.is-save {
+  border-style: dashed;
+}
+
+/* The hero: what a compile right now would produce, as one statement. */
+.compile-hero-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  max-width: var(--page-measure);
+  margin: 0 auto var(--space-3);
+}
+
+.compile-hero {
+  flex: 1;
+  min-width: 0;
+  max-width: 620px;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-xl);
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--chrome-text-heading);
+}
+
+.compile-hero-detail {
+  color: var(--chrome-text-muted);
+}
+
+.compile-hero-row .modal-confirm {
+  margin-top: 6px;
+}
+
+.compile-feedback {
+  max-width: var(--page-measure);
+  margin: 0 auto var(--space-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+}
+
+.compile-feedback.is-error {
+  color: var(--chrome-accent-error);
+}
+
+/* The steps and the proof share a row, with a real gutter between them —
+   the proof is a different material (paper against chrome) and needs the
+   separation. */
+.compile-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: var(--space-4) 44px;
+  align-items: start;
+  max-width: var(--page-measure);
+  margin: 0 auto;
+}
+
+.compile-steps {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.compile-step {
+  padding: var(--space-4) 0 var(--space-5);
+}
+
+.compile-step + .compile-step {
+  border-top: 1px solid var(--chrome-border);
+}
+
+.compile-step-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.compile-step-num {
+  flex-shrink: 0;
+  align-self: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border-strong);
+  color: var(--chrome-text-muted);
+}
+
+.compile-step-title {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--chrome-text-heading);
+}
+
+.compile-step-sum {
+  margin-left: auto;
+  text-align: right;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--chrome-text-dim);
+}
+
+.compile-step-sum.is-waived {
+  color: var(--chrome-accent-saving);
+}
+
+.compile-step-body {
+  margin-top: var(--space-3);
+  padding-left: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.compile-scope-actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.compile-hint {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--chrome-text-dim);
+}
+
+.compile-quiet-link {
+  padding: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--chrome-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--chrome-border-strong);
+}
+
+.compile-quiet-link:hover {
+  color: var(--chrome-text);
+}
+
+.compile-quiet-link.is-delete:hover {
+  color: var(--chrome-accent-error);
+}
+
+/* Findings: the same amber the saving indicator uses — attention, not error. */
+.compile-findings {
+  display: flex;
+  flex-direction: column;
+}
+
+.compile-finding {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 5px 0;
+}
+
+.compile-finding + .compile-finding {
+  border-top: 1px solid var(--chrome-border);
+}
+
+.compile-finding-dot {
+  flex-shrink: 0;
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--chrome-accent-saving);
+}
+
+.compile-finding-message {
+  flex: 1;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--chrome-text);
+}
+
+.compile-step-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+/* The proof: a title page in the chosen style, on the editor's fixed paper
+   tokens. Sticky so it keeps pace while the steps scroll. */
+.compile-proofcol {
+  position: sticky;
+  top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.compile-proof {
+  width: 420px;
+  max-width: 100%;
+  position: relative;
+  background: var(--editor-bg);
+  color: var(--editor-text);
+  border: 1px solid var(--editor-page-edge);
+  box-shadow: var(--elev-2);
+  padding: 40px 46px;
+}
+
+.compile-proof.is-manuscript {
+  font-family: 'Times New Roman', Georgia, serif;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.compile-proof.is-standard {
+  font-family: var(--font-editor);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.compile-proof-contact {
+  line-height: 1.5;
+}
+
+.compile-proof-words {
+  position: absolute;
+  top: 40px;
+  right: 46px;
+}
+
+.compile-proof-titleblock {
+  text-align: center;
+  margin-top: 34%;
+  line-height: 2;
+}
+
+.compile-proof-title {
+  font-size: 14px;
+  letter-spacing: 0.08em;
+}
+
+.compile-proof.is-standard .compile-proof-title {
+  font-size: 16px;
+  letter-spacing: 0.02em;
+}
+
+.compile-proof-byline {
+  margin-top: 8px;
+}
+
+.compile-proof-pages {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--chrome-text-muted);
+}
+
+.compile-proof-caption {
+  font-family: var(--font-ui);
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+}
+
+/* Past compiles: a filmstrip of the stored drafts, borderless — hover and
+   selection read through tone, as binder rows do. */
+.compile-film {
+  max-width: var(--page-measure);
+  margin: var(--space-5) auto 0;
+}
+
+.compile-film-label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--chrome-text-dim);
+}
+
+.compile-film-row {
+  display: flex;
+  gap: var(--space-4);
+  overflow-x: auto;
+  padding: var(--space-1);
+}
+
+.compile-film-card {
+  flex: 0 0 285px;
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.compile-film-card:hover {
+  background: var(--chrome-row-hover);
+}
+
+.compile-film-card.is-selected {
+  background: var(--chrome-row-selected);
+}
+
+.compile-film-thumb {
+  flex-shrink: 0;
+  width: 44px;
+  height: 57px;
+  background: var(--editor-bg);
+  border: 1px solid var(--editor-page-edge);
+  position: relative;
+}
+
+.compile-film-thumb::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  top: 14px;
+  height: 2px;
+  background: rgba(43, 38, 32, 0.18);
+  box-shadow:
+    0 6px rgba(43, 38, 32, 0.18),
+    0 12px rgba(43, 38, 32, 0.18),
+    0 18px rgba(43, 38, 32, 0.18),
+    0 24px rgba(43, 38, 32, 0.18);
+}
+
+.compile-film-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.compile-film-name {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--chrome-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compile-film-meta {
+  font-family: var(--font-ui);
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+}
+
+.compile-checks-clean {
+  color: var(--chrome-accent-saved);
+}
+
+.compile-checks-waived {
+  color: var(--chrome-accent-saving);
+  cursor: help;
+}
+
+.compile-film-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: 2px;
+  opacity: 0;
+}
+
+.compile-film-card:hover .compile-film-actions,
+.compile-film-card:focus-within .compile-film-actions {
+  opacity: 1;
+}
+
+/* Below two-column room, the proof falls into the main column after the
+   steps and stops being sticky. */
+@container (max-width: 1040px) {
+  .compile-split {
+    grid-template-columns: 1fr;
+  }
+
+  .compile-proofcol {
+    position: static;
+    width: 100%;
+  }
+
+  .compile-proof {
+    width: 100%;
+    max-width: 480px;
+  }
+}
+
+.compile-scope-tree {
+  max-height: 320px;
+  overflow: auto;
+}
+
+.compile-scope-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 3px var(--space-1);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  color: var(--chrome-text);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.compile-scope-row:hover {
+  background: var(--chrome-control-hover);
+}
+
+.compile-scope-row input {
+  accent-color: var(--chrome-accent);
+}
+
+.compile-scope-row .icon {
+  flex-shrink: 0;
+  color: var(--chrome-text-muted);
+}
+
+/* The whole subtree is out with its ancestor — read as switched off as a
+   unit, whatever the (stale) checkbox underneath says. */
+.compile-scope-row.is-parent-excluded {
+  opacity: 0.45;
+}
+
+.compile-scope-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compile-scope-empty {
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  color: var(--chrome-text-dim);
+}
+
+.compile-option-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.compile-option-label {
+  flex-shrink: 0;
+  width: 64px;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+}
+
+.compile-option-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.compile-link-button {
+  padding: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--chrome-accent);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.compile-format-badge {
+  display: inline-block;
+  padding: 1px var(--space-1);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  color: var(--chrome-text-muted);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+}
+
+.compile-page-select {
+  width: 240px;
+}
+
+.compile-margin-stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.compile-margin-value {
+  min-width: 56px;
+  text-align: center;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  color: var(--chrome-text);
+}
+
+.compile-preset-name-input {
+  width: 100%;
+  margin-bottom: var(--space-4);
+}
+
+/* The delete affordance inside a preset chip — revealed on hover so the row
+   reads as names, not a row of delete buttons. A span rather than a nested
+   button, because the chip itself is already the apply button. */
+.compile-preset-chip-delete {
+  display: none;
+  margin-left: var(--space-1);
+  padding: 0 2px;
+  color: var(--chrome-text-dim);
+  border-radius: var(--radius-sm);
+}
+
+.compile-preset-chip:hover .compile-preset-chip-delete {
+  display: inline;
+}
+
+.compile-preset-chip-delete:hover {
+  color: var(--chrome-accent-error);
+}
+
+/* The read-only draft viewer: header strip + the printable document in a
+   sandboxed frame, centered on chrome like a sheet on a desk. */
+.compile-viewer-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.compile-viewer-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.compile-viewer-title {
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--chrome-text-heading);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compile-viewer-sub {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compile-viewer-actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: var(--space-2);
+}
+
+.compile-viewer-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  padding: var(--space-4);
+  overflow: auto;
+}
+
+.compile-viewer-frame {
+  max-width: 100%;
+  height: 100%;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  box-shadow: var(--elev-2);
+}
+
+/* ---------------------------------------------------------------------------
+   Presence. The shared entrance/exit for every panel, disclosure and pane in
+   the app — see usePresence, which owns the mounting half of this. The hook
+   keeps a closing element in the DOM for --motion-exit-ms and toggles .is-in;
+   these rules are the only place the actual motion is described.
+
+   Two variants. The base fades only, for anything already carrying a layout
+   transform of its own (the binder flyout centres itself with translateY(-50%),
+   which a motion transform would silently overwrite). --rise adds a short
+   settle from above, which is what a disclosure opening downward wants.
+
+   Nothing here animates width, height, top or left, on purpose: those are not
+   compositor properties and animating them relayouts every frame, which is
+   plainly visible as jank in Electron. Neighbouring layout therefore snaps to
+   its new size while the element itself moves. That is the accepted trade. */
+
+/* Deliberately no will-change here. It reads as a harmless optimisation, but
+   declared permanently (these elements are always mounted) it makes every
+   presence element a stacking context AND a containing block for
+   position:fixed descendants. On .view-pane that re-anchored the app's fixed
+   modal overlays to the pane instead of the viewport — they stopped covering
+   the nav rail and the footer. The transitions are short opacity/transform
+   fades that the compositor handles perfectly well without the hint. */
+.motion-presence {
+  opacity: 0;
+  transition: opacity var(--motion-exit);
+}
+
+.motion-presence.is-in {
+  opacity: 1;
+  /* The direction's easing and duration ride on the class rather than on a
+     JS branch: entering elements wear .is-in and so get the slower ease-out,
+     leaving ones have it removed and fall back to the quicker ease-in above. */
+  transition: opacity var(--motion-enter);
+}
+
+.motion-presence--rise {
+  transform: translateY(-4px);
+  transition: opacity var(--motion-exit), transform var(--motion-exit);
+}
+
+.motion-presence--rise.is-in {
+  transform: none;
+  transition: opacity var(--motion-enter), transform var(--motion-enter);
+}
+
 /* Respect the system setting. Every transition here is a state change rather
    than decoration, so this reduces them to instant rather than removing the
    feedback. */
@@ -7069,4 +11031,419 @@ textarea:focus-visible,
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
   }
+}
+
+/* ── Import from Scrivener ─────────────────────────────────────────────
+   The word list is the point of this dialog, so it gets the height. The
+   personal dictionary is machine-wide, and a writer needs to actually read
+   it — a count would not be enough to decide on. */
+.scrivener-import-modal {
+  width: min(720px, 92vw);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.scrivener-import-option {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3);
+  margin-top: var(--space-2);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.scrivener-import-option:hover {
+  background: var(--chrome-control-hover);
+}
+
+.scrivener-import-option.is-unavailable {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.scrivener-import-option.is-unavailable:hover {
+  background: none;
+}
+
+.scrivener-import-option > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scrivener-import-note {
+  font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+}
+
+.scrivener-import-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: var(--space-3);
+}
+
+.scrivener-import-status {
+  font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+  padding: var(--space-2) 0;
+}
+
+.scrivener-import-paths {
+  margin: var(--space-2) 0;
+  padding-left: var(--space-5);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--chrome-text-dim);
+}
+
+/* Both files existing is a real ambiguity with no documented answer, so it
+   reads as a decision to make rather than a warning to dismiss. */
+.scrivener-import-ambiguous {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--chrome-text);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border-strong);
+  border-radius: var(--radius-md);
+}
+
+.scrivener-import-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  text-align: left;
+  color: var(--chrome-text);
+  background: var(--chrome-bg-elevated);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.scrivener-import-choice:hover {
+  background: var(--chrome-control-hover);
+}
+
+.scrivener-import-choice.is-chosen {
+  border-color: var(--chrome-accent);
+}
+
+.scrivener-import-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+  padding-bottom: var(--space-2);
+}
+
+.scrivener-import-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.scrivener-import-actions button {
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--chrome-border-strong);
+}
+
+.scrivener-import-actions button:hover {
+  color: var(--chrome-text);
+}
+
+.scrivener-import-filter {
+  font: inherit;
+  font-size: var(--text-md);
+  color: var(--chrome-text);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 5px var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+/* Multi-column so a couple of hundred words are scannable rather than a
+   single endless list. */
+.scrivener-import-words {
+  flex: 1;
+  min-height: 140px;
+  overflow-y: auto;
+  columns: 3 150px;
+  column-gap: var(--space-4);
+  padding: var(--space-2);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+  background: var(--chrome-bg);
+}
+
+.scrivener-import-word {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  break-inside: avoid;
+  padding: 1px 0;
+  font-size: var(--text-sm);
+  color: var(--chrome-text);
+  cursor: pointer;
+}
+
+.scrivener-import-word:hover {
+  color: var(--chrome-text-heading);
+}
+
+.scrivener-import-word input:not(:checked) + span {
+  color: var(--chrome-text-dim);
+  text-decoration: line-through;
+}
+
+.scrivener-import-result {
+  margin-top: var(--space-3);
+  font-size: var(--text-md);
+  color: var(--chrome-accent-saved);
+}
+
+/* ── Landing page: splash, ticker and shelf ────────────────────────────
+   The card grew wider than the old 520px because the projects are now laid
+   out as objects rather than list rows. Everything else about its
+   composition — centred, unhurried, scrolling as a whole — is unchanged. */
+.welcome-card {
+  max-width: 840px;
+}
+
+/* A title-screen splash: company rather than information. */
+.welcome-splash {
+  margin: var(--space-2) auto 0;
+  max-width: 620px;
+  font-family: var(--font-editor);
+  font-size: var(--text-lg);
+  color: var(--chrome-text-muted);
+}
+
+.welcome-splash-text {
+  font-style: italic;
+}
+
+.welcome-splash-source {
+  display: block;
+  margin-top: 4px;
+  font-style: normal;
+  font-size: var(--text-sm);
+  color: var(--chrome-text-dim);
+}
+
+.welcome-splash-source::before {
+  content: '— ';
+}
+
+/* ── The ticker ───────────────────────────────────────────────────────
+   A marquee: the bar pans its contents in from the right on a loop. Inset
+   rather than full width, so it reads as a component on the page rather than
+   a band across it. Every number on this screen lives in here. */
+.welcome-ticker-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-4);
+}
+
+.welcome-ticker {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  max-width: 620px;
+  border: 1px solid var(--chrome-border);
+  border-radius: 999px;
+  background: var(--chrome-bg-elevated);
+}
+
+/* The base transform holds the first fact in the middle of the bar. The
+   animation's delay keeps it there long enough to be read before anything
+   moves — animation-fill-mode stays `none`, so this is what shows during it.
+   Transform only, so the pan never touches layout or paint. */
+.welcome-ticker-track {
+  display: flex;
+  width: max-content;
+  transform: translateX(var(--ticker-start, 0px));
+  animation: welcome-ticker-pan linear infinite;
+  animation-delay: 5s;
+}
+
+@keyframes welcome-ticker-pan {
+  from {
+    transform: translateX(var(--ticker-start, 0px));
+  }
+  to {
+    /* Exactly half the track: the run is rendered twice, so at this point the
+       second copy sits where the first began and the restart is invisible. */
+    transform: translateX(calc(var(--ticker-start, 0px) - 50%));
+  }
+}
+
+.welcome-ticker:hover .welcome-ticker-track {
+  animation-play-state: paused;
+}
+
+.welcome-ticker-run {
+  display: flex;
+  flex: none;
+}
+
+/* Deliberately not a flex container: flex collapses the whitespace text nodes
+   inside the sentence and glues the numbers to the words either side. */
+.welcome-ticker-item {
+  display: block;
+  padding: 8px var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+  white-space: nowrap;
+}
+
+/* Items arrive and leave rather than being clipped at the edges. */
+.welcome-ticker::before,
+.welcome-ticker::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 44px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.welcome-ticker::before {
+  left: 0;
+  background: linear-gradient(to right, var(--chrome-bg-elevated), transparent);
+}
+
+.welcome-ticker::after {
+  right: 0;
+  background: linear-gradient(to left, var(--chrome-bg-elevated), transparent);
+}
+
+/* Perpetual motion is a real cost on a screen opened every day, so it stops
+   entirely for anyone who has asked for less of it — the facts stay, wrapped
+   and still. */
+@media (prefers-reduced-motion: reduce) {
+  .welcome-ticker {
+    border-radius: var(--radius-md);
+    max-width: 560px;
+  }
+  .welcome-ticker-track {
+    animation: none;
+    transform: none;
+    flex-wrap: wrap;
+    width: 100%;
+    justify-content: center;
+  }
+  .welcome-ticker-run:last-child {
+    display: none;
+  }
+}
+
+/* ── The shelf ────────────────────────────────────────────────────── */
+.welcome-shelf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  justify-content: center;
+}
+
+.welcome-project {
+  position: relative;
+  width: 214px;
+}
+
+/* A book on a shelf: the heavier band down the left is the binding edge. */
+.welcome-project-open {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: 168px;
+  padding: var(--space-4);
+  text-align: left;
+  font: inherit;
+  color: var(--chrome-text);
+  background: var(--chrome-bg-elevated);
+  border: 1px solid var(--chrome-border);
+  border-left: 4px solid var(--chrome-border-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: transform var(--motion-enter), border-color var(--motion-enter);
+}
+
+.welcome-project-open:hover {
+  transform: translateY(-3px);
+  border-left-color: var(--chrome-accent);
+}
+
+.welcome-project-name {
+  font-family: var(--font-editor);
+  font-size: var(--text-xl);
+  line-height: 1.2;
+  color: var(--chrome-text-heading);
+  /* A long title wraps rather than stretching the card out of the row. */
+  overflow-wrap: anywhere;
+}
+
+.welcome-project-spacer {
+  flex: 1;
+}
+
+.welcome-project-meta {
+  font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.welcome-project-opened {
+  font-size: var(--text-xs);
+  color: var(--chrome-text-dim);
+}
+
+.welcome-project-forget {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+}
+
+.welcome-empty {
+  max-width: 460px;
+  margin: 0 auto;
+  font-size: var(--text-md);
+  color: var(--chrome-text-muted);
+}
+
+/* Now that the four ways in sit side by side above the shelf, they are a
+   centred row rather than the narrow vertical stack the old 520px card
+   needed. Overrides the earlier .welcome-actions rule deliberately. */
+.welcome-card .welcome-actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+  width: auto;
+  justify-content: center;
+  align-self: center;
+}
+
+.welcome-card .welcome-actions .welcome-button {
+  padding: 0 var(--space-4);
+  font-size: var(--text-md);
 }

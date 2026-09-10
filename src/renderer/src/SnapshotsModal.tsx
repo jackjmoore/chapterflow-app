@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { SnapshotMeta } from '../../shared/snapshot'
 import ConfirmModal from './ConfirmModal'
 import SnapshotDiffModal, { type DiffSide } from './SnapshotDiffModal'
+import { formatSnapshotDate, snapshotLabel as labelFor } from './snapshotLabel'
 import { CloseIcon } from './icons'
 
 interface SnapshotsModalProps {
@@ -11,32 +12,6 @@ interface SnapshotsModalProps {
   onCreateSnapshot: (name: string | null) => Promise<SnapshotMeta>
   onRestore: (snapshotId: string) => Promise<void>
   onClose: () => void
-}
-
-function formatSnapshotDate(iso: string): string {
-  const date = new Date(iso)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMin = Math.round(diffMs / 60000)
-
-  const absolute = date.toLocaleString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit'
-  })
-
-  if (diffMin < 1) return `Just now — ${absolute}`
-  if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? '' : 's'} ago — ${absolute}`
-  const diffHr = Math.round(diffMin / 60)
-  if (diffHr < 24) return `${diffHr} hour${diffHr === 1 ? '' : 's'} ago — ${absolute}`
-  const diffDay = Math.round(diffHr / 24)
-  return `${diffDay} day${diffDay === 1 ? '' : 's'} ago — ${absolute}`
-}
-
-function labelFor(snapshot: SnapshotMeta): string {
-  return `${snapshot.name ?? 'Untitled'} (${formatSnapshotDate(snapshot.timestamp)})`
 }
 
 function SnapshotsModal(props: SnapshotsModalProps): JSX.Element {

@@ -22,6 +22,14 @@ export function resolveMentionChips(
     }))
 }
 
+/** The manuscript's documents in reading order — the x-axis every presence
+ *  strip is drawn against, so one item's strip lines up with another's. */
+export function manuscriptDocuments(tree: BinderNode[]): { id: string; name: string }[] {
+  return flattenForOutliner(tree)
+    .filter((r) => r.node.type === 'document')
+    .map((r) => ({ id: r.node.id, name: r.node.name || 'Untitled' }))
+}
+
 export interface OrderedMentionStat {
   documentId: string
   documentName: string

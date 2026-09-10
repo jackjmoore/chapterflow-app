@@ -72,3 +72,14 @@ export const MIN_PAGE_MARGIN_MM = 10
 export const MAX_PAGE_MARGIN_MM = 50
 export const PAGE_MARGIN_STEP_MM = 5
 export const DEFAULT_PAGE_MARGIN_MM = 25
+
+// Two ways to read the manuscript: paginated (page breaks rendered, matches
+// print/export) and continuous (one unbroken flow, no page-boundary layout
+// work). Global rather than per-project, like pageSize/theme/zoom — it's a
+// reading preference, not a property of the manuscript.
+export type PageViewMode = 'paginated' | 'continuous'
+export const DEFAULT_PAGE_VIEW_MODE: PageViewMode = 'paginated'
+
+export function isPageViewMode(value: unknown): value is PageViewMode {
+  return value === 'paginated' || value === 'continuous'
+}

@@ -1,5 +1,6 @@
 import type { BinderNode } from '../../shared/binder'
 import { ChevronIcon, DocumentIcon, FolderIcon } from './icons'
+import { usePresence, presenceClass } from './usePresence'
 
 interface BinderFlyoutListProps {
   tree: BinderNode[]
@@ -29,6 +30,9 @@ function BinderFlyoutRow(props: RowProps): JSX.Element {
   const isActive = node.type === 'document' && node.id === activeDocumentId
   const isSelected = selectedId === node.id
   const showChevron = isFolder || node.children.length > 0
+  // Same presence treatment as the real binder's rows — the flyout is a
+  // reduced copy of that tree and should not expand differently from it.
+  const childPresence = usePresence(node.collapsed ? null : true)
 
   const rowClasses = ['binder-flyout-row', isSelected ? 'is-selected' : '', isActive ? 'is-active-doc' : '']
     .filter(Boolean)
@@ -66,8 +70,8 @@ function BinderFlyoutRow(props: RowProps): JSX.Element {
         <span className="node-name">{node.name || 'Untitled'}</span>
       </div>
 
-      {showChevron && !node.collapsed && (
-        <div className="binder-list">
+      {showChevron && childPresence.rendered && (
+        <div className={`binder-list ${presenceClass(childPresence.visible)}`}>
           {node.children.map((child) => (
             <BinderFlyoutRow
               key={child.id}

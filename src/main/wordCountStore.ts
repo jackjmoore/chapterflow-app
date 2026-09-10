@@ -1,5 +1,5 @@
 import { countWords } from '../shared/wordCount'
-import { getAllDocumentIds, getWordCountBaseline, setWordCountBaseline } from './binderStore'
+import { getAllDocumentIds, getDraftDocumentIds, getWordCountBaseline, setWordCountBaseline } from './binderStore'
 import { loadDocument } from './documentStore'
 
 // Per-document word counts, memoized. Without this, every project-wide total
@@ -36,12 +36,25 @@ function todayString(): string {
 }
 
 async function totalProjectWordCount(excludeId?: string): Promise<number> {
-  const ids = await getAllDocumentIds()
+  // Draft only: "the project's words" means the manuscript. Notes and Matter
+  // documents keep live per-document counts (getWordCountsByDocument below is
+  // deliberately whole-binder) but never move this total — and with it the
+  // daily baseline, pace, sessions, sprints, and the dashboard registry.
+  const ids = await getDraftDocumentIds()
   let total = 0
   for (const id of ids) {
     if (id === excludeId) continue
     total += await countFor(id)
   }
+  return total
+}
+
+/** Sum of the given documents' counts, from the same memo — what the compile
+ *  panel uses to report a draft's manuscript word count without re-reading
+ *  documents the cache already knows. */
+export async function countForDocuments(ids: string[]): Promise<number> {
+  let total = 0
+  for (const id of ids) total += await countFor(id)
   return total
 }
 

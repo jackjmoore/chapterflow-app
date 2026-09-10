@@ -6,7 +6,7 @@ import { countBrokenRelationships, type Relationship } from '../../shared/relati
 import { collectAllDocuments } from './search/projectSearch'
 import { resolveMentionChips } from './mentionUtils'
 import RelationshipMap from './RelationshipMap'
-import { PlusIcon, TrashIcon, DragHandleIcon } from './icons'
+import { PlusIcon, DragHandleIcon } from './icons'
 
 export type BoardMode = 'chronology' | 'relationships'
 
@@ -140,23 +140,34 @@ function TimelineView(props: TimelineViewProps): JSX.Element {
           </button>
         )}
 
-        {totalBroken > 0 && (
-          <button
-            type="button"
-            className="timeline-cleanup-button"
-            title="Removes dead links from events, and relationships whose item was deleted."
-            onClick={onCleanUpBrokenLinks}
-          >
-            Clean up {totalBroken} broken {totalBroken === 1 ? 'link' : 'links'}
-          </button>
-        )}
-
         <span className="submissions-count">
           {board === 'chronology'
             ? `${entries.length} ${entries.length === 1 ? 'event' : 'events'}`
             : `${relationships.length} ${relationships.length === 1 ? 'relationship' : 'relationships'}`}
         </span>
       </div>
+
+      {/* Dead references are kept rather than scrubbed, so the board says so
+          once, here, instead of leaving the reason to be inferred from a
+          scattering of warning chips. */}
+      {totalBroken > 0 && (
+        <div className="timeline-broken-banner">
+          <span>
+            {totalBroken === 1
+              ? 'One link points at something that has been deleted. It is kept here so that restoring a backup brings it back, rather than being quietly dropped.'
+              : `${totalBroken} links point at things that have been deleted. They are kept here so that restoring a backup brings them back, rather than being quietly dropped.`}
+          </span>
+          <span className="timeline-broken-spacer" />
+          <button
+            type="button"
+            className="timeline-cleanup-button"
+            title="Removes dead links from events, and relationships whose item was deleted."
+            onClick={onCleanUpBrokenLinks}
+          >
+            Clean up {totalBroken === 1 ? 'the broken link' : `${totalBroken} broken links`}
+          </button>
+        </div>
+      )}
 
       {board === 'relationships' && (
         <RelationshipMap
@@ -172,10 +183,15 @@ function TimelineView(props: TimelineViewProps): JSX.Element {
       {board === 'chronology' && (
       <div className="timeline-scroll" onDrop={handleDrop} onDragOver={(e) => dragId && e.preventDefault()}>
         {entries.length === 0 ? (
-          <p className="timeline-empty">
-            No events yet. Add one to start tracking what happens when — each event can link the Story Bible
-            items involved and the scene it happens in.
-          </p>
+          <div className="timeline-empty">
+            <p>
+              Nothing has been added to the chronology yet. An event records what happens and when it happens
+              in the story, and it can name the Story Bible entries involved and the scene it takes place in.
+            </p>
+            <button type="button" className="submissions-add-button" onClick={onAdd}>
+              <PlusIcon /> Add an event
+            </button>
+          </div>
         ) : (
           <div className="timeline-list">
             {entries.map((entry, index) => {
@@ -202,35 +218,19 @@ function TimelineView(props: TimelineViewProps): JSX.Element {
                     <DragHandleIcon />
                   </div>
 
+                  {/* The in-story date gets a column of its own, so the board
+                      reads down its dates as well as its events. */}
+                  <div className="timeline-when">
+                    {entry.whenText || <span className="timeline-when-unset">No date given</span>}
+                  </div>
+
                   <div className="timeline-rail">
                     <span className="timeline-dot" />
                     <span className="timeline-index">{index + 1}</span>
                   </div>
 
-                  <div
-                    className={`timeline-card ${entry.documentId && !documentBroken ? 'is-linked' : ''}`}
-                    onClick={() => {
-                      if (entry.documentId && !documentBroken) onOpenDocument(entry.documentId)
-                    }}
-                  >
-                    <div className="timeline-card-head">
-                      <span className="timeline-description">{entry.description || 'Untitled event'}</span>
-                      <div className="timeline-card-actions" onClick={(e) => e.stopPropagation()}>
-                        <button type="button" className="outliner-open-button" onClick={() => onEdit(entry)}>
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="row-delete-visible"
-                          title="Delete event"
-                          onClick={() => onDelete(entry)}
-                        >
-                          <TrashIcon />
-                        </button>
-                      </div>
-                    </div>
-
-                    {entry.whenText && <div className="timeline-when">{entry.whenText}</div>}
+                  <div className="timeline-body">
+                    <span className="timeline-description">{entry.description || 'Untitled event'}</span>
 
                     <div className="timeline-card-meta">
                       {chips.map((chip) => (
@@ -247,18 +247,40 @@ function TimelineView(props: TimelineViewProps): JSX.Element {
                           the item, because the id was never scrubbed. */}
                       {broken.itemIds.map((id) => (
                         <span key={id} className="timeline-broken-chip" title="This Story Bible item was deleted">
-                          ⚠ Deleted item
+                          Deleted item
                         </span>
                       ))}
 
                       {entry.documentId &&
                         (documentBroken ? (
-                          <span className="timeline-broken-chip" title="This document was deleted">
-                            ⚠ Deleted scene
+                          <span className="timeline-broken-chip" title="This scene was deleted">
+                            Deleted scene
                           </span>
                         ) : (
                           <span className="timeline-scene-chip">Scene: {documentName || 'Untitled'}</span>
                         ))}
+                    </div>
+
+                    <div className="timeline-row-actions">
+                      <button type="button" className="outliner-open-button" onClick={() => onEdit(entry)}>
+                        Edit
+                      </button>
+                      {entry.documentId && !documentBroken && (
+                        <button
+                          type="button"
+                          className="outliner-open-button"
+                          onClick={() => onOpenDocument(entry.documentId as string)}
+                        >
+                          Open the scene
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="outliner-open-button timeline-delete-action"
+                        onClick={() => onDelete(entry)}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
                 </div>

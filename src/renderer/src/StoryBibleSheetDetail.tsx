@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react'
-import type { BinderNode } from '../../shared/binder'
+import { useEffect, useRef, useState, type CSSProperties, type DragEvent } from 'react'
 import type { StoryBibleBlock, StoryBibleBlockKind, StoryBibleItem, StoryBibleTypeDef } from '../../shared/storyBible'
 import { createBlock, TextBlockView, ImageBlockView, ListBlockView, StatsBlockView } from './StoryBibleBlocks'
-import { orderMentionStats } from './mentionUtils'
+import type { MentionStatsSummary } from './mentionUtils'
+import { PresenceStrip, appearanceSentence, initialsFor } from './StoryBiblePresence'
 import RelationshipsPanel from './RelationshipsPanel'
 import type { Relationship } from '../../shared/relationships'
 import { ChevronIcon, PlusIcon, TrashIcon, TextBlockIcon, ImageBlockIcon, BulletListIcon, StatsIcon } from './icons'
@@ -11,7 +11,10 @@ interface StoryBibleSheetDetailProps {
   item: StoryBibleItem
   types: StoryBibleTypeDef[]
   blocks: StoryBibleBlock[]
-  tree: BinderNode[]
+  /** The manuscript in reading order, for the presence strip. */
+  documents: { id: string; name: string }[]
+  /** This item's ordered mention statistics, or null before they arrive. */
+  stats: MentionStatsSummary | null
   onBack: () => void
   onRename: (name: string) => void
   onChangeType: (typeId: string) => void
@@ -50,7 +53,7 @@ function AliasEditor({ aliases, onChange }: { aliases: string[]; onChange: (alia
 
   return (
     <div className="story-bible-alias-editor">
-      <span className="story-bible-alias-label">Aliases</span>
+      <span className="story-bible-alias-label">Also known as</span>
       <div className="story-bible-alias-chips">
         {aliases.map((alias) => (
           <span key={alias} className="story-bible-alias-chip">
@@ -63,7 +66,7 @@ function AliasEditor({ aliases, onChange }: { aliases: string[]; onChange: (alia
         <input
           type="text"
           className="story-bible-alias-input"
-          placeholder="Add alias…"
+          placeholder="Another name…"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -79,47 +82,38 @@ function AliasEditor({ aliases, onChange }: { aliases: string[]; onChange: (alia
   )
 }
 
-/** Read-only mention statistics — total count, per-chapter breakdown, and
- *  first/last appearance, ordered by manuscript (binder tree) position. */
-function AppearancesPanel({ itemId, tree }: { itemId: string; tree: BinderNode[] }): JSX.Element | null {
-  const [stats, setStats] = useState<ReturnType<typeof orderMentionStats> | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    void window.api.getMentionStats(itemId).then((raw) => {
-      if (!cancelled) setStats(orderMentionStats(tree, raw))
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [itemId, tree])
-
-  if (!stats || stats.byChapter.length === 0) return null
-
+/** Read-only mention statistics: one sentence stating the whole picture,
+ *  then the per-document breakdown in manuscript order. The numbers arrive
+ *  from the section's single bulk read, so a card and a sheet can never
+ *  disagree about a count. */
+function AppearancesPanel({
+  itemName,
+  stats
+}: {
+  itemName: string
+  stats: MentionStatsSummary | null
+}): JSX.Element {
+  const max = Math.max(1, ...(stats?.byChapter ?? []).map((c) => c.count))
   return (
     <div className="story-bible-appearances">
-      <div className="story-bible-appearances-header">
-        <span className="story-bible-appearances-title">Appearances</span>
-        <span className="story-bible-appearances-total">{stats.totalCount} mentions across {stats.byChapter.length} documents</span>
-      </div>
-      <div className="story-bible-appearances-chapters">
-        {stats.byChapter.map((c) => {
-          const widthPct = Math.max(6, Math.min(100, (c.count / stats.totalCount) * 100))
-          return (
+      <span className="story-bible-rail-label">Where it appears</span>
+      <p className="story-bible-rail-line">{appearanceSentence(itemName, stats)}</p>
+      {stats && stats.byChapter.length > 0 && (
+        <div className="story-bible-appearances-chapters">
+          {stats.byChapter.map((c) => (
             <div key={c.documentId} className="story-bible-appearances-row">
               <span className="story-bible-appearances-doc-name">{c.documentName}</span>
               <span className="story-bible-appearances-bar-track">
-                <span className="story-bible-appearances-bar-fill" style={{ width: `${widthPct}%` }} />
+                <span
+                  className="story-bible-appearances-bar-fill"
+                  style={{ width: `${Math.max(6, (c.count / max) * 100)}%` }}
+                />
               </span>
               <span className="story-bible-appearances-count">{c.count}</span>
             </div>
-          )
-        })}
-      </div>
-      <div className="story-bible-appearances-footer">
-        <span>First: {stats.firstAppearance?.documentName}</span>
-        <span>Last: {stats.lastAppearance?.documentName}</span>
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -141,7 +135,8 @@ function StoryBibleSheetDetail(props: StoryBibleSheetDetailProps): JSX.Element {
     item,
     types,
     blocks,
-    tree,
+    documents,
+    stats,
     onBack,
     onRename,
     onChangeType,
@@ -227,60 +222,77 @@ function StoryBibleSheetDetail(props: StoryBibleSheetDetailProps): JSX.Element {
         ‹ Story Bible
       </button>
 
-      <div className="story-bible-detail-header">
-        <div className="story-bible-detail-type" ref={typePickerRef}>
-          <button
-            type="button"
-            className="story-bible-type-pill"
-            style={{ backgroundColor: activeType?.color ?? 'var(--chrome-control-bg)' }}
-            onClick={() => setTypePickerOpen((v) => !v)}
-          >
-            {activeType?.name ?? 'Unknown type'}
-          </button>
-          {typePickerOpen && (
-            <div className="story-bible-type-popover">
-              {types.map((type) => (
-                <button
-                  key={type.id}
-                  type="button"
-                  className="story-bible-type-popover-row"
-                  onClick={() => {
-                    onChangeType(type.id)
-                    setTypePickerOpen(false)
-                  }}
-                >
-                  <span className="story-bible-type-swatch" style={{ backgroundColor: type.color }} />
-                  {type.name}
-                </button>
-              ))}
+      {/* The portrait sits beside the identity: name, type, the names it is
+          also known by, and its shape across the manuscript. */}
+      <div className="story-bible-detail-head">
+        <span
+          className="story-bible-detail-portrait"
+          style={{ '--card-color': activeType?.color ?? 'var(--chrome-text-dim)' } as CSSProperties}
+        >
+          {initialsFor(item.name)}
+        </span>
+
+        <div className="story-bible-detail-id">
+          <div className="story-bible-detail-header">
+            <input
+              key={item.id}
+              type="text"
+              className="story-bible-detail-name"
+              defaultValue={item.name}
+              placeholder="Untitled"
+              onBlur={(e) => onRename(e.target.value)}
+            />
+
+            <div className="story-bible-detail-type" ref={typePickerRef}>
+              <button
+                type="button"
+                className="story-bible-type-pill"
+                style={{ backgroundColor: activeType?.color ?? 'var(--chrome-control-bg)' }}
+                onClick={() => setTypePickerOpen((v) => !v)}
+              >
+                {activeType?.name ?? 'Unknown type'}
+              </button>
+              {typePickerOpen && (
+                <div className="story-bible-type-popover">
+                  {types.map((type) => (
+                    <button
+                      key={type.id}
+                      type="button"
+                      className="story-bible-type-popover-row"
+                      onClick={() => {
+                        onChangeType(type.id)
+                        setTypePickerOpen(false)
+                      }}
+                    >
+                      <span className="story-bible-type-swatch" style={{ backgroundColor: type.color }} />
+                      {type.name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
+
+            <button type="button" className="story-bible-detail-delete" title="Delete this entry" onClick={onDelete}>
+              <TrashIcon />
+            </button>
+          </div>
+
+          <textarea
+            key={item.id}
+            className="story-bible-detail-summary"
+            placeholder="One line, shown on this entry's card…"
+            defaultValue={item.summary}
+            onBlur={(e) => onChangeSummary(e.target.value)}
+          />
+
+          <AliasEditor aliases={item.aliases} onChange={onChangeAliases} />
+
+          <PresenceStrip documents={documents} stats={stats} itemName={item.name || 'Untitled'} />
         </div>
-
-        <input
-          key={item.id}
-          type="text"
-          className="story-bible-detail-name"
-          defaultValue={item.name}
-          placeholder="Untitled"
-          onBlur={(e) => onRename(e.target.value)}
-        />
-
-        <button type="button" className="story-bible-detail-delete" title="Delete item" onClick={onDelete}>
-          <TrashIcon />
-        </button>
       </div>
 
-      <textarea
-        key={item.id}
-        className="story-bible-detail-summary"
-        placeholder="One-line summary shown on the card…"
-        defaultValue={item.summary}
-        onBlur={(e) => onChangeSummary(e.target.value)}
-      />
-
-      <AliasEditor aliases={item.aliases} onChange={onChangeAliases} />
-
+      <div className="story-bible-detail-body">
+        <div className="story-bible-detail-main">
       <div className="story-bible-block-list" onDragOver={(e) => e.preventDefault()} onDrop={handleDrop}>
         {blocks.map((block) => {
           const dragProps = {
@@ -318,34 +330,49 @@ function StoryBibleSheetDetail(props: StoryBibleSheetDetailProps): JSX.Element {
         })}
       </div>
 
-      <div className="story-bible-add-block" ref={addPickerRef}>
-        <button type="button" className="story-bible-add-block-button" onClick={() => setAddPickerOpen((v) => !v)}>
-          <PlusIcon /> Add Block <ChevronIcon />
-        </button>
-        {addPickerOpen && (
-          <div className="story-bible-add-block-popover">
-            {BLOCK_KIND_OPTIONS.map(({ kind, label, Icon }) => (
-              <button key={kind} type="button" className="story-bible-add-block-option" onClick={() => addBlock(kind)}>
-                <Icon />
-                {label}
-              </button>
-            ))}
+          <div className="story-bible-add-block" ref={addPickerRef}>
+            <button
+              type="button"
+              className="story-bible-add-block-button"
+              onClick={() => setAddPickerOpen((v) => !v)}
+            >
+              <PlusIcon /> Add a block <ChevronIcon />
+            </button>
+            {addPickerOpen && (
+              <div className="story-bible-add-block-popover">
+                {BLOCK_KIND_OPTIONS.map(({ kind, label, Icon }) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    className="story-bible-add-block-option"
+                    onClick={() => addBlock(kind)}
+                  >
+                    <Icon />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </div>
+
+        {/* The evidence rail: what the manuscript says about this entry, and
+            what it is linked to. Read-only beside the editable blocks. */}
+        <div className="story-bible-detail-rail">
+          <AppearancesPanel itemName={item.name || 'Untitled'} stats={stats} />
+
+          <RelationshipsPanel
+            itemId={item.id}
+            relationships={relationships}
+            items={items}
+            types={types}
+            onOpenItem={onOpenItem}
+            onAdd={onAddRelationship}
+            onEdit={onEditRelationship}
+            onDelete={onDeleteRelationship}
+          />
+        </div>
       </div>
-
-      <RelationshipsPanel
-        itemId={item.id}
-        relationships={relationships}
-        items={items}
-        types={types}
-        onOpenItem={onOpenItem}
-        onAdd={onAddRelationship}
-        onEdit={onEditRelationship}
-        onDelete={onDeleteRelationship}
-      />
-
-      <AppearancesPanel itemId={item.id} tree={tree} />
     </div>
   )
 }

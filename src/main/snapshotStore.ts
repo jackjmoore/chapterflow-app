@@ -123,3 +123,44 @@ export function restoreSnapshot(documentId: string, snapshotId: string): Promise
     return content
   })
 }
+
+/**
+ * Writes a snapshot whose content and timestamp come from the caller.
+ *
+ * createSnapshot cannot do this, and deliberately so: it reads the current
+ * documents/<id>.html and stamps the moment it runs, which is exactly right
+ * for taking a snapshot and exactly wrong for recording one that happened
+ * elsewhere. Importing Scrivener's version history needs the original dates —
+ * a history claiming every revision happened at the moment of import
+ * misrepresents itself, and a diff between two such snapshots would show both
+ * as today.
+ *
+ * Refuses an unparseable timestamp rather than quietly substituting now, for
+ * the same reason.
+ */
+export function importSnapshot(
+  documentId: string,
+  html: string,
+  timestamp: string,
+  name: string | null
+): Promise<SnapshotMeta> {
+  return runQueued(documentId, async () => {
+    const parsed = new Date(timestamp)
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error(`Refusing to import a snapshot with an unreadable timestamp: "${timestamp}"`)
+    }
+    const meta: SnapshotMeta = {
+      id: randomUUID(),
+      timestamp: parsed.toISOString(),
+      name,
+      // Imported history is authored, not automatic: it exists because the
+      // writer took it, in another app.
+      auto: false
+    }
+    await atomicWrite(contentPath(documentId, meta.id), html)
+    const index = await loadIndex(documentId)
+    index.push(meta)
+    await persistIndex(documentId, index)
+    return meta
+  })
+}

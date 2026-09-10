@@ -1,6 +1,6 @@
-import { paginate, pageGeometry, PAGE_GAP_PX } from '../src/renderer/src/pagePreview'
+import { paginate, paginateBlocks, resetIncrementalPagination, pageGeometry, PAGE_GAP_PX } from '../src/renderer/src/pagePreview'
 import type { PageBreak } from '../src/renderer/src/pagePreview'
-import { PAGE_DIMENSIONS_MM, PAGE_SIZE_OPTIONS } from '../src/shared/preferences'
+import { PAGE_DIMENSIONS_MM, PAGE_SIZE_OPTIONS, type PageSize } from '../src/shared/preferences'
 
 /**
  * Runs inside a real browser window with the application's own stylesheet
@@ -359,6 +359,74 @@ export function runChecks(): Check[] {
   )
   const onA4 = paginate(long, 'a4', 25)
   assert(onA4.pageCount <= longResult.pageCount, 'a taller A4 page holds at least as much per page')
+
+  // ---- the incremental rig agrees with a fresh full pass ---------------
+  // paginateBlocks() keeps the previous pass's DOM and arithmetic and redoes
+  // only what an edit touched. Every shortcut it takes is checked here
+  // against paginate() starting cold on the same content: same page count,
+  // same breaks to the pixel, same stack height, after each kind of edit an
+  // editor produces.
+  const blockList = (html: string): string[] => {
+    const holder = document.createElement('div')
+    holder.innerHTML = html
+    return Array.from(holder.children).map((el) => el.outerHTML)
+  }
+  const sameBreaks = (a: PageBreak[], b: PageBreak[]): boolean =>
+    a.length === b.length &&
+    a.every(
+      (x, i) => x.blockIndex === b[i].blockIndex && x.charOffset === b[i].charOffset && Math.abs(x.gapPx - b[i].gapPx) < 0.01
+    )
+  const agrees = (label: string, blocks: string[], size: PageSize = 'letter', margin = 25): void => {
+    const incremental = paginateBlocks(blocks, size, margin)
+    const full = paginate(blocks.join(''), size, margin)
+    assert(
+      incremental.pageCount === full.pageCount &&
+        sameBreaks(incremental.breaks, full.breaks) &&
+        Math.abs(incremental.stackHeightPx - full.stackHeightPx) < 0.01,
+      `incremental pagination matches a full pass after ${label} ` +
+        `(${incremental.pageCount} vs ${full.pageCount} pages, ${incremental.breaks.length} vs ${full.breaks.length} breaks)`
+    )
+  }
+
+  resetIncrementalPagination()
+  const step1 = blockList(long)
+  agrees('a cold start on a long document', step1)
+  const step2 = [...step1]
+  step2[10] = step2[10].replace('</p>', 'And then a sentence that was not there before was added to the paragraph. </p>')
+  agrees('a paragraph grows by a line', step2)
+  const step3 = [...step2]
+  step3[20] = step3[20].replace('went out', 'went off')
+  agrees('a word changes without changing the paragraph height', step3)
+  const step4 = [...step3]
+  step4.splice(5, 0, '<p>A new paragraph inserted near the top.</p>')
+  agrees('a paragraph is inserted', step4)
+  const step5 = [...step4]
+  step5.splice(30, 1)
+  agrees('a paragraph is deleted', step5)
+  const step6 = [...step5]
+  step6.splice(8, 0, '<p></p>', '<p></p>', '<p></p>')
+  agrees('blank lines are inserted', step6)
+  const step7 = [...step6]
+  step7[step7.length - 1] = step7[step7.length - 1].replace('</p>', 'The end. </p>')
+  agrees('the last paragraph is extended', step7)
+  agrees('a pass with no change at all', step7)
+  const step8 = [...step7]
+  step8[0] = '<h1>Chapter One, Retitled</h1>'
+  agrees('the heading is replaced', step8)
+  const step9 = step8.slice(0, 12)
+  agrees('the document is cut to a fraction of its length', step9)
+  const step10 = [...step9, ...step8.slice(12)]
+  agrees('the cut content is put back', step10)
+  agrees('a page size change', step10, 'a4', 25)
+  agrees('a margin change', step10, 'a4', 40)
+  agrees('the single run-on paragraph', blockList(runOn))
+  agrees('mixed prose and blank runs', blockList(mixed))
+  agrees('a heading that must move whole', blockList(withHeading))
+  agrees('an empty block list', [])
+  assert(
+    nothingStraddles(step10.join(''), paginateBlocks(step10, 'letter', 25).breaks, letter.usableWidthPx, letter.usableHeightPx, stride),
+    'nothing straddles a page boundary after a run of incremental edits'
+  )
 
   return checks
 }

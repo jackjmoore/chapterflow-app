@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { TypographyDefaults } from '../../shared/preferences'
-import { FONT_FAMILIES, FONT_SIZES_PT, LINE_HEIGHTS } from './toolbarOptions'
+import { FONT_GROUPS, FONT_SIZES_PT, LINE_HEIGHTS } from './toolbarOptions'
 
 interface TypographyModalProps {
   initial: TypographyDefaults
@@ -39,10 +39,14 @@ function TypographyModal(props: TypographyModalProps): JSX.Element {
             <span>Default font</span>
             <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)}>
               <option value="">App default</option>
-              {FONT_FAMILIES.map((font) => (
-                <option key={font.value} value={font.value}>
-                  {font.label}
-                </option>
+              {FONT_GROUPS.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.fonts.map((font) => (
+                    <option key={font.value} value={font.value} style={{ fontFamily: font.value }}>
+                      {font.label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </label>

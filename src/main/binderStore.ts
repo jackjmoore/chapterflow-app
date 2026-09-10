@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { readFile } from 'fs/promises'
+import { readFile, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { atomicWrite } from './atomicWrite'
@@ -14,7 +14,15 @@ import { DEFAULT_STATUSES } from '../shared/statusDefaults'
 import { countWords } from '../shared/wordCount'
 import {
   DEFAULT_VIEW_STATE,
+  DRAFT_FOLDER_ID,
+  LEADING_STRUCTURAL_FOLDERS,
+  STRUCTURAL_FOLDERS,
+  TRAILING_STRUCTURAL_FOLDERS,
+  TRASH_FOLDER_ID,
+  draftChildren,
+  isCustomTopLevelFolder,
   isManuscriptView,
+  isStructuralFolderId,
   type BinderNode,
   type BinderState,
   type DocumentNode,
@@ -51,10 +59,82 @@ interface BinderFile {
   projectTargetStartCount: number | null
 }
 
+/** The five protected root folders, freshly built — every project starts
+ *  with them, and legacy projects gain them via ensureStructuralFolders. */
+function seededStructuralTree(): BinderNode[] {
+  return STRUCTURAL_FOLDERS.map(
+    ({ id, name }): FolderNode => ({ id, type: 'folder', name, collapsed: false, children: [] })
+  )
+}
+
+/**
+ * The one-time structural migration, and the permanent self-heal.
+ *
+ * Given any root list, returns
+ *
+ *     [Draft, Notes, Matter, ...the writer's own top-level folders, Archive, Trash]
+ *
+ * with every remaining root node moved into Draft — in its original order,
+ * ids and nesting untouched. Pure in-memory pointer moves: nothing per-node,
+ * nothing that grows with manuscript size, no document files touched.
+ * Idempotent by construction: an already-structured tree comes back unchanged
+ * (changed: false), so running it on every load costs a few array scans and
+ * re-asserts the structure even against a hand-edited binder.json.
+ *
+ * The writer's own folders are recognised by their isTopLevel flag, never by
+ * position. That distinction is load-bearing: a pre-structure binder.json has
+ * ordinary folders at the root that must still be swept into Draft, and
+ * position alone cannot tell those apart from a folder deliberately placed
+ * beside Draft. Unflagged means sweep, which is precisely the behavior this
+ * function had before custom folders existed — so old projects migrate
+ * exactly as they always did, and simply gain an empty Archive and Trash.
+ */
+function ensureStructuralFolders(tree: BinderNode[]): { tree: BinderNode[]; changed: boolean } {
+  const byId = new Map<string, FolderNode>()
+  const custom: FolderNode[] = []
+  const strays: BinderNode[] = []
+  for (const node of tree) {
+    if (isStructuralFolderId(node.id) && node.type === 'folder') byId.set(node.id, node)
+    else if (isCustomTopLevelFolder(node)) custom.push(node)
+    else strays.push(node)
+  }
+
+  let changed = false
+  const build = (defs: { id: string; name: string }[]): FolderNode[] =>
+    defs.map(({ id, name }): FolderNode => {
+      const existing = byId.get(id)
+      if (existing) {
+        if (existing.name !== name) {
+          existing.name = name
+          changed = true
+        }
+        return existing
+      }
+      changed = true
+      return { id, type: 'folder', name, collapsed: false, children: [] }
+    })
+
+  const leading = build(LEADING_STRUCTURAL_FOLDERS)
+  const trailing = build(TRAILING_STRUCTURAL_FOLDERS)
+
+  if (strays.length > 0) {
+    leading[0].children.push(...strays)
+    changed = true
+  }
+
+  const next = [...leading, ...custom, ...trailing]
+  if (!changed) {
+    // Same nodes, same order — compared by identity, which also catches a
+    // hand-edited file that merely reshuffled the root.
+    changed = !(tree.length === next.length && tree.every((node, i) => node === next[i]))
+  }
+  return { tree: next, changed }
+}
+
 function emptyState(): BinderFile {
   return {
     version: 1,
-    tree: [],
+    tree: seededStructuralTree(),
     lastOpenDocumentId: null,
     wordCountBaseline: null,
     projectName: null,
@@ -83,11 +163,16 @@ function normalizeTree(nodes: BinderNode[]): void {
   for (const node of nodes) {
     if (node.type === 'document') {
       if (typeof node.synopsis !== 'string') node.synopsis = ''
+      // Added after synopsis, and backfilled the same way: a project written
+      // before notes existed simply gains an empty one on load. Nothing is
+      // migrated and the file is not rewritten until its next real edit.
+      if (typeof node.notes !== 'string') node.notes = ''
       const n = node as DocumentNode & { status?: unknown }
       if (typeof n.statusId !== 'string') n.statusId = null
       delete n.status
       if (!Array.isArray(n.tagIds)) n.tagIds = []
       if (typeof n.wordTarget !== 'number') n.wordTarget = null
+      if (typeof n.chapterNumber !== 'number') n.chapterNumber = null
     }
     normalizeTree(node.children)
   }
@@ -154,14 +239,18 @@ function parseViewState(raw: unknown): ViewState {
   const activeView: ActiveView =
     r.activeView === 'outliner' ||
     r.activeView === 'corkboard' ||
+    r.activeView === 'book' ||
     r.activeView === 'storyBible' ||
     r.activeView === 'timeline' ||
+    r.activeView === 'compile' ||
     r.activeView === 'submissions' ||
-    r.activeView === 'lexicon'
+    r.activeView === 'lexicon' ||
+    r.activeView === 'progress' ||
+    r.activeView === 'appearance'
       ? r.activeView
       : 'editor'
   const manuscriptView: ManuscriptView =
-    r.manuscriptView === 'outliner' || r.manuscriptView === 'corkboard'
+    r.manuscriptView === 'outliner' || r.manuscriptView === 'corkboard' || r.manuscriptView === 'book'
       ? r.manuscriptView
       : // Backfill for projects saved before the rail existed: if the last
         // active view was itself a manuscript view, that's the best guess at
@@ -173,7 +262,11 @@ function parseViewState(raw: unknown): ViewState {
   if (r.outlinerSort && typeof r.outlinerSort === 'object') {
     const s = r.outlinerSort as Record<string, unknown>
     if (
-      (s.column === 'title' || s.column === 'synopsis' || s.column === 'status' || s.column === 'wordCount') &&
+      (s.column === 'title' ||
+        s.column === 'synopsis' ||
+        s.column === 'notes' ||
+        s.column === 'status' ||
+        s.column === 'wordCount') &&
       (s.direction === 'asc' || s.direction === 'desc')
     ) {
       outlinerSort = { column: s.column, direction: s.direction }
@@ -219,9 +312,10 @@ async function readFromDisk(): Promise<void> {
     const parsed = JSON.parse(raw)
     if (parsed && Array.isArray(parsed.tree)) {
       normalizeTree(parsed.tree)
+      const structured = ensureStructuralFolders(parsed.tree)
       state = {
         version: 1,
-        tree: parsed.tree,
+        tree: structured.tree,
         lastOpenDocumentId: parsed.lastOpenDocumentId ?? null,
         wordCountBaseline: parsed.wordCountBaseline ?? null,
         projectName: typeof parsed.projectName === 'string' ? parsed.projectName : null,
@@ -237,6 +331,16 @@ async function readFromDisk(): Promise<void> {
         projectDeadline: typeof parsed.projectDeadline === 'string' ? parsed.projectDeadline : null,
         projectTargetStartDate: typeof parsed.projectTargetStartDate === 'string' ? parsed.projectTargetStartDate : null,
         projectTargetStartCount: typeof parsed.projectTargetStartCount === 'number' ? parsed.projectTargetStartCount : null
+      }
+      if (structured.changed) {
+        // The one-time migration to Draft/Notes/Matter. Keep the exact bytes
+        // being replaced as a sidecar (once — never overwritten by later
+        // self-heals), then persist the new shape in a single atomic write.
+        const sidecar = `${binderPath()}.pre-structure`
+        if (!existsSync(sidecar)) {
+          await writeFile(sidecar, raw, 'utf-8').catch(() => undefined)
+        }
+        await persist()
       }
     } else {
       // The file is there but isn't a binder we recognize. Show an empty
@@ -368,6 +472,17 @@ export async function getAllDocumentIds(): Promise<string[]> {
   return ids
 }
 
+/** Document ids inside Draft only — the manuscript. This is what word
+ *  totals, daily baselines, and pace measure; getAllDocumentIds above stays
+ *  whole-binder for consumers that genuinely mean everything (search,
+ *  per-document counts, pickers). */
+export async function getDraftDocumentIds(): Promise<string[]> {
+  await load()
+  const ids: string[] = []
+  for (const node of draftChildren(state.tree)) collectDocumentIds(node, ids)
+  return ids
+}
+
 export async function getWordCountBaseline(): Promise<WordCountBaseline | null> {
   await load()
   return state.wordCountBaseline
@@ -384,16 +499,21 @@ export async function createDocument(
   name = 'Untitled'
 ): Promise<DocumentNode> {
   await load()
-  const list = childrenOf(parentId) ?? state.tree
+  // No parent (or an unresolved one) means Draft, not the root — the root
+  // permanently holds exactly the three structural folders. parentId === null
+  // is checked explicitly because childrenOf(null) IS the root list.
+  const list = (parentId === null ? null : childrenOf(parentId)) ?? childrenOf(DRAFT_FOLDER_ID) ?? state.tree
   const node: DocumentNode = {
     id: randomUUID(),
     type: 'document',
     name,
     collapsed: false,
     synopsis: '',
+    notes: '',
     statusId: null,
     tagIds: [],
     wordTarget: null,
+    chapterNumber: null,
     children: []
   }
   list.push(node)
@@ -406,14 +526,222 @@ export async function createFolder(
   name = 'New Folder'
 ): Promise<FolderNode> {
   await load()
-  const list = childrenOf(parentId) ?? state.tree
+  const list = (parentId === null ? null : childrenOf(parentId)) ?? childrenOf(DRAFT_FOLDER_ID) ?? state.tree
   const node: FolderNode = { id: randomUUID(), type: 'folder', name, collapsed: false, children: [] }
   list.push(node)
   await persist()
   return node
 }
 
+/**
+ * Inserts a whole prepared subtree under `parentId` in ONE persist — the bulk
+ * counterpart to createDocument/createFolder, for importers that build a
+ * hundreds-of-nodes tree offline.
+ *
+ * Every one of those two writes the entire binder.json and re-triggers a
+ * search reindex, so a 150-item Scrivener binder through them is several
+ * hundred full rewrites. This is one.
+ *
+ * The caller owns the node ids and MUST have written documents/<id>.html for
+ * every document node BEFORE calling this. A crash with the binder written and
+ * the documents missing leaves a project full of chapters that exist and are
+ * empty, which is indistinguishable from data loss; the reverse leaves orphan
+ * files, which are discoverable and deletable.
+ *
+ * Validates everything before mutating anything, and throws rather than
+ * partially inserting: a half-applied tree in memory would be committed to
+ * disk by the next unrelated persist — an autosave setting lastOpenDocumentId
+ * is enough — so the failure would surface later, from innocent code, looking
+ * nothing like an import bug.
+ *
+ * Returns the document ids inserted, in tree order, so the caller can run the
+ * same per-document side effects the import:files path does.
+ */
+export async function insertSubtree(parentId: string | null, nodes: BinderNode[]): Promise<string[]> {
+  await load()
+
+  // persist() already refuses to write when the load failed, but this mutates
+  // state.tree first — so without this the UI would show the whole import,
+  // nothing would reach disk, and the caller would be told it worked.
+  if (loadFailed) {
+    throw new Error('Refusing to insert into a binder.json that could not be read.')
+  }
+
+  // ---- validate, completely, before touching anything ----
+  const existingIds = new Set<string>()
+  const collectIds = (list: BinderNode[]): void => {
+    for (const node of list) {
+      existingIds.add(node.id)
+      collectIds(node.children)
+    }
+  }
+  collectIds(state.tree)
+
+  const incoming = new Set<string>()
+  const validate = (list: BinderNode[]): void => {
+    for (const node of list) {
+      // Read before the narrowing, or TypeScript has already reduced `node`
+      // to never by the time the message needs it.
+      const kind = (node as { type?: unknown }).type
+      if (kind !== 'document' && kind !== 'folder') {
+        throw new Error(`Cannot insert a node of unknown type "${String(kind)}".`)
+      }
+      if (!Array.isArray(node.children)) {
+        // Every recursive walk in this file assumes children is an array; one
+        // undefined makes the project unopenable until binder.json is edited
+        // by hand.
+        throw new Error(`Node "${node.id}" has no children array.`)
+      }
+      if (isStructuralFolderId(node.id)) {
+        // ensureStructuralFolders keys the protected folders by id and keeps
+        // only the last of a collision, so this would delete a real folder and
+        // everything under it on the next load.
+        throw new Error(`Cannot insert a node using the protected id "${node.id}".`)
+      }
+      if (existingIds.has(node.id) || incoming.has(node.id)) {
+        // Never silently reassign: the caller has already written
+        // documents/<id>.html under this id, so a new id orphans the content.
+        throw new Error(`Duplicate node id "${node.id}".`)
+      }
+      incoming.add(node.id)
+      validate(node.children)
+    }
+  }
+  validate(nodes)
+
+  // ---- then mutate ----
+  // Same resolution createDocument uses: null, or an id that no longer
+  // resolves, means Draft. Never the root — an unflagged root node is swept
+  // into Draft by the next load's self-heal, so the tree the writer saw right
+  // after importing would differ from the tree after a restart.
+  const destination = (parentId === null ? null : childrenOf(parentId)) ?? childrenOf(DRAFT_FOLDER_ID) ?? state.tree
+
+  const statusIds = new Set(state.statuses.map((s) => s.id))
+  const tagIds = new Set(state.tags.map((t) => t.id))
+  const documentIds: string[] = []
+  const clean = (list: BinderNode[]): void => {
+    for (const node of list) {
+      if (node.type === 'document') {
+        documentIds.push(node.id)
+        // A reference to a status or tag that does not exist is not corrupting,
+        // but it vanishes the first time the writer edits either list, which
+        // reads as data loss. Same rule setStatuses/setTags already enforce.
+        if (node.statusId && !statusIds.has(node.statusId)) node.statusId = null
+        if (Array.isArray(node.tagIds)) node.tagIds = node.tagIds.filter((id) => tagIds.has(id))
+      } else {
+        // Inert inside Draft, but it would promote this folder to the root the
+        // first time someone dragged it out.
+        delete node.isTopLevel
+      }
+      clean(node.children)
+    }
+  }
+  clean(nodes)
+  normalizeTree(nodes)
+  destination.push(...nodes)
+
+  await persist()
+  return documentIds
+}
+
+/**
+ * A folder of the writer's own at the binder root, beside Draft rather than
+ * inside it — for material that belongs to the project without belonging to
+ * the manuscript, and that Notes/Matter/Archive don't describe.
+ *
+ * Unlike the five protected folders this one is completely ordinary: it can
+ * be renamed, dragged, and deleted. It lands between Matter and Archive,
+ * where every other custom folder lives, because the root's shape is fixed
+ * either side of that band.
+ */
+export async function createTopLevelFolder(name = 'New Folder'): Promise<FolderNode> {
+  await load()
+  const node: FolderNode = {
+    id: randomUUID(),
+    type: 'folder',
+    name,
+    collapsed: false,
+    isTopLevel: true,
+    children: []
+  }
+  state.tree.splice(Math.max(0, state.tree.length - TRAILING_STRUCTURAL_FOLDERS.length), 0, node)
+  await persist()
+  return node
+}
+
+/**
+ * Places a freshly made node relative to whatever is selected in the binder,
+ * for the toolbar/menu "new document" and "new folder" actions — distinct
+ * from createDocument/createFolder above, which always nest inside a given
+ * parent (what a bulk import into a chosen folder wants, and the only thing
+ * those two are still used for).
+ *
+ * A folder is a container: selecting one and pressing "new document" nests
+ * inside it, same as before, and expanding it makes the new child visible. A
+ * document is not a container in that sense — a "sub-document" is a real,
+ * intentional feature (nested documents show in the binder), but landing
+ * there by DEFAULT just because a document happened to be selected is not:
+ * it silently demoted whatever chapter was selected into a parent. So a
+ * document target instead places the new node as a SIBLING, immediately
+ * after it in the same list — same level, same parent, no auto-expand
+ * needed since a visible sibling was already showing.
+ */
+function insertNear(node: BinderNode, targetId: string | null): void {
+  const target = targetId ? findNode(state.tree, targetId) : null
+
+  if (target?.type === 'folder') {
+    target.children.push(node)
+    target.collapsed = false
+    return
+  }
+
+  if (target?.type === 'document') {
+    const located = findParentList(state.tree, target.id)
+    if (located) {
+      located.list.splice(located.index + 1, 0, node)
+      return
+    }
+  }
+
+  // Nothing selected, or the selected id no longer exists: same fallback
+  // createDocument/createFolder use for an unresolved parent — into Draft,
+  // never the root.
+  ;(childrenOf(DRAFT_FOLDER_ID) ?? state.tree).push(node)
+}
+
+export async function createDocumentNear(targetId: string | null, name = 'Untitled'): Promise<DocumentNode> {
+  await load()
+  const node: DocumentNode = {
+    id: randomUUID(),
+    type: 'document',
+    name,
+    collapsed: false,
+    synopsis: '',
+    notes: '',
+    statusId: null,
+    tagIds: [],
+    wordTarget: null,
+    chapterNumber: null,
+    children: []
+  }
+  insertNear(node, targetId)
+  await persist()
+  return node
+}
+
+export async function createFolderNear(targetId: string | null, name = 'New Folder'): Promise<FolderNode> {
+  await load()
+  const node: FolderNode = { id: randomUUID(), type: 'folder', name, collapsed: false, children: [] }
+  insertNear(node, targetId)
+  await persist()
+  return node
+}
+
 export async function rename(id: string, name: string): Promise<void> {
+  // The structural folders' names ARE their identity in the UI — refused
+  // here so every entry point (context menu, inline edit, future callers)
+  // is covered by one guard.
+  if (isStructuralFolderId(id)) return
   await load()
   const node = findNode(state.tree, id)
   if (!node) return
@@ -449,6 +777,7 @@ function collectDocumentIdPairs(original: BinderNode, clone: BinderNode, out: Ar
 /** Duplicates a node (and its whole subtree) as a sibling right after the
  *  original, with fresh ids throughout and copied document content. */
 export async function duplicateNode(id: string): Promise<BinderNode> {
+  if (isStructuralFolderId(id)) throw new Error('Draft, Notes, Matter, Archive, and Trash are fixed folders.')
   await load()
   const located = findParentList(state.tree, id)
   if (!located) throw new Error('Node not found')
@@ -467,6 +796,16 @@ export async function duplicateNode(id: string): Promise<BinderNode> {
   }
 
   return clone
+}
+
+/** Free-text working notes. Same tier and same storage as the synopsis — see
+ *  DocumentNode.notes for why they are metadata rather than content. */
+export async function setNotes(id: string, notes: string): Promise<void> {
+  await load()
+  const node = findNode(state.tree, id)
+  if (!node || node.type !== 'document') return
+  node.notes = notes
+  await persist()
 }
 
 export async function setSynopsis(id: string, synopsis: string): Promise<void> {
@@ -498,6 +837,26 @@ export async function setWordTarget(id: string, target: number | null): Promise<
   const node = findNode(state.tree, id)
   if (!node || node.type !== 'document') return
   node.wordTarget = target
+  await persist()
+}
+
+export async function setChapterNumber(id: string, chapterNumber: number | null): Promise<void> {
+  await load()
+  const node = findNode(state.tree, id)
+  if (!node || node.type !== 'document') return
+  node.chapterNumber = chapterNumber
+  await persist()
+}
+
+/** Designates a folder as a Part for the book compile preset. Stored as
+ *  folder metadata like collapsed; the book planner only honors it on
+ *  direct children of Draft, but the flag itself is just data. */
+export async function setFolderIsPart(id: string, isPart: boolean): Promise<void> {
+  await load()
+  const node = findNode(state.tree, id)
+  if (!node || node.type !== 'folder' || isStructuralFolderId(id)) return
+  if (isPart) node.isPart = true
+  else delete node.isPart
   await persist()
 }
 
@@ -605,6 +964,23 @@ export async function setProjectDeadline(deadline: string | null): Promise<void>
   await persist()
 }
 
+/**
+ * Explicitly repoints pace tracking: measure from this date, with this many
+ * words already on the books.
+ *
+ * The count comes with the date deliberately — moving the start without
+ * re-baselining the count would silently change every actual-pace figure.
+ * The renderer derives the count from the session history at that date, so
+ * both halves stay consistent. Null date clears both, returning to the
+ * automatic first-target capture.
+ */
+export async function setProjectTargetStart(date: string | null, count: number | null): Promise<void> {
+  await load()
+  state.projectTargetStartDate = date
+  state.projectTargetStartCount = date == null ? null : count
+  await persist()
+}
+
 export async function setCollapsed(id: string, collapsed: boolean): Promise<void> {
   await load()
   const node = findNode(state.tree, id)
@@ -684,6 +1060,7 @@ export async function setSplitViewSyncScroll(sync: boolean): Promise<void> {
  *  too. Returns the deleted document ids so callers (index.ts) can cascade
  *  into stores this one deliberately doesn't import — see mentionStore. */
 export async function deleteNode(id: string): Promise<string[]> {
+  if (isStructuralFolderId(id)) return []
   await load()
   const located = findParentList(state.tree, id)
   if (!located) return []
@@ -710,12 +1087,20 @@ export async function deleteNode(id: string): Promise<string[]> {
  * Moves a node to be a child of `targetParentId` at `targetIndex`, where
  * targetIndex is the insertion point within the destination's current
  * (pre-move) children array — the same-list shift-by-one is handled here.
+ *
+ * `targetParentId === null` means the binder root, which takes folders only,
+ * and only into the band between Matter and Archive. A document at the root
+ * would sit outside every folder the app scopes by — counted by nothing,
+ * compiled into nothing, belonging to nothing — so it is refused rather than
+ * quietly relocated.
  */
 export async function moveNode(
   id: string,
   targetParentId: string | null,
   targetIndex: number
 ): Promise<void> {
+  // The five structural folders are fixed in place.
+  if (isStructuralFolderId(id)) return
   await load()
   if (id === targetParentId) return
 
@@ -723,18 +1108,74 @@ export async function moveNode(
   if (!located) return
 
   const node = located.list[located.index]
-  if (targetParentId && isDescendant(node, targetParentId)) return
+
+  // Promotion to the root: a folder dragged out beside Draft becomes one of
+  // the writer's own top-level folders, and is flagged as such so the next
+  // load's self-heal leaves it there instead of sweeping it into Draft.
+  if (targetParentId === null) {
+    if (node.type !== 'folder') return
+    const wasAtRoot = located.list === state.tree
+    located.list.splice(located.index, 1)
+    node.isTopLevel = true
+    const lowest = LEADING_STRUCTURAL_FOLDERS.length
+    const highest = Math.max(lowest, state.tree.length - TRAILING_STRUCTURAL_FOLDERS.length)
+    const adjusted = wasAtRoot && located.index < targetIndex ? targetIndex - 1 : targetIndex
+    state.tree.splice(Math.max(lowest, Math.min(adjusted, highest)), 0, node)
+    await persist()
+    return
+  }
+
+  if (isDescendant(node, targetParentId)) return
 
   const destination = childrenOf(targetParentId)
   if (!destination) return
 
   located.list.splice(located.index, 1)
+  // Demotion: inside a real parent it is an ordinary folder again, so the
+  // flag has to go with it or the self-heal would yank it back to the root.
+  if (node.type === 'folder') delete node.isTopLevel
   const adjustedIndex =
     located.list === destination && located.index < targetIndex ? targetIndex - 1 : targetIndex
   const clampedIndex = Math.max(0, Math.min(adjustedIndex, destination.length))
   destination.splice(clampedIndex, 0, node)
 
   await persist()
+}
+
+/**
+ * Permanently deletes everything inside Trash. Trash itself remains.
+ *
+ * This is the one deliberate hole in the app's safety net. Every other
+ * destructive path in ChapterFlow leaves snapshots behind to recover from;
+ * this one deletes the snapshots too, along with the documents and their span
+ * tag indexes. Nothing survives it and nothing can be restored afterwards,
+ * which is why its only caller puts an explicit confirmation in front of it.
+ *
+ * Returns the deleted document ids so index.ts can cascade into the stores
+ * this one deliberately doesn't import, exactly as deleteNode does.
+ */
+export async function emptyTrash(): Promise<string[]> {
+  await load()
+  const trash = state.tree.find((node) => node.id === TRASH_FOLDER_ID)
+  if (!trash || trash.type !== 'folder' || trash.children.length === 0) return []
+
+  const documentIds: string[] = []
+  for (const child of trash.children) collectDocumentIds(child, documentIds)
+  trash.children = []
+
+  await Promise.all(documentIds.map((docId) => deleteDocument(docId)))
+  await Promise.all(documentIds.map((docId) => deleteAllForDocument(docId)))
+  await Promise.all(documentIds.map((docId) => deleteAllSpanTagsForDocument(docId)))
+
+  if (state.lastOpenDocumentId && documentIds.includes(state.lastOpenDocumentId)) {
+    state.lastOpenDocumentId = null
+  }
+  if (state.viewState.referenceDocumentId && documentIds.includes(state.viewState.referenceDocumentId)) {
+    state.viewState.referenceDocumentId = null
+  }
+
+  await persist()
+  return documentIds
 }
 
 export function getNode(id: string): BinderNode | null {

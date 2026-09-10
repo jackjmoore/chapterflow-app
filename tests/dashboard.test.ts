@@ -6,15 +6,15 @@
  * normal work, so this writes into a project, closes a session, and checks the
  * number moved — without restarting anything.
  */
-import { execFileSync, spawn, type ChildProcess } from 'child_process'
+import { execFileSync, type ChildProcess } from 'child_process'
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'fs/promises'
 import { existsSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { setTimeout as sleep } from 'timers/promises'
 import { assert, createReport, note, section, summarize } from './harness'
+import { spawnApp, waitForDebugPort } from './cdpPort'
 
-const PORT = 9367
 
 interface Cdp {
   evaluate: <T = unknown>(expression: string) => Promise<T>
@@ -22,11 +22,12 @@ interface Cdp {
   close: () => void
 }
 
-async function connect(child: ChildProcess): Promise<Cdp> {
+async function connect(child: ChildProcess, userDataDir: string): Promise<Cdp> {
+  const port = await waitForDebugPort(child, userDataDir)
   let target: { webSocketDebuggerUrl: string } | undefined
   for (let i = 0; i < 90 && !target; i += 1) {
     try {
-      const list = (await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json()) as {
+      const list = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()) as {
         type: string
         url: string
         webSocketDebuggerUrl: string
@@ -87,12 +88,8 @@ async function main(): Promise<void> {
   let cdp: Cdp | null = null
 
   const launch = async (): Promise<Cdp> => {
-    child = spawn(electronBinary, ['.', `--remote-debugging-port=${PORT}`, `--user-data-dir=${userDataDir}`], {
-      cwd: process.cwd(),
-      stdio: 'ignore',
-      env
-    })
-    const connected = await connect(child)
+    child = spawnApp(electronBinary, userDataDir, env)
+    const connected = await connect(child, userDataDir)
     for (let i = 0; i < 60; i += 1) {
       if (await connected.evaluate<boolean>(`!!document.querySelector('.welcome-card, .ProseMirror')`)) break
       await sleep(500)
@@ -237,7 +234,7 @@ async function main(): Promise<void> {
 
     const openedSheet = await cdp.evaluate<boolean>(`(() => {
       const rail = [...document.querySelectorAll('.nav-rail-button')]
-        .find((x) => /story bible/i.test(x.getAttribute('title') ?? ''))
+        .find((x) => /story bible/i.test(x.getAttribute('aria-label') ?? ''))
       if (!rail) return false
       rail.click()
       return true
@@ -334,7 +331,7 @@ async function main(): Promise<void> {
     })()`)
     await sleep(3000)
     cdp.close()
-    cdp = await connect(child!)
+    cdp = await connect(child!, userDataDir)
     await sleep(2000)
 
     await cdp.evaluate(`(() => {
@@ -411,7 +408,7 @@ async function main(): Promise<void> {
     // Opening a different project reloads the window to resync every store.
     await sleep(4000)
     cdp.close()
-    cdp = await connect(child!)
+    cdp = await connect(child!, userDataDir)
     await sleep(2500)
 
     assert(
@@ -520,6 +517,173 @@ async function main(): Promise<void> {
       report,
       !/wordstar/i.test(await cdp.evaluate<string>(`document.body.textContent ?? ''`)),
       'nor is it named anywhere else on the dashboard'
+    )
+
+    // ---- 5b. the two totals are different questions -----------------------
+    //
+    // "how much manuscript exists" and "how much was typed here" are separate
+    // numbers and must not be conflated: a project imported or generated
+    // outside the app contributes to the first and not the second. This is
+    // exactly the confusion that made the headline stat look broken — every
+    // project on this machine had been generated, so the effort figure was
+    // honestly near zero while the manuscripts held tens of thousands.
+    section(report, 'the dashboard separates manuscript size from words typed here')
+    // Read from the registry the dashboard itself is built from, rather than
+    // scraped off the rows: a project's size is stamped on save, so a row can
+    // legitimately read zero for a project not yet saved in this run while the
+    // registry already carries the figure the headline sums.
+    const registry = JSON.parse(await readFile(join(userDataDir, 'lifetime.json'), 'utf-8')) as {
+      stats: { words: number }
+      projects: { words: number }[]
+    }
+    const heldByProjects = registry.projects.reduce((sum, p) => sum + Math.max(0, p.words), 0)
+    const shownLine = await cdp.evaluate<string>(
+      `(() => { const el = document.querySelector('.welcome-stat'); return el ? el.textContent.trim() : '' })()`
+    )
+    note(report, `dashboard line: "${shownLine}"`)
+    note(report, `registry: ${heldByProjects} words held, ${registry.stats.words} typed here`)
+
+    assert(report, heldByProjects > 0, `the projects report a real size of their own (${heldByProjects} words)`)
+    assert(
+      report,
+      heldByProjects !== registry.stats.words,
+      `and it is a different number from the words typed here (${heldByProjects} vs ${registry.stats.words})`
+    )
+    assert(
+      report,
+      /\d/.test(shownLine),
+      `the headline stat carries a number rather than a placeholder ("${shownLine.slice(0, 70)}")`
+    )
+
+    // ---- 6. a recovered session reaches the lifetime total ----------------
+    //
+    // Sessions are sealed by two different paths and only one of them was
+    // wired to the lifetime total:
+    //
+    //   session:close      — the ordinary idle-gap / flush route. Records.
+    //   session:recoverOpen — a session left open by a crash, a force-quit, or
+    //                        File > Open Project (which reloads without
+    //                        flushing). Seals into the project's sessions.json
+    //                        and returned nothing to the lifetime store.
+    //
+    // The visible symptom is that the two systems disagree: the per-project
+    // Progress page and the session analytics count a recovered session, and
+    // the dashboard's "You have written X words" does not — so the lifetime
+    // figure reads lower than the work behind it, permanently, because a
+    // sealed session's delta is never recomputed.
+    //
+    // Crafting the crash state directly rather than force-killing mid-type:
+    // the open session is only checkpointed to disk every 30s (TICK_MS), so
+    // reproducing it by typing would mean a 30-second wait for the same
+    // arrangement of bytes this writes in one step.
+    section(report, 'a session recovered after a crash still reaches the lifetime total')
+    await shutdown()
+
+    const RECOVERED_WORDS = 500
+    const startedAt = new Date(Date.now() - 40 * 60_000).toISOString()
+    const lastActivityAt = new Date(Date.now() - 30 * 60_000).toISOString()
+    const sessionsPathA = join(projectA, 'sessions.json')
+    const priorSessions = existsSync(sessionsPathA)
+      ? (JSON.parse(await readFile(sessionsPathA, 'utf-8')) as { sessions: unknown[] })
+      : { sessions: [] }
+    await writeFile(
+      sessionsPathA,
+      JSON.stringify(
+        {
+          version: 1,
+          sessions: priorSessions.sessions,
+          openSession: {
+            id: 'crashed-session-for-lifetime',
+            startedAt,
+            lastActivityAt,
+            startWordCount: 1_000,
+            lastWordCount: 1_000 + RECOVERED_WORDS,
+            documentIds: []
+          }
+        },
+        null,
+        2
+      )
+    )
+    // Point the next launch at A, straight into the editor so the renderer's
+    // recovery call actually runs.
+    await writeFile(
+      join(userDataDir, 'preferences.json'),
+      JSON.stringify({ theme: 'dark', sidebarWidth: 260, projectRoot: projectA, skipDashboardOnLaunch: true })
+    )
+
+    const beforeRecovery = await readLifetime()
+    note(report, `before recovery: ${JSON.stringify(beforeRecovery)}`)
+    const sealedBeforeRecovery = await (async (): Promise<Map<string, number>> => {
+      const out = new Map<string, number>()
+      for (const dir of [projectA, projectB]) {
+        const path = join(dir, 'sessions.json')
+        if (!existsSync(path)) continue
+        const file = JSON.parse(await readFile(path, 'utf-8')) as {
+          sessions: { id: string; netWords: number }[]
+        }
+        for (const s of file.sessions) out.set(s.id, Math.max(0, s.netWords))
+      }
+      return out
+    })()
+
+    cdp = await launch()
+    await sleep(2500)
+
+    const sealedIntoProject = await cdp.evaluate<boolean>(`true`).then(async () => {
+      const file = JSON.parse(await readFile(sessionsPathA, 'utf-8')) as {
+        sessions: { id: string; netWords: number }[]
+        openSession: unknown
+      }
+      return (
+        file.openSession === null &&
+        file.sessions.some((s) => s.id === 'crashed-session-for-lifetime' && s.netWords === RECOVERED_WORDS)
+      )
+    })
+    assert(report, sealedIntoProject, 'the crashed session is recovered into the project’s own session record')
+
+    const afterRecovery = await readLifetime()
+    note(report, `after recovery:  ${JSON.stringify(afterRecovery)}`)
+    assert(
+      report,
+      afterRecovery.words === beforeRecovery.words + RECOVERED_WORDS,
+      `its words reach the lifetime total (${beforeRecovery.words} + ${RECOVERED_WORDS} expected, got ${afterRecovery.words})`
+    )
+    assert(
+      report,
+      afterRecovery.sessions === beforeRecovery.sessions + 1,
+      `and it counts as a session (${beforeRecovery.sessions} + 1 expected, got ${afterRecovery.sessions})`
+    )
+
+    // The invariant behind both, stated as a delta rather than an absolute:
+    // every session sealed between the two readings must be accounted for in
+    // the movement of the lifetime total, whichever path sealed it. A delta
+    // because section 3b deliberately deletes the registry mid-suite, so the
+    // absolute total legitimately no longer matches the whole history — that
+    // is a different question from whether the two systems agree from here.
+    const sealedWordsById = async (): Promise<Map<string, number>> => {
+      const out = new Map<string, number>()
+      for (const dir of [projectA, projectB]) {
+        const path = join(dir, 'sessions.json')
+        if (!existsSync(path)) continue
+        const file = JSON.parse(await readFile(path, 'utf-8')) as {
+          sessions: { id: string; netWords: number }[]
+        }
+        for (const s of file.sessions) out.set(s.id, Math.max(0, s.netWords))
+      }
+      return out
+    }
+    const newlySealed = await sealedWordsById()
+    for (const id of sealedBeforeRecovery.keys()) newlySealed.delete(id)
+    const newlySealedWords = [...newlySealed.values()].reduce((sum, w) => sum + w, 0)
+    note(
+      report,
+      `sessions sealed since the reading: ${newlySealed.size} worth ${newlySealedWords} words`
+    )
+    assert(
+      report,
+      afterRecovery.words - beforeRecovery.words === newlySealedWords,
+      `the lifetime total moved by exactly what was sealed (${newlySealedWords} expected, got ${afterRecovery.words - beforeRecovery.words})`
     )
   } catch (error) {
     report.lines.push(`  FAIL  threw: ${String((error as Error)?.stack ?? error)}`)

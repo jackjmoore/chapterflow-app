@@ -1,3 +1,4 @@
+import type { ScrivenerWordlistScan, ScrivenerWordlistPick, ScrivenerProjectImportResult } from '../shared/scrivenerImport'
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type {
@@ -12,12 +13,12 @@ import type {
   TagDef,
   SavedView
 } from '../shared/binder'
-import type { Theme, TypographyDefaults, PageSize } from '../shared/preferences'
+import type { Theme, TypographyDefaults, PageSize, PageViewMode } from '../shared/preferences'
 import type { BackupInfo } from '../shared/backup'
 import type { SnapshotMeta } from '../shared/snapshot'
 import type { SpanTagRecord } from '../shared/spanTags'
 import type { CommentRecord } from '../shared/comments'
-import type { LexiconEntry } from '../shared/lexicon'
+import type { LexiconEntry, SuppressedWord } from '../shared/lexicon'
 import type { DashboardData } from '../shared/dashboard'
 import type {
   RecentSearch,
@@ -27,6 +28,9 @@ import type {
   SearchResults
 } from '../shared/search'
 import type { ExportFormat, ExportPreset, ExportResult } from '../shared/export'
+import type { CompilePreset, CompileScope, CompileSettings, CompiledDraftMeta } from '../shared/compile'
+import type { CompileFinding, CompileValidationReport } from '../shared/compileValidation'
+import type { LookupKind } from '../shared/lookup'
 import type { ImportResult } from '../shared/import'
 import type { Submission, SubmissionState, SubmissionStatus } from '../shared/submissions'
 
@@ -39,6 +43,7 @@ import type { UpdateStatus, VersionInfo } from '../shared/update'
 import type { TemplateId } from '../shared/templates'
 import type { ToolbarSectionId } from '../shared/toolbarSections'
 import type { LayoutPreset } from '../shared/layoutPresets'
+import type { CustomTheme } from '../shared/customThemes'
 import type { EditorContextMenuPayload } from '../shared/contextMenu'
 import type {
   ItemMentionStat,
@@ -57,6 +62,26 @@ const api = {
 
   createFolder: (parentId: string | null): Promise<FolderNode> =>
     ipcRenderer.invoke('binder:createFolder', parentId),
+  createTopLevelFolder: (name?: string): Promise<FolderNode> =>
+    ipcRenderer.invoke('binder:createTopLevelFolder', name),
+
+  scanScrivenerWordlists: (): Promise<ScrivenerWordlistScan> =>
+    ipcRenderer.invoke('scrivener:scanWordlists'),
+  pickScrivenerWordlist: (): Promise<ScrivenerWordlistPick> =>
+    ipcRenderer.invoke('scrivener:pickWordlist'),
+  importScrivenerWords: (words: string[]): Promise<{ added: number; alreadyPresent: number }> =>
+    ipcRenderer.invoke('scrivener:importWords', words),
+  importScrivenerProject: (): Promise<ScrivenerProjectImportResult> =>
+    ipcRenderer.invoke('scrivener:importProject'),
+  /** Test seam — see the handler's comment. Not used by the app itself. */
+  __testImportScrivener: (source: string, destination: string): Promise<ScrivenerProjectImportResult> =>
+    ipcRenderer.invoke('scrivener:importProjectAt', source, destination),
+
+  createDocumentNear: (targetId: string | null): Promise<DocumentNode> =>
+    ipcRenderer.invoke('binder:createDocumentNear', targetId),
+
+  createFolderNear: (targetId: string | null): Promise<FolderNode> =>
+    ipcRenderer.invoke('binder:createFolderNear', targetId),
 
   renameNode: (id: string, name: string): Promise<void> => ipcRenderer.invoke('binder:rename', id, name),
 
@@ -71,6 +96,7 @@ const api = {
   setProjectName: (name: string): Promise<void> => ipcRenderer.invoke('binder:setProjectName', name),
 
   setSynopsis: (id: string, synopsis: string): Promise<void> => ipcRenderer.invoke('binder:setSynopsis', id, synopsis),
+  setNotes: (id: string, notes: string): Promise<void> => ipcRenderer.invoke('binder:setNotes', id, notes),
 
   setStatusId: (id: string, statusId: string | null): Promise<void> =>
     ipcRenderer.invoke('binder:setStatusId', id, statusId),
@@ -79,6 +105,12 @@ const api = {
 
   setWordTarget: (id: string, target: number | null): Promise<void> =>
     ipcRenderer.invoke('binder:setWordTarget', id, target),
+
+  setChapterNumber: (id: string, chapterNumber: number | null): Promise<void> =>
+    ipcRenderer.invoke('binder:setChapterNumber', id, chapterNumber),
+
+  setFolderIsPart: (id: string, isPart: boolean): Promise<void> =>
+    ipcRenderer.invoke('binder:setFolderIsPart', id, isPart),
 
   setStatuses: (statuses: StatusDef[]): Promise<void> => ipcRenderer.invoke('binder:setStatuses', statuses),
 
@@ -96,6 +128,9 @@ const api = {
 
   setProjectDeadline: (deadline: string | null): Promise<void> =>
     ipcRenderer.invoke('binder:setProjectDeadline', deadline),
+
+  setProjectTargetStart: (date: string | null, count: number | null): Promise<void> =>
+    ipcRenderer.invoke('binder:setProjectTargetStart', date, count),
 
   setActiveView: (view: ActiveView): Promise<void> => ipcRenderer.invoke('binder:setActiveView', view),
 
@@ -123,6 +158,7 @@ const api = {
     ipcRenderer.invoke('binder:move', id, targetParentId, targetIndex),
 
   deleteNode: (id: string): Promise<{ deleted: boolean }> => ipcRenderer.invoke('binder:delete', id),
+  emptyTrash: (): Promise<{ deleted: number }> => ipcRenderer.invoke('binder:emptyTrash'),
 
   getStoryBibleIndex: (): Promise<StoryBibleState> => ipcRenderer.invoke('storyBible:getIndex'),
 
@@ -164,6 +200,9 @@ const api = {
 
   getMentionStats: (itemId: string): Promise<ItemMentionStat[]> =>
     ipcRenderer.invoke('storyBible:getMentionStats', itemId),
+
+  getAllMentionStats: (): Promise<Record<string, ItemMentionStat[]>> =>
+    ipcRenderer.invoke('storyBible:getAllMentionStats'),
 
   setManualMention: (documentId: string, itemId: string, present: boolean): Promise<void> =>
     ipcRenderer.invoke('storyBible:setManualMention', documentId, itemId, present),
@@ -227,10 +266,6 @@ const api = {
 
   setAccentColor: (color: string | null): Promise<void> => ipcRenderer.invoke('preferences:setAccentColor', color),
 
-  getTrueBlack: (): Promise<boolean> => ipcRenderer.invoke('preferences:getTrueBlack'),
-
-  setTrueBlack: (enabled: boolean): Promise<void> => ipcRenderer.invoke('preferences:setTrueBlack', enabled),
-
   getZoomPercent: (): Promise<number> => ipcRenderer.invoke('preferences:getZoomPercent'),
 
   setZoomPercent: (zoom: number): Promise<void> => ipcRenderer.invoke('preferences:setZoomPercent', zoom),
@@ -249,6 +284,15 @@ const api = {
 
   setTextColor: (color: string | null): Promise<void> => ipcRenderer.invoke('preferences:setTextColor', color),
 
+  getPageBackgroundColor: (): Promise<string | null> => ipcRenderer.invoke('preferences:getPageBackgroundColor'),
+
+  setPageBackgroundColor: (color: string | null): Promise<void> =>
+    ipcRenderer.invoke('preferences:setPageBackgroundColor', color),
+
+  getColorPresetId: (): Promise<string | null> => ipcRenderer.invoke('preferences:getColorPresetId'),
+
+  setColorPresetId: (id: string | null): Promise<void> => ipcRenderer.invoke('preferences:setColorPresetId', id),
+
   getHiddenToolbarSections: (): Promise<ToolbarSectionId[]> =>
     ipcRenderer.invoke('preferences:getHiddenToolbarSections'),
 
@@ -259,6 +303,11 @@ const api = {
 
   setLayoutPresets: (presets: LayoutPreset[]): Promise<void> =>
     ipcRenderer.invoke('preferences:setLayoutPresets', presets),
+
+  getCustomThemes: (): Promise<CustomTheme[]> => ipcRenderer.invoke('preferences:getCustomThemes'),
+
+  setCustomThemes: (themes: CustomTheme[]): Promise<void> =>
+    ipcRenderer.invoke('preferences:setCustomThemes', themes),
 
   getCardWidth: (): Promise<number> => ipcRenderer.invoke('preferences:getCardWidth'),
 
@@ -272,12 +321,19 @@ const api = {
 
   setPageMarginMm: (mm: number): Promise<void> => ipcRenderer.invoke('preferences:setPageMarginMm', mm),
 
+  getPageViewMode: (): Promise<PageViewMode> => ipcRenderer.invoke('preferences:getPageViewMode'),
+
+  setPageViewMode: (mode: PageViewMode): Promise<void> => ipcRenderer.invoke('preferences:setPageViewMode', mode),
+
   applyTemplate: (id: TemplateId): Promise<void> => ipcRenderer.invoke('template:apply', id),
 
   projectExists: (): Promise<boolean> => ipcRenderer.invoke('project:exists'),
 
   openProjectFolder: (): Promise<{ opened: boolean; path?: string }> =>
     ipcRenderer.invoke('project:openFolder'),
+
+  createNewProject: (): Promise<{ created: boolean; path?: string; reason?: 'exists' }> =>
+    ipcRenderer.invoke('project:createNew'),
 
   listBackups: (): Promise<BackupInfo[]> => ipcRenderer.invoke('backup:list'),
 
@@ -353,6 +409,8 @@ const api = {
   /** Every word the editor should stop flagging. App-only: no OS dictionary
    *  is ever written. */
   listSuppressedWords: (): Promise<string[]> => ipcRenderer.invoke('suppressedWords:list'),
+  listSuppressedWordEntries: (): Promise<SuppressedWord[]> =>
+    ipcRenderer.invoke('suppressedWords:listEntries'),
 
   addSuppressedWord: (word: string): Promise<void> => ipcRenderer.invoke('suppressedWords:add', word),
 
@@ -384,6 +442,49 @@ const api = {
 
   printProject: (preset: ExportPreset = 'standard'): Promise<{ printed: boolean }> =>
     ipcRenderer.invoke('print:project', preset),
+
+  validateCompile: (scope: CompileScope, stylePreset: ExportPreset): Promise<CompileValidationReport> =>
+    ipcRenderer.invoke('compile:validate', scope, stylePreset),
+
+  runCompile: (
+    name: string | null,
+    scope: CompileScope,
+    format: ExportFormat,
+    stylePreset: ExportPreset,
+    acceptedFindings: CompileFinding[] = []
+  ): Promise<CompiledDraftMeta> =>
+    ipcRenderer.invoke('compile:run', name, scope, format, stylePreset, acceptedFindings),
+
+  listCompiles: (): Promise<CompiledDraftMeta[]> => ipcRenderer.invoke('compile:list'),
+
+  getCompileView: (id: string): Promise<string> => ipcRenderer.invoke('compile:getView', id),
+
+  exportCompileCopy: (id: string): Promise<ExportResult> => ipcRenderer.invoke('compile:exportCopy', id),
+
+  deleteCompile: (id: string): Promise<void> => ipcRenderer.invoke('compile:delete', id),
+
+  getCompileSettings: (): Promise<CompileSettings> => ipcRenderer.invoke('compile:getSettings'),
+
+  updateCompileSettings: (settings: CompileSettings): Promise<CompileSettings> =>
+    ipcRenderer.invoke('compile:updateSettings', settings),
+
+  printCompile: (id: string): Promise<{ printed: boolean }> => ipcRenderer.invoke('compile:print', id),
+
+  getCompilePrintableView: (id: string): Promise<string> => ipcRenderer.invoke('compile:getPrintableView', id),
+
+  lookupWord: (kind: LookupKind, word: string): Promise<{ url: string }> =>
+    ipcRenderer.invoke('lookup:word', kind, word),
+
+  createCompileFrontMatter: (): Promise<CompileSettings> => ipcRenderer.invoke('compile:createFrontMatter'),
+
+  createCompileBackMatter: (): Promise<CompileSettings> => ipcRenderer.invoke('compile:createBackMatter'),
+
+  listCompilePresets: (): Promise<CompilePreset[]> => ipcRenderer.invoke('compile:listPresets'),
+
+  saveCompilePreset: (draft: Omit<CompilePreset, 'id'>): Promise<CompilePreset> =>
+    ipcRenderer.invoke('compile:savePreset', draft),
+
+  deleteCompilePreset: (id: string): Promise<void> => ipcRenderer.invoke('compile:deletePreset', id),
 
   importFiles: (parentId: string | null): Promise<ImportResult> => ipcRenderer.invoke('import:files', parentId),
 

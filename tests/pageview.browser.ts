@@ -1,7 +1,7 @@
 import { Editor } from '@tiptap/core'
 import { createEditorExtensions } from '../src/renderer/src/editorExtensions'
 import { Pagination } from '../src/renderer/src/extensions/pagination'
-import { paginate, PAGE_GAP_PX } from '../src/renderer/src/pagePreview'
+import { paginate, pageStartOffsets, PAGE_GAP_PX } from '../src/renderer/src/pagePreview'
 
 export interface Check {
   ok: boolean
@@ -195,6 +195,60 @@ export function runChecks(): Check[] {
     assert(
       paginate(trailing, 'letter', marginMm).pageCount <= 2,
       'a trailing manual break does not add unbounded pages'
+    )
+  }
+
+  // ---- Book View windows: do the natural-flow offsets land on the same
+  //      content the editor's sheets show? ------------------------------
+  {
+    // Short paragraphs, so breaks fall BETWEEN blocks — the whole-block case
+    // the offset comparison below can actually measure. (The long-paragraph
+    // fixture above only ever splits mid-block.)
+    const long = Array.from({ length: 220 }, (_, i) => `<p>Short paragraph number ${i + 1}.</p>`).join('')
+    const result = paginate(long, 'letter', marginMm)
+    const starts = pageStartOffsets(result)
+
+    assert(
+      starts.length === result.pageCount,
+      `one window offset per page (${starts.length} offsets, ${result.pageCount} pages)`
+    )
+    assert(
+      starts.every((s, i) => i === 0 || s > starts[i - 1]),
+      'window offsets are strictly increasing'
+    )
+    assert(
+      starts.every((s, i) => i === 0 || s - starts[i - 1] <= usableHeightPx + 1),
+      'no window claims more content than a page can hold'
+    )
+
+    // The load-bearing equality: render the same HTML in the natural
+    // (gap-free) flow — exactly what a Book View leaf does — and check that
+    // each whole-block break's block really does sit at its page's window
+    // offset. If this drifts, Book View shows different pages than the
+    // editor while claiming the same numbers.
+    const host = document.createElement('div')
+    host.className = 'editor page-measure-host'
+    const flow = document.createElement('div')
+    flow.className = 'ProseMirror page-measure-content'
+    flow.style.width = `${usableWidthPx}px`
+    flow.innerHTML = long
+    host.appendChild(flow)
+    document.body.appendChild(host)
+
+    let checked = 0
+    let misses = 0
+    const blocks = Array.from(flow.children) as HTMLElement[]
+    result.breaks.forEach((b, i) => {
+      if (b.charOffset !== null) return // in-block breaks have no block edge to compare
+      const naturalTop = blocks[b.blockIndex].offsetTop - flow.offsetTop
+      checked += 1
+      if (Math.abs(naturalTop - starts[i + 1]) > 1) misses += 1
+    })
+    host.remove()
+
+    assert(
+      checked > 0 && misses === 0,
+      `whole-block page starts match the natural flow (${checked} checked, ${misses} off)`
     )
   }
 

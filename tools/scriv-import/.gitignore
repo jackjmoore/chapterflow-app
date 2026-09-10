@@ -1,0 +1,6 @@
+.build/
+node_modules/
+corpus/*
+!corpus/README.md
+reports/*
+!reports/.gitkeep

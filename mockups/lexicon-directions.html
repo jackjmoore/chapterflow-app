@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>Lexicon — three directions</title>
+<style>
+:root {
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-sm: 4px; --radius-md: 6px;
+  --motion-fast: 0.12s ease;
+  --text-2xs: 10px; --text-xs: 11px; --text-sm: 12px; --text-md: 13px; --text-lg: 14px;
+  --text-xl: 20px; --text-2xl: 26px;
+  --shadow-rgb: 0 0 0; --shadow-weak: 0.22; --shadow-soft: 0.3; --shadow-strong: 0.4;
+  --elev-1: 0 1px 2px rgb(var(--shadow-rgb) / var(--shadow-weak));
+  --elev-2: 0 1px 2px rgb(var(--shadow-rgb) / var(--shadow-weak)), 0 8px 20px rgb(var(--shadow-rgb) / var(--shadow-soft));
+  --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-editor: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+
+  --chrome-bg: #1c1a17;
+  --chrome-bg-elevated: #242119;
+  --chrome-bg-sidebar: #18160f;
+  --chrome-border: #35312a;
+  --chrome-border-strong: #4a4438;
+  --chrome-text: #e8e3d9;
+  --chrome-text-heading: #f0ece2;
+  --chrome-text-muted: #9c9585;
+  --chrome-text-dim: #6b6558;
+  --chrome-control-bg: #262319;
+  --chrome-control-hover: #322d22;
+  --chrome-control-active-bg: #3a3527;
+  --chrome-accent: #6f95b8;
+  --chrome-accent-contrast: #0d1520;
+  --chrome-row-hover: #221f18;
+  --chrome-row-selected: #2a3846;
+  --chrome-accent-error: #c26a5a;
+}
+:root[data-theme='light'] {
+  --shadow-weak: 0.08; --shadow-soft: 0.13; --shadow-strong: 0.18;
+  --chrome-bg: #f5f1e8;
+  --chrome-bg-elevated: #ece6d8;
+  --chrome-bg-sidebar: #efe9dc;
+  --chrome-border: #ddd4c0;
+  --chrome-border-strong: #c9bea3;
+  --chrome-text: #2b2620;
+  --chrome-text-heading: #1c1812;
+  --chrome-text-muted: #6e6656;
+  --chrome-text-dim: #948c78;
+  --chrome-control-bg: #ece5d3;
+  --chrome-control-hover: #e0d8c2;
+  --chrome-control-active-bg: #d8cdb0;
+  --chrome-accent: #3d5a7a;
+  --chrome-accent-contrast: #f5f1e8;
+  --chrome-row-hover: #ece5d3;
+  --chrome-row-selected: #d7e0e8;
+  --chrome-accent-error: #a8503f;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-ui); font-size: var(--text-md); color: var(--chrome-text); background: #0f0e0c; }
+:root[data-theme='light'] body { background: #ded7c6; }
+
+/* ---------------------------------------------------------------- mock chrome */
+.mock-bar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--chrome-bg-sidebar); border-bottom: 1px solid var(--chrome-border);
+}
+.mock-title { font-size: var(--text-md); font-weight: 600; color: var(--chrome-text-heading); }
+.mock-note { font-size: var(--text-sm); color: var(--chrome-text-dim); }
+.mock-spacer { flex: 1; }
+.mock-tabs { display: flex; gap: var(--space-1); }
+.mock-tab, .mock-toggle {
+  height: 26px; padding: 0 var(--space-3);
+  font-family: var(--font-ui); font-size: var(--text-sm);
+  color: var(--chrome-text-muted); background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border); border-radius: 13px; cursor: pointer;
+}
+.mock-tab:hover, .mock-toggle:hover { color: var(--chrome-text-heading); border-color: var(--chrome-border-strong); }
+.mock-tab.is-active { color: var(--chrome-accent-contrast); background: var(--chrome-accent); border-color: var(--chrome-accent); }
+.mock-toggle.is-on { color: var(--chrome-text-heading); background: var(--chrome-control-active-bg); }
+
+.stage { padding: var(--space-5); display: flex; justify-content: center; }
+.frame {
+  width: 1400px; height: 880px; display: flex; overflow: hidden;
+  background: var(--chrome-bg); border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md); box-shadow: var(--elev-2);
+}
+.direction { display: none; width: 100%; }
+.direction.is-active { display: flex; }
+
+/* ---------------------------------------------------------------- app frame */
+.rail {
+  width: 44px; flex: none; display: flex; flex-direction: column; align-items: center;
+  gap: var(--space-1); padding-top: var(--space-3);
+  background: var(--chrome-bg-sidebar); border-right: 1px solid var(--chrome-border);
+}
+.rail-btn { width: 30px; height: 30px; display: grid; place-items: center; font-size: var(--text-md); color: var(--chrome-text-dim); border-radius: var(--radius-sm); }
+.rail-btn.is-active { color: var(--chrome-text-heading); background: var(--chrome-control-active-bg); }
+
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.toolbar {
+  display: flex; align-items: center; gap: var(--space-2);
+  height: 44px; flex: none; padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--chrome-border);
+}
+.btn-primary {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  height: 28px; padding: 0 var(--space-3);
+  font-family: var(--font-ui); font-size: var(--text-sm); font-weight: 500;
+  color: var(--chrome-text-heading); background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border-strong); border-radius: var(--radius-sm); cursor: pointer;
+}
+.btn-primary:hover { background: var(--chrome-control-hover); }
+.field {
+  height: 28px; padding: 0 var(--space-3);
+  font-family: var(--font-ui); font-size: var(--text-sm);
+  color: var(--chrome-text); background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border); border-radius: var(--radius-sm);
+}
+.field::placeholder { color: var(--chrome-text-dim); }
+.field.is-wide { width: 240px; }
+.toolbar-count { margin-left: auto; font-size: var(--text-sm); color: var(--chrome-text-dim); }
+
+.link { padding: 0; font-family: var(--font-ui); font-size: var(--text-sm); color: var(--chrome-text-muted); background: none; border: none; cursor: pointer; }
+.link:hover { color: var(--chrome-accent); text-decoration: underline; }
+.link.is-delete:hover { color: var(--chrome-accent-error); }
+
+.scroll { flex: 1; min-height: 0; overflow: auto; padding: var(--space-5) var(--space-5) var(--space-6); }
+.measure { max-width: 860px; margin: 0 auto; }
+.measure.is-wide { max-width: 1100px; }
+/* The glossary is meant to be read down, so it holds a page's measure rather
+   than the window's. */
+.measure.is-narrow { max-width: 660px; }
+
+.lead { margin: 0 0 var(--space-2); font-size: var(--text-xl); font-weight: 400; line-height: 1.45; color: var(--chrome-text-heading); }
+.sub { margin: 0 0 var(--space-5); font-size: var(--text-md); line-height: 1.6; color: var(--chrome-text-muted); }
+.section-head {
+  display: flex; align-items: baseline; gap: var(--space-2);
+  margin: var(--space-5) 0 var(--space-2); padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--chrome-border);
+}
+.section-name { font-size: var(--text-lg); font-weight: 600; color: var(--chrome-text-heading); }
+.section-note { font-size: var(--text-sm); color: var(--chrome-text-dim); }
+
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-3);
+  margin: 120px auto 0; max-width: 480px; text-align: center;
+  font-size: var(--text-md); line-height: 1.6; color: var(--chrome-text-dim);
+}
+.empty-state p { margin: 0; }
+
+/* Words the Story Bible suppresses. Shared by all three directions: it is the
+   half of the picture the current page does not show at all. */
+.names {
+  display: flex; flex-wrap: wrap; gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+.name-chip {
+  height: 22px; display: inline-flex; align-items: center; padding: 0 var(--space-2);
+  font-size: var(--text-sm); color: var(--chrome-text-muted);
+  background: var(--chrome-control-bg); border-radius: 11px;
+}
+.name-chip.is-both { color: var(--chrome-text-heading); border: 1px solid var(--chrome-border-strong); }
+
+/* ---------------------------------------------------------------- A: the glossary */
+.gl-group { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: var(--space-4); margin-top: var(--space-5); }
+.gl-letter {
+  font-family: var(--font-editor); font-size: var(--text-2xl); line-height: 1;
+  color: var(--chrome-text-dim); padding-top: 2px;
+}
+.gl-entry { padding: var(--space-2) var(--space-2) var(--space-3) 0; border-radius: var(--radius-sm); }
+.gl-entry:hover { background: var(--chrome-row-hover); }
+.gl-head { display: flex; align-items: baseline; gap: var(--space-2); }
+.gl-word { font-family: var(--font-editor); font-size: var(--text-xl); color: var(--chrome-text-heading); }
+.gl-pron { font-family: var(--font-editor); font-style: italic; font-size: var(--text-lg); color: var(--chrome-text-dim); }
+.gl-actions { margin-left: auto; display: flex; gap: var(--space-2); opacity: 0; transition: opacity var(--motion-fast); }
+.gl-entry:hover .gl-actions { opacity: 1; }
+.gl-meaning { margin-top: var(--space-1); font-family: var(--font-editor); font-size: var(--text-lg); line-height: 1.6; color: var(--chrome-text); max-width: 62ch; }
+.gl-unset { color: var(--chrome-text-dim); font-style: italic; }
+
+/* ---------------------------------------------------------------- B: the working list */
+.wl-row {
+  display: grid; grid-template-columns: 190px 150px minmax(0, 1fr) 130px;
+  align-items: baseline; column-gap: var(--space-3);
+  padding: var(--space-2); border-radius: var(--radius-sm);
+}
+.wl-row:hover { background: var(--chrome-row-hover); }
+.wl-word { font-size: var(--text-md); font-weight: 600; color: var(--chrome-text-heading); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wl-pron { font-family: var(--font-editor); font-style: italic; font-size: var(--text-md); color: var(--chrome-text-muted); }
+.wl-meaning { font-size: var(--text-md); line-height: 1.5; color: var(--chrome-text-muted); }
+.wl-unset { color: var(--chrome-text-dim); font-style: italic; }
+.wl-actions { display: flex; justify-content: flex-end; gap: var(--space-2); opacity: 0; transition: opacity var(--motion-fast); }
+.wl-row:hover .wl-actions { opacity: 1; }
+.wl-head {
+  display: grid; grid-template-columns: 190px 150px minmax(0, 1fr) 130px;
+  column-gap: var(--space-3); padding: 0 var(--space-2) var(--space-2);
+  font-size: var(--text-xs); color: var(--chrome-text-dim);
+  border-bottom: 1px solid var(--chrome-border);
+}
+/* One row shown as it is while being edited, since every field on this page
+   commits as you type. */
+.wl-row.is-editing { background: var(--chrome-row-hover); }
+.wl-row.is-editing .wl-word,
+.wl-row.is-editing .wl-pron,
+.wl-row.is-editing .wl-meaning {
+  padding: var(--space-1) var(--space-2);
+  background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border-strong);
+  border-radius: var(--radius-sm);
+}
+.wl-caret { border-right: 1px solid var(--chrome-accent); margin-right: -1px; }
+
+/* ---------------------------------------------------------------- C: the cards */
+/* Cards size to their own text rather than stretching to the tallest in the
+   row, or a one-line meaning leaves half a card of nothing. */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-3); align-items: start; }
+.card {
+  display: flex; flex-direction: column; gap: var(--space-1);
+  padding: var(--space-3);
+  background: var(--chrome-bg-elevated); border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md); box-shadow: var(--elev-1);
+}
+.card:hover { border-color: var(--chrome-border-strong); }
+.card-word { font-family: var(--font-editor); font-size: var(--text-xl); color: var(--chrome-text-heading); }
+.card-pron { font-family: var(--font-editor); font-style: italic; font-size: var(--text-md); color: var(--chrome-text-dim); }
+.card-meaning { font-size: var(--text-md); line-height: 1.5; color: var(--chrome-text-muted); }
+.card-actions { display: flex; gap: var(--space-2); margin-top: auto; padding-top: var(--space-2); opacity: 0; transition: opacity var(--motion-fast); }
+.card:hover .card-actions { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="mock-bar">
+  <span class="mock-title">Lexicon</span>
+  <span class="mock-note">three directions · fake data · no side panel in any of them</span>
+  <span class="mock-spacer"></span>
+  <div class="mock-tabs">
+    <button class="mock-tab is-active" data-go="a">1 · The glossary</button>
+    <button class="mock-tab" data-go="b">2 · The working list</button>
+    <button class="mock-tab" data-go="c">3 · The cards</button>
+  </div>
+  <button class="mock-toggle" id="empty-toggle">Show it empty (e)</button>
+  <button class="mock-toggle" id="theme-toggle">Light (t)</button>
+</div>
+
+<div class="stage">
+  <div class="frame">
+    <div class="direction is-active" id="dir-a"></div>
+    <div class="direction" id="dir-b"></div>
+    <div class="direction" id="dir-c"></div>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------- fake data
+/* word, pronunciation, meaning. Empty strings are the real cases: the model
+   makes both optional and never infers either. */
+const WORDS = [
+  ['bothy', '/ˈbɒθi/', 'A one-room stone shelter kept unlocked for anyone caught out by the weather.'],
+  ['clinker-built', '', 'Built from overlapping planks, which is why the Kestrel Point boats sit low and take a swell the way they do.'],
+  ['gansey', '/ˈɡanzi/', 'A fisherman’s jumper knitted in a pattern particular to one village, so a body could be named by it.'],
+  ['gurry', '/ˈɡʌri/', 'The mess left on a deck after gutting. Not a word anyone uses in front of visitors.'],
+  ['haaf', '/hɑːf/', ''],
+  ['haar', '/hɑː/', 'The cold sea fog that comes in off the water in early summer, and the reason nobody here trusts a clear June morning.'],
+  ['leat', '/liːt/', 'The channel that carries water from the river to the mill. Older than the mill it feeds.'],
+  ['Mirrenwater', '/ˈmɪrənˌwɔːtə/', 'The stretch of river between the weir and the sea, named for a family that no longer exists.'],
+  ['shoaling', '', ''],
+  ['spilling weir', '', 'The overflow channel that keeps the mill pond from taking the road with it.'],
+  ['sump-gate', '', 'The gate at the low end of the weir. Opening it is the last thing anyone does before a flood.'],
+  ['trawlwife', '', 'A woman who sells what the boats bring in. Half the village owes her money and the other half owed her mother.'],
+  ['withy', '/ˈwɪði/', 'A willow shoot cut for basket work. Ivo keeps a bundle soaking under the boathouse.'],
+  ['wrack', '/rak/', 'Seaweed thrown up by a storm, and what the shoreline smells of for a week afterwards.'],
+  // Registered by the Lexicon and by the Story Bible at once — a bird and a
+  // character. The store keeps both sources for exactly this case.
+  ['Wren', '/rɛn/', 'The bird, and the reason the Halloway girl was given the name.']
+].map(([word, pron, meaning]) => ({ word, pron, meaning, both: word === 'Wren' }))
+
+/* Words the spellchecker leaves alone because a Story Bible name or alias
+   uses them. Nothing here is a Lexicon entry. */
+const NAMES = [
+  'Halloway', 'Wren', 'Tobias', 'Marguerite', 'Vance', 'Serafine', 'Okonkwo',
+  'Ivo', 'Marchetti', 'Corwin', 'Elias', 'Thorn', 'Nadia', 'Ferrell', 'Kestrel', 'Drowned'
+]
+
+let EMPTY = false
+const data = () => (EMPTY ? [] : WORDS)
+const names = () => (EMPTY ? [] : NAMES)
+
+function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])) }
+function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many) }
+const WORDNUM = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+  'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen', 'Twenty']
+function leading(n) { return n <= 20 ? WORDNUM[n] : String(n) }
+
+// ---------------------------------------------------------------- app chrome
+function chrome(inner) {
+  return '' +
+    '<div class="rail">' +
+      '<div class="rail-btn">✎</div><div class="rail-btn">◫</div><div class="rail-btn">⌗</div>' +
+      '<div class="rail-btn">⎘</div><div class="rail-btn">✉</div><div class="rail-btn is-active">≡</div>' +
+    '</div>' +
+    '<div class="main">' + inner + '</div>'
+}
+
+function toolbar(extra) {
+  const n = data().length
+  return '<div class="toolbar">' +
+    '<input class="field is-wide" placeholder="Add a word…" />' +
+    '<button class="btn-primary">Add</button>' +
+    (extra || '') +
+    '<span class="toolbar-count">' + (n === 0 ? 'No words' : plural(n, 'word', 'words')) + '</span>' +
+  '</div>'
+}
+
+/** The two sentences at the top of every direction. The second one is the
+    thing the page has never said: what else is being left alone, and why. */
+function lead() {
+  const n = data().length
+  const m = names().length
+  return '<p class="lead">' + leading(n) + ' ' + (n === 1 ? 'word' : 'words') +
+    ' in this project’s lexicon.</p>' +
+    '<p class="sub">The editor leaves these alone instead of marking them as spelling mistakes. ' +
+    'That applies inside ChapterFlow only, and never touches the system dictionary. ' +
+    leading(m) + ' more ' + (m === 1 ? 'word is' : 'words are') + ' left alone because a Story Bible name uses ' +
+    (m === 1 ? 'it' : 'them') + '.</p>'
+}
+
+function namesSection() {
+  const list = names()
+  if (!list.length) return ''
+  return '<div class="section-head"><span class="section-name">From the Story Bible</span>' +
+    '<span class="section-note">These come from names and aliases. Removing the name is what lets the editor ' +
+    'mark the word again.</span></div>' +
+    '<div class="names">' + list.map((n) => n === 'Wren'
+      // A word can be registered by both features at once, and the store keeps
+      // both sources so that deleting one does not un-suppress the other.
+      ? '<span class="name-chip is-both">' + esc(n) + ' · also a lexicon entry</span>'
+      : '<span class="name-chip">' + esc(n) + '</span>').join('') +
+    '</div>'
+}
+
+function emptyState(text) {
+  return '<div class="empty-state"><p>' + text + '</p>' +
+    '<button class="btn-primary">Add the first word</button></div>'
+}
+
+const EMPTY_TEXT = 'No words have been added yet. Add one above, or right-click a word the editor has ' +
+  'marked as a mistake and choose “Define in Lexicon”.'
+
+// ================================================================ A · the glossary
+function renderA() {
+  const words = data()
+  if (!words.length) {
+    return chrome(toolbar() + '<div class="scroll"><div class="measure">' + emptyState(EMPTY_TEXT) + '</div></div>')
+  }
+
+  const groups = {}
+  for (const w of words) {
+    const letter = w.word[0].toUpperCase()
+    ;(groups[letter] = groups[letter] || []).push(w)
+  }
+
+  const entry = (w) =>
+    '<div class="gl-entry">' +
+      '<div class="gl-head">' +
+        '<span class="gl-word">' + esc(w.word) + '</span>' +
+        (w.pron ? '<span class="gl-pron">' + esc(w.pron) + '</span>' : '') +
+        '<span class="gl-actions">' +
+          '<button class="link">Edit</button>' +
+          '<button class="link is-delete">Delete</button>' +
+        '</span>' +
+      '</div>' +
+      '<div class="gl-meaning">' + (w.meaning
+        ? esc(w.meaning)
+        : '<span class="gl-unset">No meaning written down yet.</span>') + '</div>' +
+    '</div>'
+
+  const body = Object.keys(groups).sort((a, b) => a.localeCompare(b)).map((letter) =>
+    '<div class="gl-group"><div class="gl-letter">' + letter + '</div>' +
+    '<div>' + groups[letter].map(entry).join('') + '</div></div>').join('')
+
+  return chrome(toolbar('<input class="field" placeholder="Filter…" />') +
+    '<div class="scroll"><div class="measure is-narrow">' + lead() + body + namesSection() + '</div></div>')
+}
+
+// ================================================================ B · the working list
+function renderB() {
+  const words = data()
+  if (!words.length) {
+    return chrome(toolbar() + '<div class="scroll"><div class="measure">' + emptyState(EMPTY_TEXT) + '</div></div>')
+  }
+
+  const row = (w, i) =>
+    '<div class="wl-row' + (i === 5 ? ' is-editing' : '') + '">' +
+      '<div class="wl-word">' + esc(w.word) + (i === 5 ? '<span class="wl-caret"></span>' : '') + '</div>' +
+      '<div class="wl-pron">' + (w.pron ? esc(w.pron) : '<span class="wl-unset">—</span>') + '</div>' +
+      '<div class="wl-meaning">' + (w.meaning
+        ? esc(w.meaning)
+        : '<span class="wl-unset">No meaning written down yet.</span>') + '</div>' +
+      '<div class="wl-actions">' +
+        '<button class="link">Copy</button>' +
+        '<button class="link is-delete">Delete</button>' +
+      '</div>' +
+    '</div>'
+
+  return chrome(toolbar('<input class="field" placeholder="Filter…" />') +
+    '<div class="scroll"><div class="measure is-wide">' + lead() +
+      '<div class="wl-head"><span>Word</span><span>Pronunciation</span><span>Meaning</span><span></span></div>' +
+      words.map(row).join('') +
+      namesSection() +
+    '</div></div>')
+}
+
+// ================================================================ C · the cards
+function renderC() {
+  const words = data()
+  if (!words.length) {
+    return chrome(toolbar() + '<div class="scroll"><div class="measure">' + emptyState(EMPTY_TEXT) + '</div></div>')
+  }
+
+  const card = (w) =>
+    '<div class="card">' +
+      '<div class="card-word">' + esc(w.word) + '</div>' +
+      (w.pron ? '<div class="card-pron">' + esc(w.pron) + '</div>' : '') +
+      '<div class="card-meaning">' + (w.meaning
+        ? esc(w.meaning)
+        : '<span class="wl-unset">No meaning written down yet.</span>') + '</div>' +
+      '<div class="card-actions">' +
+        '<button class="link">Edit</button>' +
+        '<button class="link is-delete">Delete</button>' +
+      '</div>' +
+    '</div>'
+
+  return chrome(toolbar('<input class="field" placeholder="Filter…" />') +
+    '<div class="scroll"><div class="measure is-wide">' + lead() +
+      '<div class="cards">' + words.map(card).join('') + '</div>' +
+      namesSection() +
+    '</div></div>')
+}
+
+// ---------------------------------------------------------------- wiring
+function draw() {
+  document.getElementById('dir-a').innerHTML = renderA()
+  document.getElementById('dir-b').innerHTML = renderB()
+  document.getElementById('dir-c').innerHTML = renderC()
+}
+
+function show(which) {
+  ['a', 'b', 'c'].forEach((k) => document.getElementById('dir-' + k).classList.toggle('is-active', k === which))
+  document.querySelectorAll('.mock-tab').forEach((t) => t.classList.toggle('is-active', t.dataset.go === which))
+  if (location.hash.slice(1) !== which) history.replaceState(null, '', '#' + which)
+}
+
+document.querySelectorAll('.mock-tab').forEach((t) => t.addEventListener('click', () => show(t.dataset.go)))
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const light = document.documentElement.getAttribute('data-theme') === 'light'
+  document.documentElement.setAttribute('data-theme', light ? 'dark' : 'light')
+  document.getElementById('theme-toggle').textContent = light ? 'Light (t)' : 'Dark (t)'
+})
+
+document.getElementById('empty-toggle').addEventListener('click', () => {
+  EMPTY = !EMPTY
+  const btn = document.getElementById('empty-toggle')
+  btn.classList.toggle('is-on', EMPTY)
+  btn.textContent = EMPTY ? 'Show it full (e)' : 'Show it empty (e)'
+  draw()
+})
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === '1') show('a')
+  if (e.key === '2') show('b')
+  if (e.key === '3') show('c')
+  if (e.key === 't') document.getElementById('theme-toggle').click()
+  if (e.key === 'e') document.getElementById('empty-toggle').click()
+})
+
+draw()
+const hash = location.hash.slice(1)
+if (['a', 'b', 'c'].indexOf(hash) !== -1) show(hash)
+</script>
+</body>
+</html>

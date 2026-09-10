@@ -51,7 +51,10 @@ function isEntity(entry: SearchEntry): boolean {
  * among the records.
  */
 function isDocument(entry: SearchEntry): boolean {
-  return entry.kind === 'documentTitle'
+  // Notes are stored alongside the title and synopsis but are prose *about* a
+  // document rather than a way of naming it, so they belong in the metadata
+  // band below rather than beside the title.
+  return entry.kind === 'documentTitle' && entry.field !== 'notes'
 }
 
 /** Structured content that describes something: fields, tags, records. */

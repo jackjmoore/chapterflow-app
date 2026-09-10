@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>Query Tracker — three directions</title>
+<style>
+:root {
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-sm: 4px; --radius-md: 6px;
+  --motion-fast: 0.12s ease;
+  --text-2xs: 10px; --text-xs: 11px; --text-sm: 12px; --text-md: 13px; --text-lg: 14px;
+  --text-xl: 20px; --text-2xl: 26px;
+  --shadow-rgb: 0 0 0; --shadow-weak: 0.22; --shadow-soft: 0.3; --shadow-strong: 0.4;
+  --elev-1: 0 1px 2px rgb(var(--shadow-rgb) / var(--shadow-weak));
+  --elev-2: 0 1px 2px rgb(var(--shadow-rgb) / var(--shadow-weak)), 0 8px 20px rgb(var(--shadow-rgb) / var(--shadow-soft));
+  --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-editor: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+
+  --chrome-bg: #1c1a17;
+  --chrome-bg-elevated: #242119;
+  --chrome-bg-sidebar: #18160f;
+  --chrome-border: #35312a;
+  --chrome-border-strong: #4a4438;
+  --chrome-text: #e8e3d9;
+  --chrome-text-heading: #f0ece2;
+  --chrome-text-muted: #9c9585;
+  --chrome-text-dim: #6b6558;
+  --chrome-control-bg: #262319;
+  --chrome-control-hover: #322d22;
+  --chrome-control-active-bg: #3a3527;
+  --chrome-accent: #6f95b8;
+  --chrome-accent-contrast: #0d1520;
+  --chrome-row-hover: #221f18;
+  --chrome-row-selected: #2a3846;
+  --chrome-accent-error: #c26a5a;
+}
+:root[data-theme='light'] {
+  --shadow-weak: 0.08; --shadow-soft: 0.13; --shadow-strong: 0.18;
+  --chrome-bg: #f5f1e8;
+  --chrome-bg-elevated: #ece6d8;
+  --chrome-bg-sidebar: #efe9dc;
+  --chrome-border: #ddd4c0;
+  --chrome-border-strong: #c9bea3;
+  --chrome-text: #2b2620;
+  --chrome-text-heading: #1c1812;
+  --chrome-text-muted: #6e6656;
+  --chrome-text-dim: #948c78;
+  --chrome-control-bg: #ece5d3;
+  --chrome-control-hover: #e0d8c2;
+  --chrome-control-active-bg: #d8cdb0;
+  --chrome-accent: #3d5a7a;
+  --chrome-accent-contrast: #f5f1e8;
+  --chrome-row-hover: #ece5d3;
+  --chrome-row-selected: #d7e0e8;
+  --chrome-accent-error: #a8503f;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  color: var(--chrome-text);
+  background: #0f0e0c;
+}
+:root[data-theme='light'] body { background: #ded7c6; }
+
+/* ---------------------------------------------------------------- mock chrome */
+.mock-bar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--chrome-bg-sidebar);
+  border-bottom: 1px solid var(--chrome-border);
+}
+.mock-title { font-size: var(--text-md); font-weight: 600; color: var(--chrome-text-heading); }
+.mock-note { font-size: var(--text-sm); color: var(--chrome-text-dim); }
+.mock-spacer { flex: 1; }
+.mock-tabs { display: flex; gap: var(--space-1); }
+.mock-tab, .mock-toggle {
+  height: 26px; padding: 0 var(--space-3);
+  font-family: var(--font-ui); font-size: var(--text-sm);
+  color: var(--chrome-text-muted); background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border); border-radius: 13px; cursor: pointer;
+}
+.mock-tab:hover, .mock-toggle:hover { color: var(--chrome-text-heading); border-color: var(--chrome-border-strong); }
+.mock-tab.is-active { color: var(--chrome-accent-contrast); background: var(--chrome-accent); border-color: var(--chrome-accent); }
+.mock-toggle.is-on { color: var(--chrome-text-heading); background: var(--chrome-control-active-bg); }
+
+.stage { padding: var(--space-5); display: flex; justify-content: center; }
+.frame {
+  width: 1400px; height: 880px;
+  display: flex; overflow: hidden;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-2);
+}
+.direction { display: none; width: 100%; }
+.direction.is-active { display: flex; }
+
+/* ---------------------------------------------------------------- app frame */
+.rail {
+  width: 44px; flex: none;
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
+  padding-top: var(--space-3);
+  background: var(--chrome-bg-sidebar);
+  border-right: 1px solid var(--chrome-border);
+}
+.rail-btn {
+  width: 30px; height: 30px; display: grid; place-items: center;
+  font-size: var(--text-md); color: var(--chrome-text-dim);
+  border-radius: var(--radius-sm);
+}
+.rail-btn.is-active { color: var(--chrome-text-heading); background: var(--chrome-control-active-bg); }
+
+.panel {
+  width: 220px; flex: none;
+  display: flex; flex-direction: column;
+  background: var(--chrome-bg-sidebar);
+  border-right: 1px solid var(--chrome-border);
+  overflow: auto;
+}
+.panel-head {
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  font-size: var(--text-sm); font-weight: 600; color: var(--chrome-text-heading);
+}
+.panel-row {
+  display: flex; align-items: center; gap: var(--space-2);
+  height: 26px; padding: 0 var(--space-3);
+  font-size: var(--text-sm); color: var(--chrome-text-muted);
+  cursor: pointer;
+}
+.panel-row:hover { background: var(--chrome-row-hover); color: var(--chrome-text-heading); }
+.panel-row.is-active { background: var(--chrome-row-selected); color: var(--chrome-text-heading); }
+.panel-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-label.is-dim { color: var(--chrome-text-dim); }
+.panel-count { font-size: var(--text-xs); color: var(--chrome-text-dim); }
+.panel-group-label {
+  padding: var(--space-4) var(--space-3) var(--space-1);
+  font-size: var(--text-xs); color: var(--chrome-text-dim);
+}
+
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.toolbar {
+  display: flex; align-items: center; gap: var(--space-2);
+  height: 44px; flex: none; padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--chrome-border);
+}
+.btn-primary {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  height: 28px; padding: 0 var(--space-3);
+  font-family: var(--font-ui); font-size: var(--text-sm); font-weight: 500;
+  color: var(--chrome-text-heading); background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border-strong); border-radius: var(--radius-sm); cursor: pointer;
+}
+.btn-primary:hover { background: var(--chrome-control-hover); }
+.btn-quiet {
+  height: 28px; padding: 0 var(--space-3);
+  font-family: var(--font-ui); font-size: var(--text-sm);
+  color: var(--chrome-text-muted); background: transparent;
+  border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer;
+}
+.btn-quiet:hover { color: var(--chrome-text-heading); background: var(--chrome-control-bg); }
+.toolbar-count { margin-left: auto; font-size: var(--text-sm); color: var(--chrome-text-dim); }
+
+.link {
+  padding: 0; font-family: var(--font-ui); font-size: var(--text-sm);
+  color: var(--chrome-text-muted); background: none; border: none; cursor: pointer;
+}
+.link:hover { color: var(--chrome-accent); text-decoration: underline; }
+.link.is-delete:hover { color: var(--chrome-accent-error); }
+
+.scroll { flex: 1; min-height: 0; overflow: auto; padding: var(--space-5) var(--space-5) var(--space-6); }
+.measure { max-width: 900px; margin: 0 auto; }
+
+/* Shared: the leading sentence. The compile assembly's hero-sentence pattern. */
+.lead {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xl); line-height: 1.45; font-weight: 400;
+  color: var(--chrome-text-heading);
+}
+.lead b { font-weight: 600; }
+.sub {
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-md); line-height: 1.6; color: var(--chrome-text-muted);
+}
+.section-head {
+  display: flex; align-items: baseline; gap: var(--space-2);
+  margin: var(--space-5) 0 var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--chrome-border);
+}
+.section-name { font-size: var(--text-lg); font-weight: 600; color: var(--chrome-text-heading); }
+.section-note { font-size: var(--text-sm); color: var(--chrome-text-dim); }
+
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-3);
+  margin: 120px auto 0; max-width: 460px; text-align: center;
+  font-size: var(--text-md); line-height: 1.6; color: var(--chrome-text-dim);
+}
+.empty-state p { margin: 0; }
+
+/* ---------------------------------------------------------------- A: the ledger */
+.led-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px 220px;
+  align-items: baseline; column-gap: var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+}
+.led-row:hover { background: var(--chrome-row-hover); }
+.led-who { min-width: 0; font-size: var(--text-md); color: var(--chrome-text-heading); }
+.led-who b { font-weight: 600; }
+.led-agency { color: var(--chrome-text-dim); }
+.led-sent { font-size: var(--text-sm); color: var(--chrome-text-muted); text-align: right; }
+.led-sub {
+  grid-column: 1 / 3; margin-top: 2px;
+  font-size: var(--text-sm); line-height: 1.5; color: var(--chrome-text-dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.led-sub .pin { color: var(--chrome-text-dim); }
+.led-gone { color: var(--chrome-text-dim); font-style: italic; }
+.led-actions {
+  grid-column: 3; grid-row: 1 / span 2;
+  display: flex; justify-content: flex-end; align-items: baseline; gap: var(--space-2);
+  opacity: 0; transition: opacity var(--motion-fast);
+}
+.led-row:hover .led-actions { opacity: 1; }
+.led-status {
+  display: inline-block; margin-left: var(--space-2);
+  font-size: var(--text-sm); color: var(--chrome-text-muted);
+}
+
+/* A's offer line: stated, not celebrated. */
+.offer-line {
+  display: flex; align-items: baseline; gap: var(--space-3);
+  margin: var(--space-4) 0 0; padding: var(--space-3);
+  font-size: var(--text-md); line-height: 1.6; color: var(--chrome-text);
+  background: var(--chrome-bg-elevated);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+}
+
+/* ---------------------------------------------------------------- B: the waiting list */
+.wait-row {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr) 92px;
+  align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+.wait-row:hover { background: var(--chrome-row-hover); }
+.wait-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-md); color: var(--chrome-text-heading); }
+.wait-who small { display: block; font-size: var(--text-xs); color: var(--chrome-text-dim); }
+.wait-track {
+  position: relative; height: 18px;
+  background: var(--chrome-control-bg);
+  border-radius: 9px; overflow: hidden;
+}
+.wait-fill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  background: color-mix(in srgb, var(--chrome-accent) 42%, transparent);
+  border-right: 2px solid var(--chrome-accent);
+  border-radius: 9px 0 0 9px;
+}
+.wait-fill.is-closed {
+  background: color-mix(in srgb, var(--chrome-text-dim) 30%, transparent);
+  border-right-color: var(--chrome-text-dim);
+}
+.wait-mark {
+  position: absolute; top: -3px; bottom: -3px; width: 1px;
+  background: var(--chrome-border-strong);
+}
+.wait-days { font-size: var(--text-sm); color: var(--chrome-text-muted); text-align: right; }
+.wait-axis {
+  display: grid; grid-template-columns: 210px minmax(0, 1fr) 92px;
+  gap: var(--space-3); margin-top: var(--space-1); padding: 0 var(--space-2);
+  font-size: var(--text-xs); color: var(--chrome-text-dim);
+}
+.wait-axis-inner { position: relative; height: 14px; }
+.wait-axis-inner span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.wait-group-lead {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-md); line-height: 1.6; color: var(--chrome-text-muted);
+}
+.wait-card {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2) var(--space-3); align-items: baseline;
+  margin-bottom: var(--space-2); padding: var(--space-3);
+  background: var(--chrome-bg-elevated);
+  border: 1px solid var(--chrome-border); border-radius: var(--radius-md);
+  box-shadow: var(--elev-1);
+}
+.wait-card-line { font-size: var(--text-md); line-height: 1.55; color: var(--chrome-text); }
+.wait-card-line b { color: var(--chrome-text-heading); font-weight: 600; }
+.wait-card-meta { grid-column: 1 / -1; font-size: var(--text-sm); color: var(--chrome-text-dim); }
+.disclosure {
+  margin-top: var(--space-4); padding: 0;
+  font-family: var(--font-ui); font-size: var(--text-md);
+  color: var(--chrome-text-muted); background: none; border: none; cursor: pointer;
+}
+.disclosure:hover { color: var(--chrome-accent); text-decoration: underline; }
+
+/* ---------------------------------------------------------------- C: the board */
+.board { flex: 1; min-height: 0; display: flex; gap: var(--space-3); padding: var(--space-4); overflow-x: auto; }
+.column {
+  width: 215px; flex: none;
+  display: flex; flex-direction: column;
+  background: var(--chrome-bg-sidebar);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+}
+.column.is-drop { border-color: var(--chrome-accent); box-shadow: inset 0 0 0 1px var(--chrome-accent); }
+.column-head {
+  display: flex; align-items: baseline; gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--chrome-border);
+}
+.column-name { font-size: var(--text-md); font-weight: 600; color: var(--chrome-text-heading); }
+.column-count { margin-left: auto; font-size: var(--text-sm); color: var(--chrome-text-dim); }
+.column-note { padding: var(--space-2) var(--space-3) 0; font-size: var(--text-sm); line-height: 1.5; color: var(--chrome-text-dim); }
+.column-cards { flex: 1; min-height: 0; overflow: auto; padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.card {
+  padding: var(--space-3);
+  background: var(--chrome-bg-elevated);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-1);
+  cursor: grab;
+}
+.card:hover { border-color: var(--chrome-border-strong); }
+.card.is-dragging { opacity: 0.45; }
+.card-who { font-size: var(--text-md); font-weight: 600; color: var(--chrome-text-heading); }
+.card-agency { font-size: var(--text-sm); color: var(--chrome-text-dim); }
+.card-when { margin-top: var(--space-1); font-size: var(--text-sm); color: var(--chrome-text-muted); }
+.card-what { margin-top: var(--space-1); font-size: var(--text-sm); color: var(--chrome-text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-note { margin-top: var(--space-1); font-size: var(--text-sm); color: var(--chrome-text-dim); }
+.card-actions { display: flex; gap: var(--space-2); margin-top: var(--space-2); opacity: 0; transition: opacity var(--motion-fast); }
+.card:hover .card-actions { opacity: 1; }
+.column-empty { padding: var(--space-3); font-size: var(--text-sm); line-height: 1.5; color: var(--chrome-text-dim); }
+.board-lead {
+  flex: none; padding: var(--space-4) var(--space-4) 0;
+  font-size: var(--text-md); line-height: 1.6; color: var(--chrome-text-muted);
+}
+.board.is-empty { position: relative; }
+.board-empty-overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--space-3);
+  font-size: var(--text-md); color: var(--chrome-text-dim);
+}
+.board-empty-overlay p { margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="mock-bar">
+  <span class="mock-title">Query Tracker</span>
+  <span class="mock-note">three directions · fake data · 4 September 2026</span>
+  <span class="mock-spacer"></span>
+  <div class="mock-tabs">
+    <button class="mock-tab is-active" data-go="a">1 · The ledger</button>
+    <button class="mock-tab" data-go="b">2 · The waiting list</button>
+    <button class="mock-tab" data-go="c">3 · The board</button>
+  </div>
+  <button class="mock-toggle" id="empty-toggle">Show it empty (e)</button>
+  <button class="mock-toggle" id="theme-toggle">Light (t)</button>
+</div>
+
+<div class="stage">
+  <div class="frame">
+    <div class="direction is-active" id="dir-a"></div>
+    <div class="direction" id="dir-b"></div>
+    <div class="direction" id="dir-c"></div>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------- fake data
+const TODAY = new Date(2026, 8, 4)
+
+const STATUSES = [
+  { id: 'sent', name: 'Sent' },
+  { id: 'no-response', name: 'No response' },
+  { id: 'rejected', name: 'Rejected' },
+  { id: 'partial', name: 'Requested partial' },
+  { id: 'full', name: 'Requested full' },
+  { id: 'offer', name: 'Offer' },
+  { id: 'withdrawn', name: 'Withdrawn' }
+]
+
+const COMPILES = [
+  { id: 'c1', name: 'The Hollow Season, first fifty' },
+  { id: 'c2', name: 'The Hollow Season, full manuscript' },
+  { id: 'c3', name: 'Sample, three chapters' }
+]
+
+/* recipient, agency, dateSent, statusId, notes, doc, pinned, draftId, draftGone,
+   repliedAfter (days the agent took to answer, null while it is still out) */
+const SUBS = [
+  ['Marguerite Chen', 'Chen Literary', '2026-02-14', 'rejected', 'A form reply with no notes on the pages.', 'Query letter', true, 'c3', false, 21],
+  ['Tobias Ilg', 'Ilg & Sparrow', '2026-02-28', 'rejected', '', 'Query letter', true, 'c3', false, 34],
+  ['Priya Raman', 'Northbank Agency', '2026-03-12', 'full', 'Read the partial in a week and asked for the rest on 4 April.', 'Query letter', false, 'c2', false, 23],
+  ['Dennis Oyelaran', 'Harrow Reid', '2026-03-12', 'no-response', 'Their site says to assume no after ninety days.', 'Query letter', false, 'c1', false, null],
+  ['Ada Renner', 'Renner Literary', '2026-03-20', 'shortlist-gone', '', 'Query letter', false, null, false, null],
+  ['Astrid Vall', 'Vall Literary', '2026-03-29', 'partial', 'Wants the first fifty pages as one document.', 'Query letter', false, 'c1', false, 18],
+  ['Colm Byrne', 'Byrne & Dodd', '2026-04-05', 'rejected', '', 'Query letter', false, 'c3', false, 12],
+  ['Wilhelmina Frost', 'Frost & Co', '2026-04-11', 'withdrawn', 'Withdrawn after they closed to unsolicited queries.', 'Query letter', false, null, false, null],
+  ['Hana Whitlock', 'The Ferry Agency', '2026-04-19', 'no-response', '', 'Query letter (deleted)', false, null, false, null],
+  ['Samuel Oduya', 'Redwing Literary', '2026-05-02', 'sent', '', 'Query letter', false, 'c1', false, null],
+  ['Ines Cardoso', 'Cardoso Books', '2026-05-16', 'rejected', 'Said the voice was not for them but asked to see the next one.', 'Query letter', false, 'c3', false, 63],
+  ['Frederick Mott', 'Mott & Vane', '2026-05-30', 'no-response', '', 'Query letter', false, 'c3', false, null],
+  ['Yuki Tanaka', 'Lantern Literary', '2026-06-07', 'offer', 'Offered representation on 28 August and asked for a decision by 11 September.', 'Query letter', false, 'c2', false, 82],
+  ['Rosalind Ferrers', 'Ferrers Agency', '2026-06-21', 'sent', '', 'Query letter', false, 'c1', false, null],
+  ['Bea Okafor', 'Okafor Literary', '2026-07-03', 'sent', '', 'Query letter', false, 'c1', false, null],
+  ['Martin Quist', 'Quist & Hale', '2026-07-18', 'partial', 'Asked for thirty pages after a conference pitch.', 'Query letter', false, 'c1', false, 9],
+  ['Elena Duarte', 'Duarte Literary', '2026-08-01', 'sent', '', 'Query letter', false, 'c1', false, null],
+  ['Nadia Hart', 'Hart Literary', '2026-08-09', 'sent', '', 'Query letter', false, 'c1', false, null],
+  ['Gregor Pahl', 'Pahl Agency', '2026-08-22', 'sent', 'Sent the older sample by mistake.', 'Query letter', false, 'c3', true, null]
+].map((r, i) => ({
+  id: 's' + i, recipient: r[0], agency: r[1], dateSent: r[2], statusId: r[3],
+  notes: r[4], doc: r[5], pinned: r[6], draftId: r[7], draftGone: r[8], repliedAfter: r[9]
+}))
+
+// ---------------------------------------------------------------- helpers
+const statusName = (id) => (STATUSES.find((s) => s.id === id) || {}).name || 'Unknown status'
+const compileName = (id) => (COMPILES.find((c) => c.id === id) || {}).name || null
+
+function parse(d) { const [y, m, day] = d.split('-').map(Number); return new Date(y, m - 1, day) }
+function daysSince(d) { return Math.round((TODAY - parse(d)) / 86400000) }
+function longDate(d) { return parse(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }) }
+function shortDate(d) { return parse(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) }
+function dayMonth(d) { return parse(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) }
+function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many) }
+function words(n) {
+  const w = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+    'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty']
+  return n <= 20 ? w[n] : String(n)
+}
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1) }
+function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])) }
+
+/** What was sent, as one phrase. The compiled draft is the strongest record,
+ *  so it leads; a deleted one keeps its tombstone label rather than vanishing. */
+function whatWasSent(s) {
+  const bits = []
+  if (s.draftId) {
+    const live = compileName(s.draftId)
+    if (s.draftGone) bits.push('<span class="led-gone">' + esc(live) + ' (deleted)</span>')
+    else bits.push(esc(live))
+  }
+  if (s.doc) {
+    const gone = s.doc.indexOf('(deleted)') !== -1
+    bits.push((gone ? '<span class="led-gone">' : '<span>') + esc(s.doc) + '</span>' +
+      (s.pinned ? '<span class="pin"> · pinned version</span>' : ''))
+  }
+  return bits.join('<span class="pin">, </span>')
+}
+
+const WAITING = ['sent', 'no-response']
+const INTEREST = ['partial', 'full', 'offer']
+const CLOSED = ['rejected', 'withdrawn']
+const knownIds = new Set(STATUSES.map((s) => s.id))
+const isUnknown = (s) => !knownIds.has(s.statusId)
+
+let EMPTY = false
+const data = () => (EMPTY ? [] : SUBS)
+
+// ---------------------------------------------------------------- app chrome
+function chrome(inner, activeFilter) {
+  const subs = data()
+  const countFor = (id) => subs.filter((s) => s.statusId === id).length
+  const unknown = subs.filter(isUnknown).length
+  const rows = STATUSES.map((st) =>
+    '<div class="panel-row"><span class="panel-label">' + st.name + '</span>' +
+    '<span class="panel-count">' + countFor(st.id) + '</span></div>').join('')
+  const unknownRow = unknown > 0
+    ? '<div class="panel-row"><span class="panel-label is-dim">Unknown status</span><span class="panel-count">' + unknown + '</span></div>'
+    : ''
+  const drafts = COMPILES.map((c) =>
+    '<div class="panel-row"><span class="panel-label">' + c.name + '</span>' +
+    '<span class="panel-count">' + subs.filter((s) => s.draftId === c.id).length + '</span></div>').join('')
+
+  return '' +
+    '<div class="rail">' +
+      '<div class="rail-btn">✎</div><div class="rail-btn">◫</div><div class="rail-btn">⌗</div>' +
+      '<div class="rail-btn">⎘</div><div class="rail-btn is-active">✉</div><div class="rail-btn">≡</div>' +
+    '</div>' +
+    '<div class="panel">' +
+      '<div class="panel-head">Query Tracker</div>' +
+      '<div class="panel-row ' + (activeFilter ? '' : 'is-active') + '">' +
+        '<span class="panel-label">All</span><span class="panel-count">' + subs.length + '</span></div>' +
+      rows + unknownRow +
+      '<div class="panel-group-label">Compiled drafts</div>' + drafts +
+    '</div>' +
+    '<div class="main">' + inner + '</div>'
+}
+
+function toolbar(count) {
+  return '<div class="toolbar">' +
+    '<button class="btn-primary">＋ Log a query</button>' +
+    '<button class="btn-quiet">Manage statuses…</button>' +
+    '<span class="toolbar-count">' + count + '</span>' +
+  '</div>'
+}
+
+// ================================================================ A · the ledger
+function renderA() {
+  const subs = data()
+  if (!subs.length) {
+    return chrome(toolbar('No entries') +
+      '<div class="scroll"><div class="measure"><div class="empty-state">' +
+        '<p>No queries have been logged yet. Log one with the date it was sent and what was sent with it.</p>' +
+        '<button class="btn-primary">＋ Log a query</button>' +
+      '</div></div></div>')
+  }
+
+  const waiting = subs.filter((s) => WAITING.indexOf(s.statusId) !== -1)
+    .sort((a, b) => a.dateSent < b.dateSent ? -1 : 1)
+  const interest = subs.filter((s) => INTEREST.indexOf(s.statusId) !== -1)
+    .sort((a, b) => a.dateSent < b.dateSent ? -1 : 1)
+  const closed = subs.filter((s) => CLOSED.indexOf(s.statusId) !== -1)
+    .sort((a, b) => a.dateSent > b.dateSent ? -1 : 1)
+  const unknown = subs.filter(isUnknown)
+  const oldest = waiting[0]
+  const offer = subs.find((s) => s.statusId === 'offer')
+
+  const row = (s) =>
+    '<div class="led-row">' +
+      '<div class="led-who"><b>' + esc(s.recipient) + '</b><span class="led-agency">, ' + esc(s.agency) + '</span>' +
+        '<span class="led-status">' + statusName(s.statusId) + '</span>' +
+      '</div>' +
+      '<div class="led-sent">Sent ' + shortDate(s.dateSent) + ', ' +
+        plural(daysSince(s.dateSent), 'day', 'days') + ' ago</div>' +
+      '<div class="led-sub">' + whatWasSent(s) + (s.notes ? '<span class="pin"> · </span>' + esc(s.notes) : '') + '</div>' +
+      '<div class="led-actions">' +
+        '<button class="link">View what was sent</button>' +
+        '<button class="link">Edit</button>' +
+        '<button class="link is-delete">Delete</button>' +
+      '</div>' +
+    '</div>'
+
+  const lead =
+    '<p class="lead">You have logged <b>' + plural(subs.length, 'query', 'queries') + '</b>. ' +
+    cap(words(waiting.length)) + ' of them are still waiting on a reply, and the oldest has been out for ' +
+    plural(daysSince(oldest.dateSent), 'day', 'days') + '.</p>' +
+    '<p class="sub">A query stays on this list until it is given a status that closes it.</p>'
+
+  const offerLine = offer
+    ? '<div class="offer-line"><span>' + esc(offer.recipient) + ' of ' + esc(offer.agency) +
+      ' has made an offer of representation, and asked for an answer by 11 September. ' +
+      cap(words(waiting.length)) + ' queries are still open with other agents.</span>' +
+      '<button class="link">Open this entry</button></div>'
+    : ''
+
+  const group = (name, note, list) => list.length === 0 ? '' :
+    '<div class="section-head"><span class="section-name">' + name + '</span>' +
+    '<span class="section-note">' + note + '</span></div>' +
+    list.map(row).join('')
+
+  return chrome(toolbar(plural(subs.length, 'entry', 'entries')) +
+    '<div class="scroll"><div class="measure">' +
+      lead + offerLine +
+      group('Awaiting a reply', 'Longest wait first.', waiting) +
+      group('Requests', 'Partial, full, or an offer.', interest) +
+      group('Closed', 'Rejected or withdrawn. Newest first.', closed) +
+      group('Unknown status', 'The status these were logged under has been deleted.', unknown) +
+    '</div></div>')
+}
+
+// ================================================================ B · the waiting list
+const SCALE = 210 // days across the track
+
+function renderB() {
+  const subs = data()
+  if (!subs.length) {
+    return chrome(toolbar('No entries') +
+      '<div class="scroll"><div class="measure"><div class="empty-state">' +
+        '<p>No queries have been logged yet. Once one is logged, this page shows how long it has been ' +
+        'waiting for a reply.</p>' +
+        '<button class="btn-primary">＋ Log a query</button>' +
+      '</div></div></div>')
+  }
+
+  const waiting = subs.filter((s) => WAITING.indexOf(s.statusId) !== -1)
+    .sort((a, b) => a.dateSent < b.dateSent ? -1 : 1)
+  const interest = subs.filter((s) => INTEREST.indexOf(s.statusId) !== -1)
+    .sort((a, b) => a.dateSent < b.dateSent ? -1 : 1)
+  const closed = subs.filter((s) => CLOSED.indexOf(s.statusId) !== -1)
+  const unknown = subs.filter(isUnknown)
+
+  // Typical reply time, computed from the queries that actually came back.
+  // Withdrawing is the writer's own act, not an answer, so it is left out.
+  const replied = subs.filter((s) => s.repliedAfter !== null)
+  const replyDays = replied.map((s) => s.repliedAfter).sort((a, b) => a - b)
+  const mid = Math.floor(replyDays.length / 2)
+  const median = replyDays.length % 2
+    ? replyDays[mid]
+    : Math.round((replyDays[mid - 1] + replyDays[mid]) / 2)
+  const overdue = waiting.filter((s) => daysSince(s.dateSent) > median).length
+
+  const bar = (s, closedLook) => {
+    const d = daysSince(s.dateSent)
+    const pct = Math.min(100, (d / SCALE) * 100)
+    return '<div class="wait-row">' +
+      '<div class="wait-who">' + esc(s.recipient) + '<small>' + esc(s.agency) + ' · ' + statusName(s.statusId) + '</small></div>' +
+      '<div class="wait-track">' +
+        '<div class="wait-fill' + (closedLook ? ' is-closed' : '') + '" style="width:' + pct.toFixed(1) + '%"></div>' +
+        '<div class="wait-mark" style="left:' + ((median / SCALE) * 100).toFixed(1) + '%"></div>' +
+      '</div>' +
+      '<div class="wait-days">' + d + ' days</div>' +
+    '</div>'
+  }
+
+  const axis =
+    '<div class="wait-axis"><div></div><div class="wait-axis-inner">' +
+      '<span style="left:' + ((median / SCALE) * 100).toFixed(1) + '%">' + median + ' days, the median reply</span>' +
+      '<span style="left:100%">' + SCALE + ' days</span>' +
+    '</div><div></div></div>'
+
+  const card = (s) =>
+    '<div class="wait-card">' +
+      '<div class="wait-card-line"><b>' + esc(s.recipient) + '</b> of ' + esc(s.agency) + ' ' +
+        (s.statusId === 'offer' ? 'offered representation'
+          : s.statusId === 'full' ? 'asked for the full manuscript'
+          : 'asked for a partial') +
+        ' ' + plural(s.repliedAfter, 'day', 'days') + ' after the query went out on ' + longDate(s.dateSent) + '.</div>' +
+      '<button class="link">Open this entry</button>' +
+      (s.notes ? '<div class="wait-card-meta">' + esc(s.notes) + '</div>' : '') +
+    '</div>'
+
+  const lead =
+    '<p class="lead">' + cap(words(waiting.length)) + ' queries are still waiting on a reply.</p>' +
+    '<p class="sub">Of the ' + words(replied.length) + ' agents who have answered, half did so within about ' +
+    plural(median, 'day', 'days') + '. ' + cap(words(overdue)) + ' of the open queries have been out longer than that.</p>'
+
+  return chrome(toolbar(plural(subs.length, 'entry', 'entries')) +
+    '<div class="scroll"><div class="measure">' +
+      lead +
+      '<div class="section-head"><span class="section-name">Awaiting a reply</span>' +
+        '<span class="section-note">Longest wait first.</span></div>' +
+      waiting.map((s) => bar(s, false)).join('') + axis +
+      (unknown.length
+        ? '<div class="section-head"><span class="section-name">Unknown status</span>' +
+          '<span class="section-note">The status these were logged under has been deleted.</span></div>' +
+          unknown.map((s) => bar(s, false)).join('')
+        : '') +
+      '<div class="section-head"><span class="section-name">Requests</span>' +
+        '<span class="section-note">Partial, full, or an offer.</span></div>' +
+      interest.map(card).join('') +
+      '<button class="disclosure">Show ' + plural(closed.length, 'closed query', 'closed queries') + '</button>' +
+    '</div></div>')
+}
+
+// ================================================================ C · the board
+function renderC() {
+  const subs = data()
+  const columns = STATUSES.slice()
+  const unknownCount = subs.filter(isUnknown).length
+
+  // Only the compiled draft is named on a card. The query letter is attached
+  // to nearly all of them, so repeating it on every card said nothing.
+  const sentLine = (s) => {
+    if (!s.draftId) return ''
+    const name = compileName(s.draftId)
+    return '<div class="card-what">' + (s.draftGone
+      ? '<span class="led-gone">' + esc(name) + ' (deleted)</span>'
+      : esc(name)) + (s.pinned ? ' · pinned version' : '') + '</div>'
+  }
+
+  const card = (s, dragging) =>
+    '<div class="card' + (dragging ? ' is-dragging' : '') + '">' +
+      '<div class="card-who">' + esc(s.recipient) + '</div>' +
+      '<div class="card-agency">' + esc(s.agency) + '</div>' +
+      '<div class="card-when">Sent ' + dayMonth(s.dateSent) + ', ' + plural(daysSince(s.dateSent), 'day', 'days') + ' ago</div>' +
+      sentLine(s) +
+      (s.notes ? '<div class="card-note">' + esc(s.notes) + '</div>' : '') +
+      '<div class="card-actions">' +
+        '<button class="link">View what was sent</button>' +
+        '<button class="link">Edit</button>' +
+      '</div>' +
+    '</div>'
+
+  // One card shown mid-drag, so the mock says what dragging looks like: the
+  // card fades in the column it is leaving, and the column it would land in
+  // is outlined.
+  const DRAG_FROM = 'sent'
+  const DRAG_TO = 'partial'
+
+  const column = (id, name, note) => {
+    const cards = subs.filter((s) => id === 'unknown' ? isUnknown(s) : s.statusId === id)
+      .sort((a, b) => a.dateSent > b.dateSent ? -1 : 1)
+    // The drag demonstration only makes sense when there is a card to drag.
+    const dragging = subs.length > 0
+    return '<div class="column' + (dragging && id === DRAG_TO ? ' is-drop' : '') + '">' +
+      '<div class="column-head"><span class="column-name">' + name + '</span>' +
+        '<span class="column-count">' + cards.length + '</span></div>' +
+      (note ? '<div class="column-note">' + note + '</div>' : '') +
+      '<div class="column-cards">' +
+        (cards.length ? cards.map((s, i) => card(s, dragging && id === DRAG_FROM && i === 0)).join('')
+          : subs.length ? '<div class="column-empty">No queries at this status. Drag a card here to move it.</div>' : '') +
+      '</div>' +
+    '</div>'
+  }
+
+  if (!subs.length) {
+    return chrome(toolbar('No entries') +
+      '<div class="board-lead">Each column is one of your statuses. Dragging a card to another column changes ' +
+      'that query’s status.</div>' +
+      '<div class="board is-empty">' + columns.map((c) => column(c.id, c.name, '')).join('') +
+        '<div class="board-empty-overlay">' +
+          '<p>No queries have been logged yet.</p>' +
+          '<button class="btn-primary">＋ Log a query</button>' +
+        '</div>' +
+      '</div>')
+  }
+
+  const notes = {}
+
+  return chrome(toolbar(plural(subs.length, 'entry', 'entries')) +
+    '<div class="board-lead">Each column is one of your statuses. Dragging a card to another column changes ' +
+    'that query’s status. Cards are ordered by date sent, newest first.</div>' +
+    '<div class="board">' +
+      columns.map((c) => column(c.id, c.name, notes[c.id] || '')).join('') +
+      (unknownCount ? column('unknown', 'Unknown status', 'The status these were logged under has since been deleted.') : '') +
+    '</div>')
+}
+
+// ---------------------------------------------------------------- wiring
+function draw() {
+  document.getElementById('dir-a').innerHTML = renderA()
+  document.getElementById('dir-b').innerHTML = renderB()
+  document.getElementById('dir-c').innerHTML = renderC()
+}
+
+function show(which) {
+  ['a', 'b', 'c'].forEach((k) => {
+    document.getElementById('dir-' + k).classList.toggle('is-active', k === which)
+  })
+  document.querySelectorAll('.mock-tab').forEach((t) => {
+    t.classList.toggle('is-active', t.dataset.go === which)
+  })
+  if (location.hash.slice(1) !== which) history.replaceState(null, '', '#' + which)
+}
+
+document.querySelectorAll('.mock-tab').forEach((t) => {
+  t.addEventListener('click', () => show(t.dataset.go))
+})
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const light = document.documentElement.getAttribute('data-theme') === 'light'
+  document.documentElement.setAttribute('data-theme', light ? 'dark' : 'light')
+  document.getElementById('theme-toggle').textContent = light ? 'Light (t)' : 'Dark (t)'
+})
+
+document.getElementById('empty-toggle').addEventListener('click', () => {
+  EMPTY = !EMPTY
+  document.getElementById('empty-toggle').classList.toggle('is-on', EMPTY)
+  document.getElementById('empty-toggle').textContent = EMPTY ? 'Show it full (e)' : 'Show it empty (e)'
+  draw()
+})
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === '1') show('a')
+  if (e.key === '2') show('b')
+  if (e.key === '3') show('c')
+  if (e.key === 't') document.getElementById('theme-toggle').click()
+  if (e.key === 'e') document.getElementById('empty-toggle').click()
+})
+
+draw()
+const hash = location.hash.slice(1)
+if (['a', 'b', 'c'].indexOf(hash) !== -1) show(hash)
+</script>
+</body>
+</html>

@@ -234,12 +234,16 @@ function parseSource(ref: SourceRef, content: string, sourceMtime: number): Sear
             type: string
             name: string
             synopsis?: string
+            notes?: string
             children?: unknown[]
           }
           if (node.type === 'document') documentNames.set(node.id, node.name)
           add(entry('documentTitle', node.id, 'name', node.name, node.name, node.type === 'document' ? node.id : null))
           if (node.synopsis) {
             add(entry('documentTitle', node.id, 'synopsis', node.name, node.synopsis, node.id))
+          }
+          if (node.notes) {
+            add(entry('documentTitle', node.id, 'notes', node.name, node.notes, node.id))
           }
           if (Array.isArray(node.children)) walk(node.children)
         }
@@ -637,13 +641,19 @@ function sourceKeyFor(e: SearchEntry): string | null {
  * store, IPC handler or feature knows the index exists.
  */
 function onProjectWrite(filePath: string, data: string): void {
+  // Held off during a bulk import — see suspend() at the foot of this file.
+  if (suspended) return
   const root = getProjectRoot()
   const rel = relative(root, filePath)
   if (rel.startsWith('..')) return
   const ref = classify(rel)
   if (!ref) return
 
-  void runQueued(async () => {
+  // Caught rather than left as `void`: an exception here must never become
+  // an unhandled rejection. It is reindexing reacting to a write that
+  // already landed on disk successfully — a failure here means the index is
+  // stale until the next write, not that anything the writer did failed.
+  runQueued(async () => {
     // The write has just landed, so "now" is the file's mtime to within the
     // stat call that follows — and using it means indexing does not have to
     // wait on a stat first.
@@ -651,15 +661,15 @@ function onProjectWrite(filePath: string, data: string): void {
     const print = await stamp(root, rel)
     if (print) fingerprints.set(ref.key, print)
     await persist()
-  })
+  }).catch((error) => console.error('Search index update failed:', error))
 }
 
 /** atomicWrite never sees a delete, so documentStore reports them here. */
 export function onDocumentDeleted(documentId: string): void {
-  void runQueued(async () => {
+  runQueued(async () => {
     dropSource(`documents/${documentId}.html`)
     await persist()
-  })
+  }).catch((error) => console.error('Search index update failed:', error))
 }
 
 /**
@@ -750,4 +760,32 @@ export function install(): void {
 /** Test seam: waits for any in-flight indexing to settle. */
 export function settled(): Promise<void> {
   return runQueued(async () => undefined)
+}
+
+/**
+ * Stops reacting to project writes, and picks the index back up afterwards.
+ *
+ * Every project write runs applySource and then persists the WHOLE index —
+ * see onProjectWrite. That is right for one document saving, and quadratic for
+ * an import writing a hundred and fifty: a multi-megabyte searchIndex.json
+ * rewritten once per document, through atomicWrite's Windows retry loop.
+ *
+ * resume() calls open(), which validates fingerprints against the real files
+ * and re-indexes only what disagrees — one pass, one persist. A crash between
+ * the two is self-healing, because open() runs on the next launch anyway.
+ *
+ * The gate lives here rather than being a setProjectWriteObserver(null) from
+ * outside: the index owns whether it is listening, and nothing else has to
+ * know how it is wired.
+ */
+let suspended = false
+
+export function suspend(): void {
+  suspended = true
+}
+
+export async function resume(): Promise<void> {
+  if (!suspended) return
+  suspended = false
+  await open()
 }

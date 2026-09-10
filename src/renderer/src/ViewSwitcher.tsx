@@ -6,10 +6,12 @@ interface ViewSwitcherProps {
   onChange: (view: ManuscriptView) => void
 }
 
-/** Sub-mode switch *within* the Manuscript rail section — three ways of
- *  looking at the same documents, not three destinations. Story Bible, the
- *  Continuity Board, and the Query Tracker are reached from the rail instead,
- *  because they aren't views of the manuscript at all. */
+/** Sub-mode switch *within* the Manuscript rail section — ways of looking at
+ *  the same documents, not destinations. Story Bible, the Continuity Board,
+ *  and the Query Tracker are reached from the rail instead, because they
+ *  aren't views of the manuscript at all. The book view is also absent by
+ *  design: it's folder-scoped, reached by clicking any folder in the binder
+ *  rather than from this per-document sub-mode row. */
 const VIEWS: { id: ManuscriptView; label: string; Icon: () => JSX.Element }[] = [
   { id: 'editor', label: 'Editor', Icon: EditorViewIcon },
   { id: 'outliner', label: 'Outliner', Icon: OutlinerViewIcon },

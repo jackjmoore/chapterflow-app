@@ -420,18 +420,21 @@ const SUB_STATUSES = [
   { id: 'sub-withdrawn', name: 'Withdrawn' }
 ]
 const submissions = [
-  ['Hester Quill — Quill & Vane Literary', 'sub-full', 'Asked for the full after the first fifty. Mentioned the tidal detail specifically.', 12],
-  ['Aldous Byrne — Byrne Associates', 'sub-rejected', 'Passed. Said the opening is too quiet for the market.', 40],
-  ['Priya Raghunathan — North Light Agency', 'sub-partial', 'Requested first three chapters. Wants the synopsis tightened.', 21],
-  ['Marlow & Sons', 'sub-no-response', 'No response after eight weeks. Their stated window is six.', 60],
-  ['Coastal Press (open submissions)', 'sub-sent', 'Open reading period, unagented. Sent the manuscript-format PDF.', 6],
-  ['Ffion Carew — Carew Literary', 'sub-rejected', 'Kind rejection. Suggested trying again with the next book.', 75],
-  ['Tessa Lindqvist — Harbourlight Books', 'sub-offer', 'Offer of representation. Call scheduled.', 3],
-  ['Gareth Pryce — Pryce Literary Management', 'sub-withdrawn', 'Withdrew after the Harbourlight offer.', 2]
-].map(([recipient, statusId, notes, daysAgo], i) => ({
+  ['Hester Quill — Quill & Vane Literary', 'sub-full', 'Asked for the full after the first fifty. Mentioned the tidal detail specifically.', 12, 5],
+  ['Aldous Byrne — Byrne Associates', 'sub-rejected', 'Passed. Said the opening is too quiet for the market.', 40, 26],
+  ['Priya Raghunathan — North Light Agency', 'sub-partial', 'Requested first three chapters. Wants the synopsis tightened.', 21, 9],
+  ['Marlow & Sons', 'sub-no-response', 'No response after eight weeks. Their stated window is six.', 60, null],
+  ['Coastal Press (open submissions)', 'sub-sent', 'Open reading period, unagented. Sent the manuscript-format PDF.', 6, null],
+  ['Ffion Carew — Carew Literary', 'sub-rejected', 'Kind rejection. Suggested trying again with the next book.', 75, 41],
+  ['Tessa Lindqvist — Harbourlight Books', 'sub-offer', 'Offer of representation. Call scheduled.', 3, null],
+  ['Gareth Pryce — Pryce Literary Management', 'sub-withdrawn', 'Withdrew after the Harbourlight offer.', 2, null]
+].map(([recipient, statusId, notes, daysAgo, repliedAfter], i) => ({
   id: `sub-${i}`,
   recipient,
   dateSent: ymd(daysAgo),
+  // Recorded only where a reply actually came back — the tracker's median
+  // reply time is computed from these and from nothing else.
+  repliedOn: repliedAfter == null ? null : ymd(daysAgo - repliedAfter),
   statusId,
   notes,
   documentId: i % 3 === 0 ? 'doc-ch01' : null,

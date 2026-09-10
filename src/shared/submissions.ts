@@ -13,6 +13,16 @@ export interface Submission {
   recipient: string
   /** YYYY-MM-DD, matching the projectDeadline convention. */
   dateSent: string
+  /**
+   * The day a reply arrived, in the same YYYY-MM-DD form. Null while nothing
+   * has come back, and undefined on records written before this field existed
+   * — treat both as no reply recorded.
+   *
+   * Recorded, never inferred. `updatedAt` moves on any edit at all, so it
+   * cannot stand in for this, and the tracker's reply times are only as real
+   * as what was actually entered here.
+   */
+  repliedOn?: string | null
   statusId: string
   notes: string
   /** A real binder document id — nulled if that document is deleted. */
@@ -23,6 +33,16 @@ export interface Submission {
   /** The document's name when it was attached. A tombstone label used only
    *  once documentId no longer resolves — never the lookup mechanism. */
   documentNameAtSend: string | null
+  /** A real compiled-draft id under compiles/ — the strongest form of "what
+   *  was sent": the stored artifact is byte-for-byte the file that went out.
+   *  Independent of documentId/snapshotId (a query letter document and a
+   *  compiled sample can both be attached). Kept (not nulled) if the draft
+   *  is later deleted, same as statusId. Undefined on records from before
+   *  compiled drafts existed — treat as null. */
+  compiledDraftId?: string | null
+  /** The draft's name when it was attached — the tombstone label once
+   *  compiledDraftId no longer resolves, same pattern as documentNameAtSend. */
+  compiledDraftNameAtAttach?: string | null
   createdAt: string
   updatedAt: string
 }

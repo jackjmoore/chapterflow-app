@@ -6,7 +6,9 @@
     "src/preload/index.d.ts",
     "src/shared/**/*",
     "tests/pagination.browser.ts",
-    "tests/pageview.browser.ts"
+    "tests/pageview.browser.ts",
+    "tests/revision.browser.ts",
+    "tests/editorfeatures.browser.ts"
   ],
   "compilerOptions": {
     "composite": true,

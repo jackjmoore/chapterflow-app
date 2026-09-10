@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { StoryBibleItem, StoryBibleSheet, StoryBibleTypeDef } from '../../shared/storyBible'
 import { ChevronIcon } from './icons'
+import { presenceClass } from './usePresence'
 
 interface MentionHoverCardProps {
   rect: DOMRect
@@ -11,8 +12,8 @@ interface MentionHoverCardProps {
   onOpenItem: () => void
   onMouseEnter: () => void
   onMouseLeave: () => void
-  /** Drives the entrance/exit fade — see useFadePresence, which owns the
-   *  timing. This prop only ever flips a class; it never delays a mount. */
+  /** Drives the entrance/exit fade — see usePresence, which owns the timing.
+   *  This prop only ever flips a class; it never delays a mount. */
   fadeVisible: boolean
 }
 
@@ -99,7 +100,7 @@ function MentionHoverCard(props: MentionHoverCardProps): JSX.Element {
   return (
     <div
       ref={ref}
-      className={`mention-hover-card ${fadeVisible ? 'is-visible' : ''}`}
+      className={`mention-hover-card ${presenceClass(fadeVisible)}`}
       style={{ left: pos.left, top: pos.top }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}

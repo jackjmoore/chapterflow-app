@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type RefObject } from 'react'
-import { EditorContent, useEditor } from '@tiptap/react'
+import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import { createEditorExtensions } from './editorExtensions'
+import { Hemingway, setHemingwayActive } from './extensions/hemingway'
 import { FindReplace } from './extensions/findReplace'
 import { countWords } from '../../shared/wordCount'
 import type { BinderNode } from '../../shared/binder'
@@ -9,6 +10,7 @@ import { collectAllDocuments } from './search/projectSearch'
 import { computePageCount } from './pagePreview'
 import { CloseIcon, LockIcon, SyncScrollIcon } from './icons'
 import type { MentionCandidate } from '../../shared/mentionMatcher'
+import { presenceClass } from './usePresence'
 
 const MENTION_SCAN_DEBOUNCE_MS = 600
 
@@ -20,17 +22,26 @@ type Status = 'idle' | 'saving' | 'saved' | 'error'
 
 export interface SplitViewPaneHandle {
   flushPendingSave: () => Promise<void>
+  /** The pane's own Tiptap instance, so the app-level toolbar/Format menu can
+   *  target it when this pane — not the main editor — is the one focused. */
+  getEditor: () => Editor | null
 }
 
 interface SplitViewPaneProps {
   tree: BinderNode[]
   documentId: string
+  /** Drives the entrance/exit — see usePresence, which owns the timing and
+   *  keeps this pane mounted through its exit. Flips a class only. */
+  presenceVisible: boolean
   excludeDocumentId: string | null
   locked: boolean
   syncScroll: boolean
   pageSize: PageSize
   pageMarginMm: number
   mentionCandidates: MentionCandidate[]
+  /** Typing in this pane is manuscript writing too, so the main editor's
+   *  Hemingway mode applies here as well. */
+  hemingwayMode: boolean
   /** Marks writing activity for session detection. */
   onActivity: () => void
   scrollContainerRef: RefObject<HTMLDivElement>
@@ -38,6 +49,9 @@ interface SplitViewPaneProps {
   onToggleLocked: () => void
   onToggleSyncScroll: () => void
   onClose: () => void
+  /** Tells the parent this pane's editor now has focus, so the shared
+   *  toolbar/Format menu switch to acting on it. */
+  onFocusPane: () => void
 }
 
 /** A second, fully independent instance of the same editor pipeline the main
@@ -49,18 +63,21 @@ const SplitViewPane = forwardRef<SplitViewPaneHandle, SplitViewPaneProps>(functi
   const {
     tree,
     documentId,
+    presenceVisible,
     excludeDocumentId,
     locked,
     syncScroll,
     pageSize,
     pageMarginMm,
     mentionCandidates,
+    hemingwayMode,
     onActivity,
     scrollContainerRef,
     onSelectDocument,
     onToggleLocked,
     onToggleSyncScroll,
-    onClose
+    onClose,
+    onFocusPane
   } = props
 
   const [status, setStatus] = useState<Status>('idle')
@@ -75,7 +92,7 @@ const SplitViewPane = forwardRef<SplitViewPaneHandle, SplitViewPaneProps>(functi
   const mentionScanTimer = useRef<ReturnType<typeof setTimeout>>()
 
   const editor = useEditor({
-    extensions: [...createEditorExtensions(), FindReplace],
+    extensions: [...createEditorExtensions(), FindReplace, Hemingway],
     content: '',
     editorProps: { attributes: { spellcheck: 'true' } },
     onUpdate: ({ editor }) => {
@@ -87,7 +104,8 @@ const SplitViewPane = forwardRef<SplitViewPaneHandle, SplitViewPaneProps>(functi
       schedulePageCount(html)
       if (mentionScanTimer.current) clearTimeout(mentionScanTimer.current)
       mentionScanTimer.current = setTimeout(() => editor.commands.rescanMentions(), MENTION_SCAN_DEBOUNCE_MS)
-    }
+    },
+    onFocus: () => onFocusPane()
   })
 
   // Pushes the live candidate list into this pane's own mentionHighlight
@@ -99,6 +117,10 @@ const SplitViewPane = forwardRef<SplitViewPaneHandle, SplitViewPaneProps>(functi
     editor.commands.setMentionCandidates(mentionCandidates)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, mentionCandidates])
+
+  useEffect(() => {
+    setHemingwayActive(editor, hemingwayMode)
+  }, [editor, hemingwayMode])
 
   async function performSave(html: string): Promise<void> {
     if (saveTimer.current) {
@@ -148,7 +170,7 @@ const SplitViewPane = forwardRef<SplitViewPaneHandle, SplitViewPaneProps>(functi
     await performSave(editor.getHTML())
   }
 
-  useImperativeHandle(ref, () => ({ flushPendingSave }))
+  useImperativeHandle(ref, () => ({ flushPendingSave, getEditor: () => editor }))
 
   // Load whichever document is pinned — flushing the previous one's pending
   // save first, the same discipline the main editor's switchDocument uses.
@@ -190,7 +212,7 @@ const SplitViewPane = forwardRef<SplitViewPaneHandle, SplitViewPaneProps>(functi
   const options = collectAllDocuments(tree).filter((d) => d.id !== excludeDocumentId || d.id === documentId)
 
   return (
-    <div className="split-pane">
+    <div className={`split-pane ${presenceClass(presenceVisible)}`}>
       <div className="split-pane-header">
         <select
           className="split-pane-picker"

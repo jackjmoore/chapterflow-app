@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { diffWords } from 'diff'
-import { htmlToPlainText } from '../../shared/snapshot'
+import { diffText } from './revisionDiff'
 import { CloseIcon } from './icons'
 
 export interface DiffSide {
@@ -17,8 +17,10 @@ interface SnapshotDiffModalProps {
 function SnapshotDiffModal(props: SnapshotDiffModalProps): JSX.Element {
   const { left, right, onClose } = props
 
+  // Same extraction and same comparison revision mode uses — one pipeline, so
+  // this view and the inline one can never disagree about what changed.
   const parts = useMemo(
-    () => diffWords(htmlToPlainText(left.html), htmlToPlainText(right.html)),
+    () => diffWords(diffText(left.html), diffText(right.html)),
     [left.html, right.html]
   )
 

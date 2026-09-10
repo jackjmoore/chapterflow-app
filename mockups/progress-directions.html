@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Progress tab — three directions</title>
+<style>
+  /* ChapterFlow tokens, copied from src/renderer/src/index.css so the mock
+     is judged in the app's own light. Dark is the default, as in the app. */
+  :root {
+    --space-1: 4px; --space-2: 8px; --space-3: 12px;
+    --space-4: 16px; --space-5: 24px; --space-6: 32px;
+    --radius-sm: 4px; --radius-md: 6px;
+    --text-2xs: 10px; --text-xs: 11px; --text-sm: 12px; --text-md: 13px;
+    --text-lg: 14px; --text-xl: 20px; --text-2xl: 26px; --text-display: 32px;
+    --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-editor: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+
+    --chrome-bg: #1c1a17;
+    --chrome-bg-elevated: #242119;
+    --chrome-border: #35312a;
+    --chrome-border-strong: #4a4438;
+    --chrome-text: #e8e3d9;
+    --chrome-text-heading: #f0ece2;
+    --chrome-text-muted: #9c9585;
+    --chrome-text-dim: #6b6558;
+    --chrome-control-bg: #262319;
+    --chrome-control-hover: #322d22;
+    --chrome-accent: #6f95b8;
+    --chrome-accent-contrast: #0d1520;
+    --chrome-accent-saved: #7a9b6e;
+    --chrome-accent-error: #c26a5a;
+  }
+  body.light {
+    --chrome-bg: #f5f1e8;
+    --chrome-bg-elevated: #ece6d8;
+    --chrome-border: #ddd4c0;
+    --chrome-border-strong: #c9bea3;
+    --chrome-text: #2b2620;
+    --chrome-text-heading: #1c1812;
+    --chrome-text-muted: #6e6656;
+    --chrome-text-dim: #948c78;
+    --chrome-control-bg: #ece5d3;
+    --chrome-control-hover: #e0d8c2;
+    --chrome-accent: #3d5a7a;
+    --chrome-accent-contrast: #f5f1e8;
+    --chrome-accent-saved: #5a7a4e;
+    --chrome-accent-error: #b0492f;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--chrome-bg);
+    color: var(--chrome-text);
+    font-family: var(--font-ui);
+    font-size: var(--text-md);
+    line-height: 1.45;
+  }
+
+  /* ── Mock chrome: the switcher bar ─────────────────────────────── */
+  .mockbar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: var(--space-4);
+    padding: 0 var(--space-4); height: 44px;
+    background: var(--chrome-bg-elevated);
+    border-bottom: 1px solid var(--chrome-border);
+  }
+  .mockbar-title { font-size: var(--text-sm); color: var(--chrome-text-muted); white-space: nowrap; }
+  .mockbar-tabs { display: flex; gap: var(--space-1); margin: 0 auto; }
+  .mockbar-tabs button {
+    font: inherit; font-size: var(--text-sm); color: var(--chrome-text-muted);
+    background: none; border: 1px solid transparent; border-radius: var(--radius-sm);
+    padding: 4px 12px; cursor: pointer;
+  }
+  .mockbar-tabs button:hover { background: var(--chrome-control-hover); }
+  .mockbar-tabs button.is-active {
+    color: var(--chrome-text-heading);
+    background: var(--chrome-control-bg);
+    border-color: var(--chrome-border-strong);
+  }
+  .mockbar-theme {
+    font: inherit; font-size: var(--text-xs); color: var(--chrome-text-muted);
+    background: var(--chrome-control-bg); border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-sm); padding: 3px 10px; cursor: pointer; white-space: nowrap;
+  }
+  .mockbar-theme:hover { background: var(--chrome-control-hover); }
+
+  .direction { display: none; padding: var(--space-6) var(--space-5) 80px; }
+  .direction.is-active { display: block; }
+  .direction-note {
+    max-width: 960px; margin: 0 auto var(--space-5);
+    font-size: var(--text-xs); color: var(--chrome-text-dim);
+    border-left: 2px solid var(--chrome-border-strong); padding-left: var(--space-3);
+  }
+
+  /* ── Shared pieces ─────────────────────────────────────────────── */
+  h2.sec { font-size: var(--text-sm); font-weight: 600; color: var(--chrome-text-muted);
+           text-transform: uppercase; letter-spacing: 0.06em; }
+  .pbar { height: 6px; border-radius: 3px; background: var(--chrome-control-bg); overflow: hidden; }
+  .pbar-fill { height: 100%; border-radius: 3px; background: var(--chrome-accent); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: baseline; }
+  .dot.good { background: var(--chrome-accent-saved); }
+  input[type="number"], input[type="date"] {
+    font: inherit; font-size: var(--text-sm); color: var(--chrome-text);
+    background: var(--chrome-control-bg); border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-sm); padding: 4px 8px; width: 120px;
+    color-scheme: dark;
+  }
+  body.light input[type="number"], body.light input[type="date"] { color-scheme: light; }
+  .btn {
+    font: inherit; font-size: var(--text-sm); color: var(--chrome-text);
+    background: var(--chrome-control-bg); border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-sm); padding: 4px 12px; cursor: pointer;
+  }
+  .btn:hover { background: var(--chrome-control-hover); }
+  .btn.primary { background: var(--chrome-accent); color: var(--chrome-accent-contrast); border-color: transparent; }
+  label.field { display: flex; flex-direction: column; gap: 3px; font-size: var(--text-xs); color: var(--chrome-text-muted); }
+
+  /* Charts — recessive grid, ink labels, one accent series. */
+  .chart svg { display: block; width: 100%; height: auto; }
+  .grid { stroke: var(--chrome-border); stroke-width: 1; }
+  .zero { stroke: var(--chrome-border-strong); stroke-width: 1; }
+  .ax { fill: var(--chrome-text-dim); font-size: 10px; font-family: var(--font-ui); }
+  .bar { fill: var(--chrome-accent); }
+  .bar.neg { fill: var(--chrome-accent); opacity: 0.55; }
+  .hp:hover .bar { fill: color-mix(in oklab, var(--chrome-accent) 80%, var(--chrome-text-heading)); }
+  .hit { fill: transparent; }
+  .cumline { fill: none; stroke: var(--chrome-accent); stroke-width: 2; stroke-linejoin: round; }
+  .cumarea { fill: var(--chrome-accent); opacity: 0.08; }
+  .ref { stroke: var(--chrome-text-dim); stroke-width: 1; stroke-dasharray: 4 4; fill: none; }
+  .hp .cue-line { stroke: var(--chrome-border-strong); stroke-width: 1; opacity: 0; }
+  .hp .cue-dot { fill: var(--chrome-accent); opacity: 0; }
+  .hp:hover .cue-line, .hp:hover .cue-dot { opacity: 1; }
+
+  .chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-2); }
+  .mode-switch { display: flex; border: 1px solid var(--chrome-border); border-radius: var(--radius-sm); overflow: hidden; }
+  .mode-switch button {
+    font: inherit; font-size: var(--text-xs); color: var(--chrome-text-muted);
+    background: none; border: none; padding: 3px 10px; cursor: pointer;
+  }
+  .mode-switch button.is-active { background: var(--chrome-control-bg); color: var(--chrome-text-heading); }
+
+  /* Tooltip */
+  #tip {
+    position: fixed; z-index: 50; pointer-events: none; display: none;
+    background: var(--chrome-bg-elevated); border: 1px solid var(--chrome-border-strong);
+    border-radius: var(--radius-sm); padding: 4px 8px;
+    font-size: var(--text-xs); color: var(--chrome-text);
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.35); white-space: nowrap;
+  }
+
+  /* Heatmap */
+  .hm-wrap { display: flex; gap: 6px; align-items: flex-start; }
+  .hm-days { display: grid; grid-template-rows: repeat(7, 12px); row-gap: 3px; line-height: 12px;
+             font-size: var(--text-2xs); color: var(--chrome-text-dim); text-align: right; padding-right: 2px; }
+  .hm { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 12px);
+        grid-auto-columns: 12px; gap: 3px; }
+  .hm-cell { border-radius: 3px; background: var(--chrome-control-bg); }
+  .hm-cell.l1 { background: color-mix(in oklab, var(--chrome-accent) 28%, var(--chrome-bg)); }
+  .hm-cell.l2 { background: color-mix(in oklab, var(--chrome-accent) 48%, var(--chrome-bg)); }
+  .hm-cell.l3 { background: color-mix(in oklab, var(--chrome-accent) 72%, var(--chrome-bg)); }
+  .hm-cell.l4 { background: var(--chrome-accent); }
+  .hm-cell.neg { background: color-mix(in oklab, var(--chrome-accent-error) 55%, var(--chrome-bg)); }
+  .hm-legend { display: flex; align-items: center; gap: 4px; margin-top: var(--space-2);
+               font-size: var(--text-2xs); color: var(--chrome-text-dim); }
+  .hm-legend .hm-cell { width: 12px; height: 12px; }
+
+  /* ── Direction A · Ledger ─────────────────────────────────────── */
+  #dir-a .wrap { max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-6); }
+  .a-head h1 { font-size: var(--text-xl); font-weight: 600; color: var(--chrome-text-heading); }
+  .a-stats { display: flex; flex-wrap: wrap; gap: var(--space-2) 0; margin-top: var(--space-4); }
+  .a-stat { padding: 0 var(--space-5); border-left: 1px solid var(--chrome-border); }
+  .a-stat:first-child { padding-left: 0; border-left: none; }
+  .a-stat b { display: block; font-size: var(--text-2xl); font-weight: 600; color: var(--chrome-text-heading); line-height: 1.15; }
+  .a-stat span { font-size: var(--text-xs); color: var(--chrome-text-muted); }
+  .a-barrow { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-4); }
+  .a-barrow .pbar { flex: 1; }
+  .a-barrow em { font-style: normal; font-size: var(--text-xs); color: var(--chrome-text-muted); white-space: nowrap; }
+  .a-pace { font-size: var(--text-md); color: var(--chrome-text); margin-top: var(--space-3); }
+  .a-pace .dot { margin-right: 6px; }
+  .a-controls { display: flex; align-items: flex-end; gap: var(--space-3); flex-wrap: wrap;
+                padding: var(--space-3) 0; border-top: 1px solid var(--chrome-border);
+                border-bottom: 1px solid var(--chrome-border); }
+  .a-sec { display: flex; flex-direction: column; gap: var(--space-2); }
+  table.docs { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+  table.docs th { text-align: left; font-weight: 500; font-size: var(--text-xs); color: var(--chrome-text-dim);
+                  padding: 4px 10px 6px 0; border-bottom: 1px solid var(--chrome-border); }
+  table.docs th.num, table.docs td.num { text-align: right; }
+  table.docs td { padding: 5px 10px 5px 0; border-bottom: 1px solid var(--chrome-border); color: var(--chrome-text); }
+  table.docs td.num { font-variant-numeric: tabular-nums; color: var(--chrome-text-muted); }
+  table.docs td.name { color: var(--chrome-text); }
+  table.docs td.barcell { width: 220px; }
+  table.docs .quiet { font-size: var(--text-xs); color: var(--chrome-text-dim); }
+
+  /* ── Direction B · Dashboard ──────────────────────────────────── */
+  #dir-b .wrap { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-4); }
+  .card { background: var(--chrome-bg-elevated); border: 1px solid var(--chrome-border);
+          border-radius: var(--radius-md); padding: var(--space-4); }
+  .b-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); }
+  .tile b { display: block; font-size: var(--text-2xl); font-weight: 600; color: var(--chrome-text-heading); line-height: 1.2; }
+  .tile .tlabel { font-size: var(--text-xs); color: var(--chrome-text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .tile .tsub { font-size: var(--text-xs); color: var(--chrome-text-muted); margin-top: 4px; }
+  .tile .pbar { margin-top: var(--space-2); }
+  .b-charts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  .b-bottom { display: grid; grid-template-columns: 340px 1fr; gap: var(--space-4); }
+  .b-bottom .card:first-child { align-self: start; }
+  .b-form { display: flex; flex-direction: column; gap: var(--space-3); }
+  .b-form .row { display: flex; gap: var(--space-2); }
+  .b-doclist { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; }
+  .b-docrow { display: grid; grid-template-columns: 1fr 110px 120px; gap: var(--space-3);
+              align-items: center; padding: 5px 0; border-bottom: 1px solid var(--chrome-border); font-size: var(--text-sm); }
+  .b-docrow:last-child { border-bottom: none; }
+  .b-docrow .n { color: var(--chrome-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .b-docrow .c { text-align: right; font-variant-numeric: tabular-nums; color: var(--chrome-text-muted); font-size: var(--text-xs); }
+
+  /* ── Direction C · Page ───────────────────────────────────────── */
+  #dir-c .wrap { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-6); }
+  .c-hero { text-align: center; padding-top: var(--space-4); }
+  .c-hero b { display: block; font-family: var(--font-editor); font-weight: 400;
+              font-size: 56px; line-height: 1.1; color: var(--chrome-text-heading);
+              font-variant-numeric: tabular-nums; }
+  .c-hero .sub { margin-top: var(--space-2); font-size: var(--text-md); color: var(--chrome-text-muted); }
+  .c-hero .sub .dot { margin: 0 6px; }
+  .c-track { position: relative; height: 4px; border-radius: 2px; background: var(--chrome-control-bg);
+             margin-top: var(--space-5); }
+  .c-track .fill { position: absolute; inset: 0 auto 0 0; border-radius: 2px; background: var(--chrome-accent); }
+  .c-track .tick { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--chrome-text-dim); }
+  .c-track-labels { display: flex; justify-content: space-between; margin-top: 6px;
+                    font-size: var(--text-2xs); color: var(--chrome-text-dim); }
+  .c-facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); text-align: center; }
+  .c-fact b { display: block; font-size: var(--text-lg); font-weight: 600; color: var(--chrome-text-heading);
+              font-variant-numeric: tabular-nums; }
+  .c-fact span { font-size: var(--text-2xs); color: var(--chrome-text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  .c-fact .spark { margin-top: 4px; }
+  .c-fact .spark svg { width: 100px; height: 26px; }
+  .spark polyline { fill: none; stroke: var(--chrome-accent); stroke-width: 2; stroke-linejoin: round; }
+  .c-sec-title { font-size: var(--text-xs); color: var(--chrome-text-dim); text-align: center;
+                 text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: var(--space-3); }
+  .c-hm { display: flex; flex-direction: column; align-items: center; }
+  .c-docs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1) var(--space-5); }
+  .c-docrow { display: flex; align-items: center; gap: var(--space-2); padding: 4px 0; font-size: var(--text-sm); }
+  .c-docrow .n { flex: 1; color: var(--chrome-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .c-docrow .c { font-size: var(--text-2xs); color: var(--chrome-text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .c-docrow .pbar { width: 64px; height: 3px; }
+  .c-edit { text-align: center; }
+  .c-edit button { font: inherit; font-size: var(--text-xs); color: var(--chrome-text-muted);
+                   background: none; border: none; cursor: pointer; text-decoration: underline;
+                   text-underline-offset: 3px; text-decoration-color: var(--chrome-border-strong); }
+  .c-edit button:hover { color: var(--chrome-text); }
+
+  @media (max-width: 900px) {
+    .b-tiles { grid-template-columns: 1fr 1fr; }
+    .b-charts, .b-bottom { grid-template-columns: 1fr; }
+    .c-facts { grid-template-columns: 1fr 1fr; }
+    .c-docs { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="mockbar">
+  <span class="mockbar-title">Progress tab · fake data</span>
+  <div class="mockbar-tabs" id="tabs">
+    <button data-dir="dir-a" class="is-active">A · Ledger</button>
+    <button data-dir="dir-b">B · Dashboard</button>
+    <button data-dir="dir-c">C · Page</button>
+  </div>
+  <button class="mockbar-theme" id="themeToggle">Light theme</button>
+</div>
+
+<!-- ════════ A · LEDGER ════════ -->
+<section class="direction is-active" id="dir-a">
+  <p class="direction-note">A — the ledger. One column read top to bottom: the numbers first, then the
+    charts, then every document as a table row. Controls sit in a quiet strip under the numbers.
+    Densest of the three; closest in spirit to a report.</p>
+  <div class="wrap">
+    <div class="a-head">
+      <h1>Progress</h1>
+      <div class="a-stats">
+        <div class="a-stat"><b>58,214</b><span>words of 90,000</span></div>
+        <div class="a-stat"><b>1,214</b><span>today</span></div>
+        <div class="a-stat"><b>695</b><span>words a day · 358 needed</span></div>
+        <div class="a-stat"><b>89</b><span>days to Dec 1</span></div>
+      </div>
+      <div class="a-barrow">
+        <div class="pbar"><div class="pbar-fill" style="width:64.7%"></div></div>
+        <em>65% · 31,786 left</em>
+      </div>
+      <p class="a-pace"><span class="dot good"></span>Ahead of pace — 695 words a day against the 358 needed.</p>
+    </div>
+
+    <div class="a-controls">
+      <label class="field">Word target<input type="number" value="90000" /></label>
+      <label class="field">Deadline<input type="date" value="2026-12-01" /></label>
+      <label class="field">Start date<input type="date" value="2026-07-01" /></label>
+      <button class="btn">Save</button>
+      <button class="btn">Clear</button>
+    </div>
+
+    <div class="a-sec">
+      <div class="chart-head">
+        <h2 class="sec" data-bar-title>Words written per week</h2>
+        <div class="mode-switch" data-bar-switch>
+          <button data-mode="weekly" class="is-active">Weekly</button>
+          <button data-mode="daily">Daily · 30</button>
+        </div>
+      </div>
+      <div class="chart" data-chart="bars"></div>
+    </div>
+
+    <div class="a-sec">
+      <h2 class="sec">Total words over time</h2>
+      <div class="chart" data-chart="cumulative"></div>
+    </div>
+
+    <div class="a-sec">
+      <h2 class="sec">Per-document targets</h2>
+      <table class="docs">
+        <thead><tr><th>Document</th><th class="num">Words</th><th class="num">Target</th><th></th><th></th></tr></thead>
+        <tbody data-docs="table"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ B · DASHBOARD ════════ -->
+<section class="direction" id="dir-b">
+  <p class="direction-note">B — the dashboard. Cards on a grid: four tiles up top, the two charts side
+    by side, target controls living in a card like any other, documents in a scrolling card. Everything
+    visible at once; most conventional of the three.</p>
+  <div class="wrap">
+    <div class="b-tiles">
+      <div class="card tile">
+        <span class="tlabel">Total words</span>
+        <b>58,214</b>
+        <div class="tsub">of 90,000 · 65%</div>
+        <div class="pbar"><div class="pbar-fill" style="width:64.7%"></div></div>
+      </div>
+      <div class="card tile">
+        <span class="tlabel">Today</span>
+        <b>1,214</b>
+        <div class="tsub">words this session</div>
+      </div>
+      <div class="card tile">
+        <span class="tlabel">Pace</span>
+        <b><span class="dot good"></span> Ahead</b>
+        <div class="tsub">695 a day · 358 needed</div>
+      </div>
+      <div class="card tile">
+        <span class="tlabel">Deadline</span>
+        <b>89 days</b>
+        <div class="tsub">due Dec 1 · 31,786 words left</div>
+      </div>
+    </div>
+
+    <div class="b-charts">
+      <div class="card">
+        <div class="chart-head">
+          <h2 class="sec" data-bar-title>Words per week</h2>
+          <div class="mode-switch" data-bar-switch>
+            <button data-mode="weekly" class="is-active">Weekly</button>
+            <button data-mode="daily">Daily · 30</button>
+          </div>
+        </div>
+        <div class="chart" data-chart="bars" data-compact></div>
+      </div>
+      <div class="card">
+        <div class="chart-head"><h2 class="sec">Total words over time</h2></div>
+        <div class="chart" data-chart="cumulative" data-compact></div>
+      </div>
+    </div>
+
+    <div class="b-bottom">
+      <div class="card">
+        <div class="chart-head"><h2 class="sec">Target &amp; deadline</h2></div>
+        <div class="b-form">
+          <label class="field">Word target<input type="number" value="90000" style="width:100%" /></label>
+          <label class="field">Deadline<input type="date" value="2026-12-01" style="width:100%" /></label>
+          <label class="field">Start date<input type="date" value="2026-07-01" style="width:100%" /></label>
+          <div class="row"><button class="btn primary">Save</button><button class="btn">Clear</button></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chart-head"><h2 class="sec">Per-document targets</h2></div>
+        <div class="b-doclist" data-docs="list"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ C · PAGE ════════ -->
+<section class="direction" id="dir-c">
+  <p class="direction-note">C — the page. One statement, one hero chart; everything else recedes into a
+    writing calendar, four quiet facts, and a compact document list. Controls collapse to a single link.
+    Least dense, most like the manuscript itself.</p>
+  <div class="wrap">
+    <div class="c-hero">
+      <b>58,214</b>
+      <p class="sub">of 90,000 words<span class="dot good"></span>ahead of pace · due 1 December</p>
+      <div class="c-track">
+        <div class="fill" style="width:64.7%"></div>
+        <div class="tick" style="left:64.7%"></div>
+      </div>
+      <div class="c-track-labels"><span>Jul 1 · 13,052</span><span>65%</span><span>Dec 1 · 90,000</span></div>
+    </div>
+
+    <div>
+      <div class="chart" data-chart="cumulative" data-tall></div>
+    </div>
+
+    <div class="c-hm">
+      <div class="c-sec-title">Sixty-five days of writing</div>
+      <div class="hm-wrap">
+        <div class="hm-days"><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span><span></span></div>
+        <div class="hm" data-heatmap></div>
+      </div>
+      <div class="hm-legend">
+        <span>0</span>
+        <span class="hm-cell"></span><span class="hm-cell l1"></span><span class="hm-cell l2"></span>
+        <span class="hm-cell l3"></span><span class="hm-cell l4"></span>
+        <span>1,200+</span>
+      </div>
+    </div>
+
+    <div class="c-facts">
+      <div class="c-fact"><span>This week</span><b>2,714</b>
+        <div class="spark" data-spark></div>
+      </div>
+      <div class="c-fact"><span>Best day</span><b>2,140</b><div style="font-size:10px;color:var(--chrome-text-dim);margin-top:2px">Aug 22</div></div>
+      <div class="c-fact"><span>Days written</span><b>52 of 65</b><div style="font-size:10px;color:var(--chrome-text-dim);margin-top:2px">since Jul 1</div></div>
+      <div class="c-fact"><span>Words a day</span><b>695</b><div style="font-size:10px;color:var(--chrome-text-dim);margin-top:2px">358 needed</div></div>
+    </div>
+
+    <div>
+      <div class="c-sec-title">Documents</div>
+      <div class="c-docs" data-docs="grid"></div>
+    </div>
+
+    <div class="c-edit"><button>Edit target &amp; deadline</button></div>
+  </div>
+</section>
+
+<div id="tip"></div>
+
+<script>
+/* ── Fake data ──────────────────────────────────────────────────── */
+// Daily words, Jul 1 – Sep 3 2026 (65 days). One negative day: Aug 12,
+// a revision cut — deletion is history too.
+const DAYS = [
+  820, 0, 640, 1120, 380,
+  750, 900, 0, 660, 810, 1450, 0,
+  580, 720, 940, 0, 860, 1210, 320,
+  0, 1080, 760, 690, 0, 980, 1540,
+  880, 640, 590, 720, 950, 1380, 0,
+  700, 820, 610, 0, 940, 1620, 480,
+  0, 760, -412, 1040, 720, 1310, 0,
+  830, 0, 950, 700, 1180, 2140, 620,
+  540, 880, 0, 760, 1020, 1490, 380,
+  690, 810, 0, 1214
+];
+const START = new Date(2026, 6, 1);        // Jul 1
+const DEADLINE = new Date(2026, 11, 1);    // Dec 1
+const START_COUNT = 13052;                 // sum(DAYS) + this === TOTAL
+const TARGET = 90000;
+const TOTAL = 58214;
+
+const DOCS = [
+  ['Prologue', 3214, 3000],
+  ['Chapter 1 · The Orchard', 4812, 5000],
+  ['Chapter 2 · Low Tide', 5240, 5000],
+  ['Chapter 3 · The Visitor', 4388, 4500],
+  ['Chapter 4 · What the House Kept', 6102, 6000],
+  ['Interlude · The Letters', 3228, 3000],
+  ['Chapter 5 · Signal Fires', 5510, 5500],
+  ['Chapter 6 · The Long Field', 4970, 5000],
+  ['Chapter 7 · Threadbare', 5630, 6000],
+  ['Chapter 8 · The Weir', 5914, 5500],
+  ['Chapter 9 · Ashes on the Sill', 5161, 5500],
+  ['Chapter 10 · The Hollow Season', 2940, 5500],
+  ['Chapter 11 · North of Everything', 1105, 5500],
+  ['Chapter 12', 0, null]
+];
+
+/* ── Helpers ────────────────────────────────────────────────────── */
+const fmt = (n) => Math.abs(n).toLocaleString('en-US');
+const sfmt = (n) => (n < 0 ? '−' : '') + fmt(n);
+const dateOf = (i) => new Date(2026, 6, 1 + i);
+const shortDate = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+function niceMax(v) {
+  if (v <= 0) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(v)));
+  const s = v / mag;
+  return (s <= 1 ? 1 : s <= 2 ? 2 : s <= 5 ? 5 : 10) * mag;
+}
+
+function weeklyFromDaily() {
+  const out = [];
+  let key = null;
+  DAYS.forEach((v, i) => {
+    const d = dateOf(i);
+    const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    const k = mon.getTime();
+    if (k !== key) { key = k; out.push({ label: shortDate(mon), v: 0, tipLabel: 'Week of ' + shortDate(mon) }); }
+    out[out.length - 1].v += v;
+  });
+  return out;
+}
+const cum = (() => {
+  let t = START_COUNT;
+  return DAYS.map((v, i) => ({ d: dateOf(i), v: (t += v) }));
+})();
+
+/* ── Bar chart (weekly / daily), matching the app's plain register ─ */
+function renderBars(el, bars) {
+  // Compact geometry for half-width cards, so axis text keeps its size.
+  const W = el.hasAttribute('data-compact') ? 520 : 900;
+  const H = 220, P = { t: 16, r: 12, b: 26, l: 52 };
+  const maxAbs = niceMax(Math.max(...bars.map((b) => Math.abs(b.v)), 1));
+  const hasNeg = bars.some((b) => b.v < 0);
+  const pw = W - P.l - P.r, ph = H - P.t - P.b;
+  const zeroY = hasNeg ? P.t + ph / 2 : P.t + ph;
+  const sc = (hasNeg ? ph / 2 : ph) / maxAbs;
+  const step = pw / bars.length;
+  const bw = Math.max(2, Math.min(26, step - 3));
+  let s = '';
+  for (const f of [0.5, 1]) {
+    const y = zeroY - maxAbs * f * sc;
+    s += `<line class="grid" x1="${P.l}" x2="${W - P.r}" y1="${y}" y2="${y}"/>`;
+    s += `<text class="ax" x="${P.l - 6}" y="${y + 3}" text-anchor="end">${fmt(maxAbs * f)}</text>`;
+  }
+  s += `<line class="zero" x1="${P.l}" x2="${W - P.r}" y1="${zeroY}" y2="${zeroY}"/>`;
+  const labelEvery = bars.length <= 12 ? 1 : 5;
+  bars.forEach((b, i) => {
+    const h = Math.abs(b.v) * sc;
+    const x = P.l + i * step + (step - bw) / 2;
+    const y = b.v >= 0 ? zeroY - h : zeroY;
+    const tip = `${b.tipLabel || b.label} · ${sfmt(b.v)} words${b.v < 0 ? ' · revision' : ''}`;
+    s += `<g class="hp" data-tip="${tip}">`;
+    s += `<rect class="hit" x="${P.l + i * step}" y="${P.t}" width="${step}" height="${ph}"/>`;
+    s += `<rect class="bar${b.v < 0 ? ' neg' : ''}" x="${x}" y="${y}" width="${bw}" height="${Math.max(h, b.v === 0 ? 0 : 1)}" rx="2"/>`;
+    s += `</g>`;
+    if (i % labelEvery === 0) {
+      s += `<text class="ax" x="${P.l + i * step + step / 2}" y="${H - 8}" text-anchor="middle">${b.label}</text>`;
+    }
+  });
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Words written">${s}</svg>`;
+}
+
+/* ── Cumulative chart with target + required-path references ─────── */
+function renderCumulative(el) {
+  const tall = el.hasAttribute('data-tall');
+  const W = el.hasAttribute('data-compact') ? 520 : 900;
+  const H = tall ? 300 : 230, P = { t: 18, r: 16, b: 26, l: 58 };
+  const pw = W - P.l - P.r, ph = H - P.t - P.b;
+  const spanDays = Math.round((DEADLINE - START) / 86400000); // 153
+  const YMAX = 95000;
+  const x = (d) => P.l + ((d - START) / 86400000 / spanDays) * pw;
+  const y = (v) => P.t + (1 - v / YMAX) * ph;
+  let s = '';
+  for (const v of [30000, 60000]) {
+    s += `<line class="grid" x1="${P.l}" x2="${W - P.r}" y1="${y(v)}" y2="${y(v)}"/>`;
+    s += `<text class="ax" x="${P.l - 6}" y="${y(v) + 3}" text-anchor="end">${fmt(v)}</text>`;
+  }
+  // Target reference — muted, dashed, labeled in ink.
+  s += `<line class="ref" x1="${P.l}" x2="${W - P.r}" y1="${y(TARGET)}" y2="${y(TARGET)}"/>`;
+  s += `<text class="ax" x="${P.l - 6}" y="${y(TARGET) + 3}" text-anchor="end">${fmt(TARGET)}</text>`;
+  s += `<text class="ax" x="${W - P.r}" y="${y(TARGET) - 5}" text-anchor="end">target · due ${shortDate(DEADLINE)}</text>`;
+  // Month ticks.
+  for (let m = 6; m <= 11; m++) {
+    const d = new Date(2026, m, 1);
+    s += `<text class="ax" x="${x(d)}" y="${H - 8}" text-anchor="middle">${d.toLocaleDateString('en-US', { month: 'short' })}</text>`;
+  }
+  // Written line + area.
+  const pts = cum.map((p) => `${x(p.d).toFixed(1)},${y(p.v).toFixed(1)}`);
+  const base = P.t + ph;
+  s += `<path class="cumarea" d="M ${pts[0]} L ${pts.join(' L ')} L ${x(cum[cum.length - 1].d).toFixed(1)},${base} L ${x(cum[0].d).toFixed(1)},${base} Z"/>`;
+  // Required path from today to (deadline, target).
+  const last = cum[cum.length - 1];
+  s += `<line class="ref" x1="${x(last.d)}" y1="${y(last.v)}" x2="${x(DEADLINE)}" y2="${y(TARGET)}"/>`;
+  s += `<polyline class="cumline" points="${pts.join(' ')}"/>`;
+  s += `<circle cx="${x(last.d)}" cy="${y(last.v)}" r="3.5" fill="var(--chrome-accent)"/>`;
+  s += `<circle cx="${x(DEADLINE)}" cy="${y(TARGET)}" r="2.5" fill="var(--chrome-text-dim)"/>`;
+  // Per-day hover bands with a crosshair cue.
+  const band = pw / spanDays;
+  cum.forEach((p, i) => {
+    s += `<g class="hp" data-tip="${shortDate(p.d)} · ${fmt(p.v)} words">`;
+    s += `<line class="cue-line" x1="${x(p.d)}" x2="${x(p.d)}" y1="${P.t}" y2="${base}"/>`;
+    s += `<circle class="cue-dot" cx="${x(p.d)}" cy="${y(p.v)}" r="3"/>`;
+    s += `<rect class="hit" x="${x(p.d) - band / 2}" y="${P.t}" width="${band}" height="${ph}"/>`;
+    s += `</g>`;
+  });
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Total words over time">${s}</svg>`;
+}
+
+/* ── Heatmap (direction C) ──────────────────────────────────────── */
+function renderHeatmap(el) {
+  const startPad = (START.getDay() + 6) % 7; // Mon-based offset
+  let s = '';
+  for (let i = 0; i < startPad; i++) s += `<span></span>`;
+  DAYS.forEach((v, i) => {
+    const lvl = v < 0 ? 'neg' : v === 0 ? '' : v <= 400 ? 'l1' : v <= 800 ? 'l2' : v <= 1200 ? 'l3' : 'l4';
+    const tip = `${shortDate(dateOf(i))} · ${sfmt(v)} words${v < 0 ? ' · revision' : ''}`;
+    s += `<span class="hm-cell ${lvl}" data-tip="${tip}"></span>`;
+  });
+  el.innerHTML = s;
+}
+
+/* ── Sparkline (direction C, last 14 days) ──────────────────────── */
+function renderSpark(el) {
+  const vals = DAYS.slice(-14);
+  const max = Math.max(...vals.map((v) => Math.abs(v)), 1);
+  const pts = vals.map((v, i) => `${(i / 13) * 96 + 2},${28 - (Math.max(v, 0) / max) * 24}`);
+  el.innerHTML = `<svg viewBox="0 0 100 30"><polyline points="${pts.join(' ')}"/></svg>`;
+}
+
+/* ── Documents in three shapes ──────────────────────────────────── */
+function docBar(count, target, cls) {
+  if (target == null || target <= 0) return '';
+  const pct = Math.min(100, (count / target) * 100).toFixed(1);
+  return `<div class="pbar ${cls || ''}" style="height:4px"><div class="pbar-fill" style="width:${pct}%"></div></div>`;
+}
+function renderDocs() {
+  document.querySelectorAll('[data-docs]').forEach((el) => {
+    const shape = el.getAttribute('data-docs');
+    el.innerHTML = DOCS.map(([name, count, target]) => {
+      if (shape === 'table') {
+        return `<tr><td class="name">${name}</td><td class="num">${fmt(count)}</td>` +
+          `<td class="num">${target == null ? '<span class="quiet">—</span>' : fmt(target)}</td>` +
+          `<td class="barcell">${docBar(count, target)}</td>` +
+          `<td class="num"><span class="quiet">${target == null ? 'Set target' : 'Edit'}</span></td></tr>`;
+      }
+      if (shape === 'list') {
+        return `<div class="b-docrow"><span class="n">${name}</span>` +
+          `<span class="c">${fmt(count)}${target != null ? ' / ' + fmt(target) : ''}</span>` +
+          `<span>${docBar(count, target)}</span></div>`;
+      }
+      return `<div class="c-docrow"><span class="n">${name}</span>` +
+        `<span class="c">${fmt(count)}${target != null ? ' / ' + fmt(target) : ''}</span>` +
+        `${docBar(count, target) || '<span style="width:64px"></span>'}</div>`;
+    }).join('');
+  });
+}
+
+/* ── Wiring ─────────────────────────────────────────────────────── */
+const weekly = weeklyFromDaily();
+const daily30 = DAYS.slice(-30).map((v, i) => {
+  const d = dateOf(DAYS.length - 30 + i);
+  return { label: shortDate(d), v };
+});
+
+document.querySelectorAll('[data-chart="bars"]').forEach((el) => renderBars(el, weekly));
+document.querySelectorAll('[data-chart="cumulative"]').forEach(renderCumulative);
+document.querySelectorAll('[data-heatmap]').forEach(renderHeatmap);
+document.querySelectorAll('[data-spark]').forEach(renderSpark);
+renderDocs();
+
+// Weekly / Daily toggles — each switch drives the chart in its own section.
+document.querySelectorAll('[data-bar-switch]').forEach((sw) => {
+  sw.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-mode]');
+    if (!btn) return;
+    sw.querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', b === btn));
+    const section = sw.closest('.a-sec, .card');
+    const chart = section.querySelector('[data-chart="bars"]');
+    const title = section.querySelector('[data-bar-title]');
+    const isWeekly = btn.dataset.mode === 'weekly';
+    if (!title.dataset.weekly) title.dataset.weekly = title.textContent;
+    renderBars(chart, isWeekly ? weekly : daily30);
+    title.textContent = isWeekly ? title.dataset.weekly : 'Words per day · last 30';
+  });
+});
+
+// Direction tabs (also keys 1 / 2 / 3).
+const tabs = document.getElementById('tabs');
+function activate(dir) {
+  tabs.querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', b.dataset.dir === dir));
+  document.querySelectorAll('.direction').forEach((s) => s.classList.toggle('is-active', s.id === dir));
+  window.scrollTo(0, 0);
+}
+tabs.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-dir]');
+  if (btn) activate(btn.dataset.dir);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  const map = { 1: 'dir-a', 2: 'dir-b', 3: 'dir-c' };
+  if (map[e.key]) activate(map[e.key]);
+});
+
+// Theme toggle.
+const themeBtn = document.getElementById('themeToggle');
+themeBtn.addEventListener('click', () => {
+  const light = document.body.classList.toggle('light');
+  themeBtn.textContent = light ? 'Dark theme' : 'Light theme';
+});
+
+// Deep links: #a / #b / #c pick a direction, add "-light" for the light
+// theme (e.g. progress-directions.html#c-light).
+{
+  const h = location.hash.slice(1);
+  const dir = { a: 'dir-a', b: 'dir-b', c: 'dir-c' }[h[0]];
+  if (dir) activate(dir);
+  if (h.includes('light')) themeBtn.click();
+}
+
+// Tooltip — one shared layer, per-mark data-tip.
+const tip = document.getElementById('tip');
+document.addEventListener('mouseover', (e) => {
+  const t = e.target.closest('[data-tip]');
+  tip.style.display = t ? 'block' : 'none';
+  if (t) tip.textContent = t.getAttribute('data-tip');
+});
+document.addEventListener('mousemove', (e) => {
+  if (tip.style.display !== 'block') return;
+  const pad = 12;
+  let left = e.clientX + pad, top = e.clientY + pad;
+  const r = tip.getBoundingClientRect();
+  if (left + r.width > window.innerWidth - 8) left = e.clientX - r.width - pad;
+  if (top + r.height > window.innerHeight - 8) top = e.clientY - r.height - pad;
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+});
+</script>
+</body>
+</html>

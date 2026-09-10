@@ -1,7 +1,8 @@
 import { app, shell, BrowserWindow, ipcMain, dialog, Menu, type MenuItemConstructorOptions } from 'electron'
-import { writeFile } from 'fs/promises'
+import { mkdir, writeFile } from 'fs/promises'
 import { basename, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import appIcon from '../../resources/icon.png?asset'
 import * as binderStore from './binderStore'
 import * as documentStore from './documentStore'
 import * as wordCountStore from './wordCountStore'
@@ -22,14 +23,20 @@ import * as storyBibleSheetStore from './storyBibleSheetStore'
 import * as storyBibleImageStore from './storyBibleImageStore'
 import * as mentionStore from './mentionStore'
 import * as submissionStore from './submissionStore'
+import * as compileStore from './compileStore'
+import * as compileSettingsStore from './compileSettingsStore'
 import * as timelineStore from './timelineStore'
 import * as relationshipStore from './relationshipStore'
 import * as sessionStore from './sessionStore'
 import * as sprintStore from './sprintStore'
 import { getProjectRoot, setProjectRoot, projectExistsAt } from './projectRoot'
-import type { Theme, TypographyDefaults, PageSize } from '../shared/preferences'
-import type { ActiveView, ManuscriptView, OutlinerSort, StatusDef, TagDef, SavedView } from '../shared/binder'
-import type { StoryBibleBlock, StoryBibleTypeDef } from '../shared/storyBible'
+import type { Theme, TypographyDefaults, PageSize, PageViewMode } from '../shared/preferences'
+import { draftChildren, matterFolder } from '../shared/binder'
+import * as scrivenerWordlist from './import/scrivenerWordlist'
+import * as scrivenerImport from './import/scrivener'
+import type { ScrivenerProjectImportResult } from '../shared/scrivenerImport'
+import type { ActiveView, BinderNode, ManuscriptView, OutlinerSort, StatusDef, TagDef, SavedView } from '../shared/binder'
+import type { ItemMentionStat, StoryBibleBlock, StoryBibleTypeDef } from '../shared/storyBible'
 import type { CommentRecord } from '../shared/comments'
 import type { LexiconEntry } from '../shared/lexicon'
 import type { SearchQueryOptions } from '../shared/search'
@@ -37,16 +44,24 @@ import type { ExportFormat } from '../shared/export'
 import type { TemplateId } from '../shared/templates'
 import type { ToolbarSectionId } from '../shared/toolbarSections'
 import type { LayoutPreset } from '../shared/layoutPresets'
+import type { CustomTheme } from '../shared/customThemes'
 import {
   renderDocumentExport,
   renderProjectExport,
+  renderProjectCompile,
   renderDocumentHtml,
   renderProjectHtml,
   printHtml,
+  buildPrintableHtml,
   EXPORT_EXTENSIONS,
   EXPORT_FILTER_NAMES
 } from './export'
 import type { ExportOptions, ExportPreset } from '../shared/export'
+import { filterTreeByScope, summarizeScope } from '../shared/compile'
+import type { CompilePreset, CompileScope, CompileSettings } from '../shared/compile'
+import { validateCompileScope } from './compile/validate'
+import type { CompileFinding } from '../shared/compileValidation'
+import { isLookupKind, lookupUrl, type LookupKind } from '../shared/lookup'
 import { parseImportFile, IMPORT_EXTENSIONS } from './import'
 import type { ImportFailure, ImportResult, ImportWarningKind, ImportedDocument } from '../shared/import'
 import type { SubmissionStatus } from '../shared/submissions'
@@ -54,7 +69,7 @@ import type { TimelineDraft } from '../shared/timeline'
 import type { RelationshipDraft } from '../shared/relationships'
 import { sessionsToCsv, type OpenSession } from '../shared/sessions'
 import type { Sprint } from '../shared/sprints'
-import { applyTemplate } from './templates'
+import { applyTemplate, createFrontMatter, createBackMatter } from './templates'
 import { initUpdater } from './updater'
 
 const QUIT_FLUSH_TIMEOUT_MS = 2500
@@ -85,12 +100,26 @@ function triggerMentionRescan(event: Electron.IpcMainInvokeEvent): void {
  * hardcoded to Letter with fixed margins in the PDF path.
  */
 async function buildExportOptions(preset: ExportPreset, title: string): Promise<ExportOptions> {
-  const [pageSize, marginMm, authorName] = await Promise.all([
+  // The book preset exists only in the compile section: its folio sequences
+  // and recto/verso seating cohere for a whole project, not a menu export.
+  if (preset === 'book') throw new Error('The book style compiles from the Compile section only.')
+  const [pageSize, marginMm, authorName, compileSettings] = await Promise.all([
     preferencesStore.getPageSize(),
     preferencesStore.getPageMarginMm(),
-    binderStore.getAuthorName()
+    binderStore.getAuthorName(),
+    // peek, not get: reading the scene-break marker here must not seed
+    // compile.json — that stays tied to entering the compile section.
+    compileSettingsStore.peekCompileSettings()
   ])
-  return { preset, pageSize, marginMm, authorName, title }
+  return {
+    preset,
+    pageSize,
+    marginMm,
+    authorName,
+    title,
+    sceneBreakMark: compileSettings.sceneBreakMark,
+    documentSeparation: compileSettings.documentSeparation
+  }
 }
 
 /** Shared by both export IPC handlers: prompts for a save location (never
@@ -128,6 +157,9 @@ async function createWindow(): Promise<void> {
     height: 720,
     show: false,
     autoHideMenuBar: false,
+    // The heron (scripts/make-app-icon.mjs). Packaged Windows takes the exe's
+    // embedded build/icon.ico; this covers the dev window and Linux.
+    icon: appIcon,
     titleBarStyle: 'hidden',
     titleBarOverlay: { ...TITLE_BAR_COLORS[theme], height: 32 },
     webPreferences: {
@@ -302,6 +334,93 @@ app.whenReady().then(async () => {
     return node
   })
 
+  // --- Scrivener personal dictionary ------------------------------------
+  //
+  // Scanning and parsing only. Nothing is written until the writer has seen
+  // the actual words and confirmed them: this file is machine-wide, so it
+  // routinely holds names from other people's manuscripts and the occasional
+  // accepted typo.
+  ipcMain.handle('scrivener:scanWordlists', async () => {
+    const scan = scrivenerWordlist.scanForWordlists()
+    const parsed = await Promise.all(
+      scan.found.map(async (location) => {
+        try {
+          return await scrivenerWordlist.readWordlist(location, location.path)
+        } catch (error) {
+          return {
+            location,
+            words: [],
+            duplicates: 0,
+            empty: true,
+            error: (error as Error).message
+          }
+        }
+      })
+    )
+    return { ambiguous: scan.ambiguous, candidates: parsed, searched: scrivenerWordlist.knownWordlistPaths() }
+  })
+
+  /** The fallback when neither known location exists — a picker rather than a
+   *  dead end. */
+  ipcMain.handle('scrivener:pickWordlist', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    const options: Electron.OpenDialogOptions = {
+      title: 'Choose a Scrivener word list',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Scrivener word list', extensions: ['txt', 'ini'] },
+        { name: 'All files', extensions: ['*'] }
+      ]
+    }
+    const result = window
+      ? await dialog.showOpenDialog(window, options)
+      : await dialog.showOpenDialog(options)
+    if (result.canceled || result.filePaths.length === 0) return { canceled: true }
+    try {
+      const parsed = await scrivenerWordlist.readWordlist(null, result.filePaths[0])
+      return { canceled: false, parsed: { ...parsed, path: result.filePaths[0] } }
+    } catch (error) {
+      return { canceled: false, error: (error as Error).message }
+    }
+  })
+
+  /** Adds the chosen words to this project's Lexicon. addEntry is idempotent
+   *  per word and registers each one with the spellchecker, which is what a
+   *  personal dictionary is for. */
+  /** Adds the chosen words to this project's Lexicon in one pass. Each entry
+   *  also registers its word with the spellchecker, which is what a personal
+   *  dictionary is for. */
+  ipcMain.handle('scrivener:importWords', async (_event, words: string[]) => {
+    const outcome = await lexiconStore.addEntries(words)
+    if (outcome.added > 0) {
+      backupStore.markDirty()
+      BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('lexicon:suppressedWordsChanged'))
+    }
+    return outcome
+  })
+
+  ipcMain.handle('binder:createTopLevelFolder', async (_event, name?: string) => {
+    const node = await binderStore.createTopLevelFolder(name)
+    backupStore.markDirty()
+    return node
+  })
+
+  // Toolbar/menu "new document"/"new folder": placed relative to the
+  // selected node rather than always nested inside it — see insertNear in
+  // binderStore for why a selected document lands a sibling next to it
+  // instead of gaining an unwanted child.
+  ipcMain.handle('binder:createDocumentNear', async (_event, targetId: string | null) => {
+    const node = await binderStore.createDocumentNear(targetId)
+    backupStore.markDirty()
+    return node
+  })
+
+  ipcMain.handle('binder:createFolderNear', async (_event, targetId: string | null) => {
+    const node = await binderStore.createFolderNear(targetId)
+    backupStore.markDirty()
+    return node
+  })
+
   ipcMain.handle('binder:rename', async (_event, id: string, name: string) => {
     await binderStore.rename(id, name)
     backupStore.markDirty()
@@ -322,6 +441,11 @@ app.whenReady().then(async () => {
     binderStore.setLastOpenDocument(id)
   )
 
+  ipcMain.handle('binder:setNotes', async (_event, id: string, notes: string) => {
+    await binderStore.setNotes(id, notes)
+    backupStore.markDirty()
+  })
+
   ipcMain.handle('binder:setSynopsis', async (_event, id: string, synopsis: string) => {
     await binderStore.setSynopsis(id, synopsis)
     backupStore.markDirty()
@@ -339,6 +463,16 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('binder:setWordTarget', async (_event, id: string, target: number | null) => {
     await binderStore.setWordTarget(id, target)
+    backupStore.markDirty()
+  })
+
+  ipcMain.handle('binder:setChapterNumber', async (_event, id: string, chapterNumber: number | null) => {
+    await binderStore.setChapterNumber(id, chapterNumber)
+    backupStore.markDirty()
+  })
+
+  ipcMain.handle('binder:setFolderIsPart', async (_event, id: string, isPart: boolean) => {
+    await binderStore.setFolderIsPart(id, isPart)
     backupStore.markDirty()
   })
 
@@ -376,6 +510,14 @@ app.whenReady().then(async () => {
     await binderStore.setProjectDeadline(deadline)
     backupStore.markDirty()
   })
+
+  ipcMain.handle(
+    'binder:setProjectTargetStart',
+    async (_event, date: string | null, count: number | null) => {
+      await binderStore.setProjectTargetStart(date, count)
+      backupStore.markDirty()
+    }
+  )
 
   ipcMain.handle('binder:setActiveView', (_event, view: ActiveView) => binderStore.setActiveView(view))
 
@@ -416,30 +558,13 @@ app.whenReady().then(async () => {
     }
   )
 
-  ipcMain.handle('binder:delete', async (event, id: string) => {
+  // The confirmation itself is the renderer's job now — an in-app modal
+  // (ConfirmModal, styled with the rest of the app) rather than this OS
+  // dialog. By the time this handler runs, the writer has already confirmed;
+  // it deletes unconditionally, the same as every other binder mutation here.
+  ipcMain.handle('binder:delete', async (_event, id: string) => {
     const node = binderStore.getNode(id)
     if (!node) return { deleted: false }
-
-    const hasChildren = node.children.length > 0
-    const options = {
-      type: 'warning' as const,
-      buttons: ['Cancel', 'Delete'],
-      defaultId: 0,
-      cancelId: 0,
-      message: hasChildren
-        ? `Delete "${node.name}" and everything inside it?`
-        : `Delete "${node.name}"?`,
-      detail: hasChildren
-        ? 'This permanently deletes this item and every document and folder inside it. This cannot be undone.'
-        : 'This permanently deletes this document. This cannot be undone.'
-    }
-
-    const window = BrowserWindow.fromWebContents(event.sender)
-    const result = window
-      ? await dialog.showMessageBox(window, options)
-      : await dialog.showMessageBox(options)
-
-    if (result.response !== 1) return { deleted: false }
 
     const documentIds = await binderStore.deleteNode(id)
     await Promise.all(documentIds.map((docId) => mentionStore.deleteAllForDocument(docId)))
@@ -451,6 +576,21 @@ app.whenReady().then(async () => {
     await Promise.all(documentIds.map((docId) => submissionStore.handleDocumentDeleted(docId)))
     backupStore.markDirty()
     return { deleted: true }
+  })
+
+  // Emptying Trash is the one destructive action in the app that leaves
+  // nothing behind — binderStore.emptyTrash takes the snapshots with the
+  // documents. As with binder:delete, the confirmation is the renderer's job
+  // and has already happened by the time this runs; the cascade below is the
+  // same one a delete performs, because the deletion itself is the same, only
+  // wider and without a recovery path.
+  ipcMain.handle('binder:emptyTrash', async () => {
+    const documentIds = await binderStore.emptyTrash()
+    await Promise.all(documentIds.map((docId) => mentionStore.deleteAllForDocument(docId)))
+    await Promise.all(documentIds.map((docId) => commentStore.deleteAllForDocument(docId)))
+    await Promise.all(documentIds.map((docId) => submissionStore.handleDocumentDeleted(docId)))
+    if (documentIds.length) backupStore.markDirty()
+    return { deleted: documentIds.length }
   })
 
   ipcMain.handle('submissions:getState', () => submissionStore.getState())
@@ -545,7 +685,22 @@ app.whenReady().then(async () => {
     return sealed
   })
 
-  ipcMain.handle('session:recoverOpen', () => sessionStore.recoverOpenSession())
+  /**
+   * The other path that seals a session, and it has to move the lifetime total
+   * exactly as session:close does.
+   *
+   * A session is left open by a crash, a force-quit, or File > Open Project
+   * (which reloads without flushing). Recovering it wrote the session into the
+   * project's own sessions.json — so the Progress page and the session
+   * analytics counted it — while the dashboard's lifetime total never heard
+   * about it. The two systems disagreed, permanently, because a sealed
+   * session's delta is never recomputed.
+   */
+  ipcMain.handle('session:recoverOpen', async () => {
+    const sealed = await sessionStore.recoverOpenSession()
+    if (sealed) await lifetimeStore.recordSession(sealed)
+    return sealed
+  })
 
   // Sprints reference sessions by id and never create session records — see
   // sprintStore. Recording one is a single append.
@@ -796,6 +951,11 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('suppressedWords:list', () => suppressedWordStore.listWords())
 
+  /* The same list with the source that asked for each word. The editor only
+     needs the words; the Lexicon page needs to say which of them came from a
+     Story Bible name, which is the half of the picture it never showed. */
+  ipcMain.handle('suppressedWords:listEntries', () => suppressedWordStore.listEntries())
+
   /** Right-click "Add to Dictionary": suppresses the word in this project
    *  only, with no Lexicon entry and no OS involvement. */
   ipcMain.handle('suppressedWords:add', async (_event, word: string) => {
@@ -837,6 +997,27 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('storyBible:getMentionStats', (_event, itemId: string) => mentionStore.getStatsForItem(itemId))
+
+  /** Every item's stats in one read, keyed by item id. The card wall wears a
+   *  mention count and a presence strip on every card, and asking per item
+   *  would be one IPC round trip per entry over the same single file. */
+  ipcMain.handle('storyBible:getAllMentionStats', async () => {
+    const [mentions, { items }] = await Promise.all([mentionStore.listMentions(), storyBibleStore.getState()])
+    const validItemIds = new Set(items.map((i) => i.id))
+    const byItem: Record<string, ItemMentionStat[]> = {}
+    for (const m of mentions) {
+      if (!validItemIds.has(m.itemId)) continue
+      const existing = byItem[m.itemId] ?? []
+      existing.push({
+        documentId: m.documentId,
+        count: m.count,
+        firstOffset: m.firstOffset,
+        lastOffset: m.lastOffset
+      })
+      byItem[m.itemId] = existing
+    }
+    return byItem
+  })
 
   ipcMain.handle('storyBible:setManualMention', async (_event, documentId: string, itemId: string, present: boolean) => {
     await mentionStore.setManualMention(documentId, itemId, present)
@@ -880,13 +1061,16 @@ app.whenReady().then(async () => {
     return runExport(event, suggested, format, () => renderDocumentExport(html, format, options))
   })
 
+  // "Project" here means the manuscript: Draft's contents. Notes and Matter
+  // are excluded from the quick menu paths — the compile panel is the
+  // matter-aware pipeline.
   ipcMain.handle('export:project', async (event, format: ExportFormat, preset: ExportPreset = 'standard') => {
     const state = await binderStore.getState()
     const name = state.projectName || 'Untitled Project'
     const options = await buildExportOptions(preset, name)
     const suggested = preset === 'manuscript' ? `${name} (manuscript)` : name
     return runExport(event, suggested, format, () =>
-      renderProjectExport(state.tree, state.projectName, format, options)
+      renderProjectExport(draftChildren(state.tree), state.projectName, format, options)
     )
   })
 
@@ -902,7 +1086,201 @@ app.whenReady().then(async () => {
   ipcMain.handle('print:project', async (_event, preset: ExportPreset = 'standard') => {
     const state = await binderStore.getState()
     const options = await buildExportOptions(preset, state.projectName || 'Untitled Project')
-    return printHtml(await renderProjectHtml(state.tree, options), options)
+    return printHtml(await renderProjectHtml(draftChildren(state.tree), options), options)
+  })
+
+  // Compiling is export:project's pipeline pointed at in-app storage instead
+  // of a save dialog, with three substitutions: page setup comes from the
+  // project's compile settings (never the editor's global Page Setup — see
+  // compileSettingsStore), the tree is pruned to the requested scope first,
+  // and the result lands in compiles/<id>/ as an immutable record.
+  // The pre-flight check, standalone — the workbench's Run Checks button,
+  // and the first leg of every compile (the renderer validates, shows the
+  // findings, and only then calls compile:run with whatever was accepted).
+  ipcMain.handle('compile:validate', (_event, scope: CompileScope, stylePreset: ExportPreset) =>
+    validateCompileScope(scope, stylePreset)
+  )
+
+  ipcMain.handle(
+    'compile:run',
+    async (
+      _event,
+      name: string | null,
+      scope: CompileScope,
+      format: ExportFormat,
+      stylePreset: ExportPreset,
+      acceptedFindings: CompileFinding[] = []
+    ) => {
+      const [state, settings] = await Promise.all([
+        binderStore.getState(),
+        compileSettingsStore.getCompileSettings()
+      ])
+      // Draft is the manuscript: scope selection and the summary live on its
+      // forest. Matter joins the output around it (front matter before, the
+      // designated back-matter folder after), and Notes never compiles.
+      const draftForest = draftChildren(state.tree)
+      const scopeSummary = summarizeScope(draftForest, scope)
+      if (scopeSummary.includedDocuments === 0) {
+        throw new Error('The selected scope contains no manuscript documents.')
+      }
+      const title = state.projectName || 'Untitled Project'
+      const options: ExportOptions = {
+        preset: stylePreset,
+        pageSize: settings.pageSize,
+        marginMm: settings.marginMm,
+        authorName: state.authorName,
+        title,
+        sceneBreakMark: settings.sceneBreakMark,
+        bookTrim: settings.bookTrim,
+        bookIncludeContents: settings.bookIncludeContents,
+        documentSeparation: settings.documentSeparation,
+        personalDetails: settings.personalDetails
+      }
+      const filteredDraft = filterTreeByScope(draftForest, scope)
+      const matter = matterFolder(state.tree)
+      const matterItems = matter ? (filterTreeByScope([matter], scope)[0]?.children ?? []) : []
+      const matterBack = matterItems.filter((node) => node.id === settings.backMatterFolderId)
+      const matterFront = matterItems.filter((node) => node.id !== settings.backMatterFolderId)
+      // Passed as groups, not concatenated: the renderer gives matter its own
+      // display-page treatment rather than the chapter-heading one.
+      const { output, viewHtml } = await renderProjectCompile(filteredDraft, state.projectName, format, options, {
+        front: matterFront,
+        back: matterBack
+      })
+      // The recorded word count is the MANUSCRIPT's — matter appears in the
+      // output but never in this number.
+      const draftDocIds: string[] = []
+      const collectIds = (nodes: BinderNode[]): void => {
+        for (const node of nodes) {
+          if (node.type === 'document') draftDocIds.push(node.id)
+          collectIds(node.children)
+        }
+      }
+      collectIds(filteredDraft)
+      const wordCount = await wordCountStore.countForDocuments(draftDocIds)
+      return compileStore.createCompile(
+        {
+          name: name?.trim() || title,
+          format,
+          stylePreset,
+          scope,
+          scopeSummary,
+          pageSize: settings.pageSize,
+          marginMm: settings.marginMm,
+          ...(stylePreset === 'book' ? { bookTrim: settings.bookTrim } : {}),
+          wordCount,
+          warningsAccepted: acceptedFindings.length,
+          // Only stored when something was actually waived — a clean compile
+          // reads as clean by the field's absence, not an empty list.
+          ...(acceptedFindings.length > 0 ? { acceptedFindings } : {})
+        },
+        output,
+        viewHtml
+      )
+    }
+  )
+
+  ipcMain.handle('compile:list', () => compileStore.listCompiles())
+
+  ipcMain.handle('compile:getView', (_event, id: string) => compileStore.getCompileView(id))
+
+  // "Export a copy" writes the stored artifact's exact bytes to a location the
+  // user picks — a re-render could differ if documents changed since.
+  ipcMain.handle('compile:exportCopy', async (event, id: string) => {
+    const meta = await compileStore.getCompile(id)
+    return runExport(event, meta.name, meta.format, () => compileStore.readCompileOutput(id))
+  })
+
+  ipcMain.handle('compile:delete', (_event, id: string) => compileStore.deleteCompile(id))
+
+  ipcMain.handle('compile:getSettings', () => compileSettingsStore.getCompileSettings())
+
+  ipcMain.handle('compile:updateSettings', (_event, settings: CompileSettings) =>
+    compileSettingsStore.updateCompileSettings(settings)
+  )
+
+  // The stored draft as a complete printable document — buildPrintableHtml
+  // over the frozen body with the page setup recorded on the compile, which
+  // is exactly what printing or PDF-exporting it would render. The in-app
+  // viewer shows THIS, so what you see is what the artifact is.
+  ipcMain.handle('compile:getPrintableView', async (_event, id: string) => {
+    const meta = await compileStore.getCompile(id)
+    const viewHtml = await compileStore.getCompileView(id)
+    const options: ExportOptions = {
+      preset: meta.stylePreset,
+      pageSize: meta.pageSize,
+      marginMm: meta.marginMm,
+      authorName: null,
+      title: meta.name
+    }
+    return buildPrintableHtml(viewHtml, options)
+  })
+
+  // Prints a STORED draft's frozen view — the page that prints is the page
+  // that was compiled, not a re-render of documents that may have changed
+  // since. Same printHtml path as live printing, so no second print styling.
+  ipcMain.handle('compile:print', async (_event, id: string) => {
+    const meta = await compileStore.getCompile(id)
+    // A book compile's page — folios, blanks, gutter — exists only in the
+    // stored PDF; printHtml would re-lay it wrongly. Hand the artifact to the
+    // system PDF viewer, whose print dialog prints it as compiled.
+    if (meta.stylePreset === 'book' && meta.format === 'pdf') {
+      const bytes = await compileStore.readCompileOutput(id)
+      const target = join(app.getPath('temp'), `chapterflow-print-${id}.pdf`)
+      await writeFile(target, bytes)
+      const error = await shell.openPath(target)
+      if (error) throw new Error(error)
+      return { printed: true }
+    }
+    const viewHtml = await compileStore.getCompileView(id)
+    const options: ExportOptions = {
+      preset: meta.stylePreset,
+      pageSize: meta.pageSize,
+      marginMm: meta.marginMm,
+      // The one live input: the manuscript header's byline. The body is
+      // frozen; the header template is built at print time and the meta
+      // doesn't record the author, so current is the best truth available.
+      authorName: await binderStore.getAuthorName(),
+      title: meta.name
+    }
+    return printHtml(viewHtml, options)
+  })
+
+  // Front/back matter are ordinary binder structure made through the same
+  // template machinery — the settings only record the designation so the
+  // panel can show they exist.
+  ipcMain.handle('compile:createFrontMatter', async () => {
+    const folderId = await createFrontMatter()
+    const settings = await compileSettingsStore.getCompileSettings()
+    return compileSettingsStore.updateCompileSettings({ ...settings, frontMatterFolderId: folderId })
+  })
+
+  ipcMain.handle('compile:createBackMatter', async () => {
+    const folderId = await createBackMatter()
+    const settings = await compileSettingsStore.getCompileSettings()
+    return compileSettingsStore.updateCompileSettings({ ...settings, backMatterFolderId: folderId })
+  })
+
+  ipcMain.handle('compile:listPresets', () => compileSettingsStore.listPresets())
+
+  ipcMain.handle('compile:savePreset', (_event, draft: Omit<CompilePreset, 'id'>) =>
+    compileSettingsStore.savePreset(draft)
+  )
+
+  ipcMain.handle('compile:deletePreset', (_event, id: string) => compileSettingsStore.deletePreset(id))
+
+  // External word lookup. The renderer sends a word and one of two
+  // whitelisted kinds — never a URL — and the URL is assembled here from the
+  // fixed template, so this handler can only ever open the two reference
+  // services. Returns the URL it opened, so callers (and tests) can see
+  // exactly what left the app.
+  ipcMain.handle('lookup:word', async (_event, kind: LookupKind, word: string) => {
+    if (!isLookupKind(kind) || typeof word !== 'string' || !word.trim()) {
+      throw new Error('Nothing to look up')
+    }
+    const url = lookupUrl(kind, word.trim())
+    await shell.openExternal(url)
+    return { url }
   })
 
   ipcMain.handle('import:files', async (event, parentId: string | null): Promise<ImportResult> => {
@@ -1000,12 +1378,6 @@ app.whenReady().then(async () => {
     preferencesStore.setAccentColor(color)
   )
 
-  ipcMain.handle('preferences:getTrueBlack', () => preferencesStore.getTrueBlack())
-
-  ipcMain.handle('preferences:setTrueBlack', (_event, enabled: boolean) =>
-    preferencesStore.setTrueBlack(enabled)
-  )
-
   ipcMain.handle('preferences:getZoomPercent', () => preferencesStore.getZoomPercent())
 
   ipcMain.handle('preferences:setZoomPercent', (_event, zoom: number) =>
@@ -1030,6 +1402,18 @@ app.whenReady().then(async () => {
     preferencesStore.setTextColor(color)
   )
 
+  ipcMain.handle('preferences:getPageBackgroundColor', () => preferencesStore.getPageBackgroundColor())
+
+  ipcMain.handle('preferences:setPageBackgroundColor', (_event, color: string | null) =>
+    preferencesStore.setPageBackgroundColor(color)
+  )
+
+  ipcMain.handle('preferences:getColorPresetId', () => preferencesStore.getColorPresetId())
+
+  ipcMain.handle('preferences:setColorPresetId', (_event, id: string | null) =>
+    preferencesStore.setColorPresetId(id)
+  )
+
   ipcMain.handle('preferences:getHiddenToolbarSections', () => preferencesStore.getHiddenToolbarSections())
 
   ipcMain.handle('preferences:setHiddenToolbarSections', (_event, sections: ToolbarSectionId[]) =>
@@ -1037,6 +1421,12 @@ app.whenReady().then(async () => {
   )
 
   ipcMain.handle('preferences:getLayoutPresets', () => preferencesStore.getLayoutPresets())
+
+  ipcMain.handle('preferences:getCustomThemes', () => preferencesStore.getCustomThemes())
+
+  ipcMain.handle('preferences:setCustomThemes', (_event, themes: CustomTheme[]) =>
+    preferencesStore.setCustomThemes(themes)
+  )
 
   ipcMain.handle('preferences:setLayoutPresets', (_event, presets: LayoutPreset[]) =>
     preferencesStore.setLayoutPresets(presets)
@@ -1053,6 +1443,12 @@ app.whenReady().then(async () => {
   ipcMain.handle('preferences:getPageMarginMm', () => preferencesStore.getPageMarginMm())
 
   ipcMain.handle('preferences:setPageMarginMm', (_event, mm: number) => preferencesStore.setPageMarginMm(mm))
+
+  ipcMain.handle('preferences:getPageViewMode', () => preferencesStore.getPageViewMode())
+
+  ipcMain.handle('preferences:setPageViewMode', (_event, mode: PageViewMode) =>
+    preferencesStore.setPageViewMode(mode)
+  )
 
   ipcMain.handle('template:apply', async (_event, id: TemplateId) => {
     await applyTemplate(id)
@@ -1082,6 +1478,211 @@ app.whenReady().then(async () => {
     // persisted one against the files and re-indexes only what disagrees.
     void searchIndex.open()
     return { opened: true, path: chosen }
+  })
+
+  /**
+   * Creates a genuinely new project: an empty binder in a folder of the
+   * writer's choosing, which the app then switches to.
+   *
+   * This is deliberately NOT template application. Templates add structure to
+   * whatever project is already open; they never made a project, so "New
+   * Project" previously changed nothing at all when the chosen structure was
+   * Blank. Creation is its own step, and it happens here.
+   *
+   * The steps mirror project:openFolder — the only established way the root
+   * changes — plus the two that make the folder a project rather than just a
+   * destination: the caches are reset to empty defaults (invalidateCache,
+   * which exists precisely so a root without a binder.json doesn't keep
+   * showing the previous project's tree) and binder.json is written straight
+   * away, so the project exists on disk before the window reloads into it.
+   */
+  ipcMain.handle('project:createNew', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    const options: Electron.OpenDialogOptions = {
+      title: 'New Project',
+      buttonLabel: 'Create Project',
+      // createDirectory lets the writer make the folder in the dialog; an
+      // existing empty folder is equally valid.
+      properties: ['openDirectory', 'createDirectory']
+    }
+    const result = window
+      ? await dialog.showOpenDialog(window, options)
+      : await dialog.showOpenDialog(options)
+
+    if (result.canceled || result.filePaths.length === 0) return { created: false as const }
+
+    const chosen = result.filePaths[0]
+    // A binder.json here means this folder already IS a project. Adopting it
+    // would silently present someone's existing work as a new empty one, and
+    // the first write would erase it — so refuse, and say so rather than
+    // returning quietly, which would look exactly like the do-nothing bug
+    // this handler replaces.
+    if (projectExistsAt(chosen)) {
+      const warning = {
+        type: 'info' as const,
+        buttons: ['OK'],
+        message: 'That folder already holds a project',
+        detail:
+          'Pick an empty folder — or create one in the dialog — for a new project. To work on the project that is already there, use File ▸ Open Project instead.'
+      }
+      if (window) await dialog.showMessageBox(window, warning)
+      else await dialog.showMessageBox(warning)
+      return { created: false as const, reason: 'exists' as const }
+    }
+
+    await mkdir(chosen, { recursive: true })
+    setProjectRoot(chosen)
+    await preferencesStore.setProjectRootPref(chosen)
+    binderStore.invalidateCache()
+    storyBibleStore.invalidateCache()
+    wordCountStore.invalidateAll()
+    // Writes binder.json (a missing file is not a load failure, so persist is
+    // allowed), naming the project after its folder.
+    await binderStore.setProjectName(basename(chosen))
+    await lifetimeStore.recordProjectOpened(chosen, (await binderStore.getState()).projectName)
+    void searchIndex.open()
+    return { created: true as const, path: chosen }
+  })
+
+  /**
+   * Imports a Scrivener project into a new ChapterFlow project.
+   *
+   * Everything is parsed BEFORE anything is written, so a malformed project
+   * fails without leaving a half-made one behind. Then the order below, which
+   * is deliberate at two points:
+   *
+   *   - documents to disk before the binder insert. A crash after the binder
+   *     lands leaves a project full of chapters that exist and are empty,
+   *     indistinguishable from data loss; the reverse leaves orphan files,
+   *     which are discoverable and deletable.
+   *   - the search index suspended across the whole write. Every project write
+   *     re-serialises the entire index, so 129 documents is quadratic without
+   *     it. resume() re-opens once, in a finally.
+   */
+  ipcMain.handle('scrivener:importProject', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    const ask = async (options: Electron.OpenDialogOptions): Promise<Electron.OpenDialogReturnValue> =>
+      window ? dialog.showOpenDialog(window, options) : dialog.showOpenDialog(options)
+
+    const picked = await ask({
+      title: 'Choose a Scrivener project',
+      buttonLabel: 'Choose',
+      // A .scriv is a folder on Windows; a .zip is Scrivener's own backup.
+      properties: ['openDirectory']
+    })
+    if (picked.canceled || picked.filePaths.length === 0) return { imported: false as const }
+    const sourcePath = picked.filePaths[0]
+
+    // Parse first. Nothing below this point is reversible.
+    let prepared: Awaited<ReturnType<typeof scrivenerImport.prepareProject>>
+    try {
+      prepared = await scrivenerImport.prepareProject(sourcePath)
+    } catch (error) {
+      const warning = {
+        type: 'warning' as const,
+        buttons: ['OK'],
+        message: 'That project could not be imported',
+        detail: (error as Error).message
+      }
+      if (window) await dialog.showMessageBox(window, warning)
+      else await dialog.showMessageBox(warning)
+      return { imported: false as const, reason: (error as Error).message }
+    }
+
+    const destination = await ask({
+      title: 'Where should the imported project go?',
+      buttonLabel: 'Import Here',
+      properties: ['openDirectory', 'createDirectory']
+    })
+    if (destination.canceled || destination.filePaths.length === 0) return { imported: false as const }
+    const chosen = destination.filePaths[0]
+
+    if (projectExistsAt(chosen)) {
+      const warning = {
+        type: 'info' as const,
+        buttons: ['OK'],
+        message: 'That folder already holds a project',
+        detail:
+          'Pick an empty folder — or create one in the dialog. Importing into an existing project would overwrite its binder.'
+      }
+      if (window) await dialog.showMessageBox(window, warning)
+      else await dialog.showMessageBox(warning)
+      return { imported: false as const, reason: 'exists' as const }
+    }
+
+    return writeImportedProject(prepared, sourcePath, chosen)
+  })
+
+  /**
+   * The write half, shared by the dialog-driven handler above and the
+   * acceptance test seam below — so what is verified end to end is the same
+   * code a writer runs, not a parallel copy of it.
+   */
+  async function writeImportedProject(
+    prepared: Awaited<ReturnType<typeof scrivenerImport.prepareProject>>,
+    sourcePath: string,
+    chosen: string
+  ): Promise<ScrivenerProjectImportResult> {
+    await mkdir(chosen, { recursive: true })
+    setProjectRoot(chosen)
+    await preferencesStore.setProjectRootPref(chosen)
+    binderStore.invalidateCache()
+    storyBibleStore.invalidateCache()
+    wordCountStore.invalidateAll()
+
+    const name = prepared.title || basename(sourcePath).replace(/\.scriv$/i, '')
+    await binderStore.setProjectName(name)
+    // Both replace the whole list, which is safe only because this is a new
+    // project with nothing of the writer's to merge with.
+    if (prepared.statuses.length > 0) await binderStore.setStatuses(prepared.statuses)
+    if (prepared.tags.length > 0) await binderStore.setTags(prepared.tags)
+
+    let documentCount = 0
+    searchIndex.suspend()
+    try {
+      for (const document of prepared.documents) {
+        await documentStore.saveDocument(document.id, document.html)
+        documentCount++
+        // After the document itself, so a crash never leaves version history
+        // for a document with no current text.
+        for (const snapshot of document.snapshots) {
+          await snapshotStore.importSnapshot(document.id, snapshot.html, snapshot.timestamp, snapshot.title)
+        }
+      }
+      for (const folder of prepared.topLevelFolders) {
+        const created = await binderStore.createTopLevelFolder(folder.name)
+        if (folder.nodes.length > 0) await binderStore.insertSubtree(created.id, folder.nodes)
+      }
+      for (const placement of prepared.placements) {
+        if (placement.nodes.length > 0) await binderStore.insertSubtree(placement.parentId, placement.nodes)
+      }
+    } finally {
+      await searchIndex.resume()
+    }
+
+    wordCountStore.invalidateAll()
+    backupStore.markDirty()
+    await lifetimeStore.recordProjectOpened(chosen, name)
+
+    return {
+      imported: true as const,
+      path: chosen,
+      documents: documentCount,
+      snapshots: prepared.snapshotCount,
+      warnings: Object.entries(prepared.warnings).map(([kind, count]) => ({
+        kind: kind as ImportWarningKind,
+        count: count as number
+      })),
+      notes: prepared.notes,
+      failures: prepared.failures
+    }
+  }
+
+  /** Test seam: the same import without the two directory dialogs, so the
+   *  acceptance test drives the real path rather than a copy of it. */
+  ipcMain.handle('scrivener:importProjectAt', async (_event, sourcePath: string, destination: string) => {
+    const prepared = await scrivenerImport.prepareProject(sourcePath)
+    return writeImportedProject(prepared, sourcePath, destination)
   })
 
   ipcMain.handle('backup:list', () => backupStore.listBackups())

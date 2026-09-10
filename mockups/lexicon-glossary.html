@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>Lexicon — the glossary, with an alphabet index</title>
+<style>
+:root {
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-sm: 4px; --radius-md: 6px;
+  --motion-fast: 0.12s ease;
+  --text-2xs: 10px; --text-xs: 11px; --text-sm: 12px; --text-md: 13px; --text-lg: 14px;
+  --text-xl: 20px; --text-2xl: 26px;
+  --shadow-rgb: 0 0 0; --shadow-weak: 0.22; --shadow-soft: 0.3; --shadow-strong: 0.4;
+  --elev-1: 0 1px 2px rgb(var(--shadow-rgb) / var(--shadow-weak));
+  --elev-2: 0 1px 2px rgb(var(--shadow-rgb) / var(--shadow-weak)), 0 8px 20px rgb(var(--shadow-rgb) / var(--shadow-soft));
+  --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-editor: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+
+  --chrome-bg: #1c1a17;
+  --chrome-bg-elevated: #242119;
+  --chrome-bg-sidebar: #18160f;
+  --chrome-border: #35312a;
+  --chrome-border-strong: #4a4438;
+  --chrome-text: #e8e3d9;
+  --chrome-text-heading: #f0ece2;
+  --chrome-text-muted: #9c9585;
+  --chrome-text-dim: #6b6558;
+  --chrome-control-bg: #262319;
+  --chrome-control-hover: #322d22;
+  --chrome-control-active-bg: #3a3527;
+  --chrome-accent: #6f95b8;
+  --chrome-accent-contrast: #0d1520;
+  --chrome-row-hover: #221f18;
+  --chrome-row-selected: #2a3846;
+  --chrome-accent-error: #c26a5a;
+}
+:root[data-theme='light'] {
+  --shadow-weak: 0.08; --shadow-soft: 0.13; --shadow-strong: 0.18;
+  --chrome-bg: #f5f1e8;
+  --chrome-bg-elevated: #ece6d8;
+  --chrome-bg-sidebar: #efe9dc;
+  --chrome-border: #ddd4c0;
+  --chrome-border-strong: #c9bea3;
+  --chrome-text: #2b2620;
+  --chrome-text-heading: #1c1812;
+  --chrome-text-muted: #6e6656;
+  --chrome-text-dim: #948c78;
+  --chrome-control-bg: #ece5d3;
+  --chrome-control-hover: #e0d8c2;
+  --chrome-control-active-bg: #d8cdb0;
+  --chrome-accent: #3d5a7a;
+  --chrome-accent-contrast: #f5f1e8;
+  --chrome-row-hover: #ece5d3;
+  --chrome-row-selected: #d7e0e8;
+  --chrome-accent-error: #a8503f;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-ui); font-size: var(--text-md); color: var(--chrome-text); background: #0f0e0c; }
+:root[data-theme='light'] body { background: #ded7c6; }
+
+/* ---------------------------------------------------------------- mock chrome */
+.mock-bar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--chrome-bg-sidebar); border-bottom: 1px solid var(--chrome-border);
+}
+.mock-title { font-size: var(--text-md); font-weight: 600; color: var(--chrome-text-heading); }
+.mock-note { font-size: var(--text-sm); color: var(--chrome-text-dim); }
+.mock-spacer { flex: 1; }
+.mock-tabs { display: flex; gap: var(--space-1); }
+.mock-tab, .mock-toggle {
+  height: 26px; padding: 0 var(--space-3);
+  font-family: var(--font-ui); font-size: var(--text-sm);
+  color: var(--chrome-text-muted); background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border); border-radius: 13px; cursor: pointer;
+}
+.mock-tab:hover, .mock-toggle:hover { color: var(--chrome-text-heading); border-color: var(--chrome-border-strong); }
+.mock-tab.is-active { color: var(--chrome-accent-contrast); background: var(--chrome-accent); border-color: var(--chrome-accent); }
+.mock-toggle.is-on { color: var(--chrome-text-heading); background: var(--chrome-control-active-bg); }
+
+.stage { padding: var(--space-5); display: flex; justify-content: center; }
+.frame {
+  width: 1400px; height: 880px; display: flex; overflow: hidden;
+  background: var(--chrome-bg); border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md); box-shadow: var(--elev-2);
+}
+
+/* ---------------------------------------------------------------- app frame */
+.rail {
+  width: 44px; flex: none; display: flex; flex-direction: column; align-items: center;
+  gap: var(--space-1); padding-top: var(--space-3);
+  background: var(--chrome-bg-sidebar); border-right: 1px solid var(--chrome-border);
+}
+.rail-btn { width: 30px; height: 30px; display: grid; place-items: center; font-size: var(--text-md); color: var(--chrome-text-dim); border-radius: var(--radius-sm); }
+.rail-btn.is-active { color: var(--chrome-text-heading); background: var(--chrome-control-active-bg); }
+
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.toolbar {
+  display: flex; align-items: center; gap: var(--space-2);
+  height: 44px; flex: none; padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--chrome-border);
+}
+.btn-primary {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  height: 28px; padding: 0 var(--space-3);
+  font-family: var(--font-ui); font-size: var(--text-sm); font-weight: 500;
+  color: var(--chrome-text-heading); background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border-strong); border-radius: var(--radius-sm); cursor: pointer;
+}
+.btn-primary:hover { background: var(--chrome-control-hover); }
+.field {
+  height: 28px; padding: 0 var(--space-3);
+  font-family: var(--font-ui); font-size: var(--text-sm);
+  color: var(--chrome-text); background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border); border-radius: var(--radius-sm);
+}
+.field::placeholder { color: var(--chrome-text-dim); }
+.field.is-wide { width: 240px; }
+.toolbar-count { margin-left: auto; font-size: var(--text-sm); color: var(--chrome-text-dim); }
+
+.link { padding: 0; font-family: var(--font-ui); font-size: var(--text-sm); color: var(--chrome-text-muted); background: none; border: none; cursor: pointer; }
+.link:hover { color: var(--chrome-accent); text-decoration: underline; }
+.link.is-delete:hover { color: var(--chrome-accent-error); }
+
+.body { flex: 1; min-height: 0; display: flex; }
+.scroll { flex: 1; min-height: 0; overflow: auto; padding: var(--space-5) var(--space-5) var(--space-6); scroll-behavior: auto; }
+.measure { max-width: 660px; margin: 0 auto; }
+
+.lead { margin: 0 0 var(--space-2); font-size: var(--text-xl); font-weight: 400; line-height: 1.45; color: var(--chrome-text-heading); }
+.sub { margin: 0 0 var(--space-5); font-size: var(--text-md); line-height: 1.6; color: var(--chrome-text-muted); }
+.section-head {
+  display: flex; align-items: baseline; gap: var(--space-2);
+  margin: var(--space-6) 0 var(--space-2); padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--chrome-border);
+}
+.section-name { font-size: var(--text-lg); font-weight: 600; color: var(--chrome-text-heading); }
+.section-note { font-size: var(--text-sm); color: var(--chrome-text-dim); }
+
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-3);
+  margin: 120px auto 0; max-width: 480px; text-align: center;
+  font-size: var(--text-md); line-height: 1.6; color: var(--chrome-text-dim);
+}
+.empty-state p { margin: 0; }
+
+.names { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-2); }
+.name-chip {
+  height: 22px; display: inline-flex; align-items: center; padding: 0 var(--space-2);
+  font-size: var(--text-sm); color: var(--chrome-text-muted);
+  background: var(--chrome-control-bg); border-radius: 11px;
+}
+.name-chip.is-both { color: var(--chrome-text-heading); border: 1px solid var(--chrome-border-strong); }
+
+/* ---------------------------------------------------------------- the glossary */
+.gl-group { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: var(--space-4); margin-top: var(--space-5); scroll-margin-top: var(--space-4); }
+.gl-letter { font-family: var(--font-editor); font-size: var(--text-2xl); line-height: 1; color: var(--chrome-text-dim); padding-top: 2px; }
+.gl-entry { padding: var(--space-2) var(--space-2) var(--space-3) 0; border-radius: var(--radius-sm); }
+.gl-entry:hover { background: var(--chrome-row-hover); }
+.gl-head { display: flex; align-items: baseline; gap: var(--space-2); }
+.gl-word { font-family: var(--font-editor); font-size: var(--text-xl); color: var(--chrome-text-heading); }
+.gl-pron { font-family: var(--font-editor); font-style: italic; font-size: var(--text-lg); color: var(--chrome-text-dim); }
+.gl-actions { margin-left: auto; display: flex; gap: var(--space-2); opacity: 0; transition: opacity var(--motion-fast); }
+.gl-entry:hover .gl-actions { opacity: 1; }
+.gl-meaning { margin-top: var(--space-1); font-family: var(--font-editor); font-size: var(--text-lg); line-height: 1.6; color: var(--chrome-text); }
+.gl-unset { color: var(--chrome-text-dim); font-style: italic; }
+
+/* ---------------------------------------------------------------- the alphabet index
+   Hovering a letter moves the glossary to it. Nothing is clicked, and a letter
+   with no words under it is inert: dimmed, no hover state, no jump. */
+.alpha {
+  display: flex; flex: none;
+  color: var(--chrome-text-dim);
+  user-select: none;
+}
+.alpha-letter {
+  display: grid; place-items: center;
+  font-family: var(--font-editor); font-size: var(--text-sm);
+  color: var(--chrome-text-muted);
+  transition: color var(--motion-fast), background var(--motion-fast);
+}
+.alpha-letter.is-empty {
+  /* Nothing to jump to, so it reads as a gap in the alphabet rather than as a
+     control that does nothing. */
+  color: var(--chrome-text-dim);
+  opacity: 0.4;
+}
+.alpha-letter:not(.is-empty):hover {
+  color: var(--chrome-accent-contrast);
+  background: var(--chrome-accent);
+}
+/* Where the glossary is now, so the strip reads as a position as well as a way
+   of moving. */
+.alpha-letter.is-current:not(:hover) { color: var(--chrome-text-heading); background: var(--chrome-control-active-bg); }
+
+/* Down the side, the way a binder's tabs run. */
+.alpha.is-side {
+  flex-direction: column;
+  width: 26px;
+  padding: var(--space-3) 0;
+  gap: 1px;
+  border-left: 1px solid var(--chrome-border);
+  background: var(--chrome-bg);
+}
+.alpha.is-side .alpha-letter { height: 21px; border-radius: var(--radius-sm); }
+
+/* Across the top, under the toolbar. */
+.alpha.is-top {
+  flex-direction: row; justify-content: center; gap: 1px;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--chrome-border);
+  background: var(--chrome-bg);
+}
+.alpha.is-top .alpha-letter { width: 22px; height: 20px; border-radius: var(--radius-sm); }
+</style>
+</head>
+<body>
+
+<div class="mock-bar">
+  <span class="mock-title">Lexicon · the glossary</span>
+  <span class="mock-note">hover a letter to move there · dimmed letters do nothing</span>
+  <span class="mock-spacer"></span>
+  <div class="mock-tabs">
+    <button class="mock-tab is-active" data-go="side">1 · Index down the side</button>
+    <button class="mock-tab" data-go="top">2 · Index across the top</button>
+  </div>
+  <button class="mock-toggle" id="empty-toggle">Show it empty (e)</button>
+  <button class="mock-toggle" id="theme-toggle">Light (t)</button>
+</div>
+
+<div class="stage">
+  <div class="frame" id="frame"></div>
+</div>
+
+<script>
+// ---------------------------------------------------------------- fake data
+/* word, pronunciation, meaning. Empty strings are the real cases: the model
+   makes both optional and never infers either. */
+const WORDS = [
+  ['alow', '/əˈləʊ/', 'Below deck. The opposite of aloft, and the only one of the pair anyone here still says.'],
+  ['bothy', '/ˈbɒθi/', 'A one-room stone shelter kept unlocked for anyone caught out by the weather.'],
+  ['clinker-built', '', 'Built from overlapping planks, which is why the Kestrel Point boats sit low and take a swell the way they do.'],
+  ['dunnage', '/ˈdʌnɪdʒ/', 'Loose wood packed around cargo to stop it shifting. Ivo uses it for anything wedged in to stop a thing moving.'],
+  ['fetch', '', 'The distance of open water a wave has crossed before it arrives, which is why the northerly storms are the ones to mind.'],
+  ['gansey', '/ˈɡanzi/', 'A fisherman’s jumper knitted in a pattern particular to one village, so a body could be named by it.'],
+  ['gurry', '/ˈɡʌri/', 'The mess left on a deck after gutting. Not a word anyone uses in front of visitors.'],
+  ['haaf', '/hɑːf/', ''],
+  ['haar', '/hɑː/', 'The cold sea fog that comes in off the water in early summer, and the reason nobody here trusts a clear June morning.'],
+  ['ketch', '/kɛtʃ/', 'A two-masted boat with the smaller mast set behind the wheel.'],
+  ['leat', '/liːt/', 'The channel that carries water from the river to the mill. Older than the mill it feeds.'],
+  ['Mirrenwater', '/ˈmɪrənˌwɔːtə/', 'The stretch of river between the weir and the sea, named for a family that no longer exists.'],
+  ['neap', '/niːp/', 'The weakest tide of the month, when the flats stay half covered and nothing is properly revealed.'],
+  ['painter', '', 'The rope at a boat’s bow, for making it fast. Nothing to do with pictures, as Serafine will tell you twice.'],
+  ['rove', '', ''],
+  ['scran', '/skran/', 'Food taken out on a boat. The word carries an opinion about the quality.'],
+  ['shoaling', '', ''],
+  ['spilling weir', '', 'The overflow channel that keeps the mill pond from taking the road with it.'],
+  ['sump-gate', '', 'The gate at the low end of the weir. Opening it is the last thing anyone does before a flood.'],
+  ['tidewrack', '', 'The line of debris left at high water, read the morning after like a receipt.'],
+  ['trawlwife', '', 'A woman who sells what the boats bring in. Half the village owes her money and the other half owed her mother.'],
+  ['withy', '/ˈwɪði/', 'A willow shoot cut for basket work. Ivo keeps a bundle soaking under the boathouse.'],
+  ['wrack', '/rak/', 'Seaweed thrown up by a storm, and what the shoreline smells of for a week afterwards.'],
+  ['Wren', '/rɛn/', 'The bird, and the reason the Halloway girl was given the name.'],
+  ['yawl', '/jɔːl/', 'A boat like a ketch with the small mast set further back still. The distinction matters to about four people here.']
+].map(([word, pron, meaning]) => ({ word, pron, meaning }))
+
+/* Words the spellchecker leaves alone because a Story Bible name or alias uses
+   them. Nothing here is a Lexicon entry, except where it says so. */
+const NAMES = [
+  'Halloway', 'Wren', 'Tobias', 'Marguerite', 'Vance', 'Serafine', 'Okonkwo',
+  'Ivo', 'Marchetti', 'Corwin', 'Elias', 'Thorn', 'Nadia', 'Ferrell', 'Kestrel', 'Drowned'
+]
+
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+
+let EMPTY = false
+let PLACEMENT = 'side'
+const data = () => (EMPTY ? [] : WORDS)
+const names = () => (EMPTY ? [] : NAMES)
+
+function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])) }
+function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many) }
+const WORDNUM = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+  'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen', 'Twenty']
+function leading(n) { return n <= 20 ? WORDNUM[n] : String(n) }
+
+function groupsOf(words) {
+  const groups = {}
+  for (const w of words) {
+    const letter = w.word[0].toUpperCase()
+    ;(groups[letter] = groups[letter] || []).push(w)
+  }
+  return groups
+}
+
+// ---------------------------------------------------------------- rendering
+function alphaStrip(groups) {
+  return '<div class="alpha is-' + PLACEMENT + '">' +
+    ALPHABET.map((letter) => {
+      const has = !!groups[letter]
+      return '<span class="alpha-letter' + (has ? '' : ' is-empty') + '" data-letter="' + letter + '">' +
+        letter + '</span>'
+    }).join('') +
+  '</div>'
+}
+
+function lead() {
+  const n = data().length
+  const m = names().length
+  return '<p class="lead">' + leading(n) + ' ' + (n === 1 ? 'word' : 'words') + ' in this project’s lexicon.</p>' +
+    '<p class="sub">The editor leaves these alone instead of marking them as spelling mistakes. ' +
+    'That applies inside ChapterFlow only, and never touches the system dictionary. ' +
+    leading(m) + ' more ' + (m === 1 ? 'word is' : 'words are') + ' left alone because a Story Bible name uses ' +
+    (m === 1 ? 'it' : 'them') + '.</p>'
+}
+
+function namesSection() {
+  const list = names()
+  if (!list.length) return ''
+  return '<div class="section-head"><span class="section-name">From the Story Bible</span>' +
+    '<span class="section-note">These come from names and aliases. Removing the name is what lets the editor ' +
+    'mark the word again.</span></div>' +
+    '<div class="names">' + list.map((n) => n === 'Wren'
+      ? '<span class="name-chip is-both">' + esc(n) + ' · also a lexicon entry</span>'
+      : '<span class="name-chip">' + esc(n) + '</span>').join('') +
+    '</div>'
+}
+
+function glossary(groups) {
+  const entry = (w) =>
+    '<div class="gl-entry">' +
+      '<div class="gl-head">' +
+        '<span class="gl-word">' + esc(w.word) + '</span>' +
+        (w.pron ? '<span class="gl-pron">' + esc(w.pron) + '</span>' : '') +
+        '<span class="gl-actions">' +
+          '<button class="link">Edit</button>' +
+          '<button class="link is-delete">Delete</button>' +
+        '</span>' +
+      '</div>' +
+      '<div class="gl-meaning">' + (w.meaning
+        ? esc(w.meaning)
+        : '<span class="gl-unset">No meaning written down yet.</span>') + '</div>' +
+    '</div>'
+
+  return Object.keys(groups).sort((a, b) => a.localeCompare(b)).map((letter) =>
+    '<div class="gl-group" data-group="' + letter + '">' +
+      '<div class="gl-letter">' + letter + '</div>' +
+      '<div>' + groups[letter].map(entry).join('') + '</div>' +
+    '</div>').join('')
+}
+
+function draw() {
+  const words = data()
+  const groups = groupsOf(words)
+  const toolbar =
+    '<div class="toolbar">' +
+      '<input class="field is-wide" placeholder="Add a word…" />' +
+      '<button class="btn-primary">Add</button>' +
+      (words.length ? '<input class="field" placeholder="Filter…" />' : '') +
+      '<span class="toolbar-count">' + (words.length === 0 ? 'No words' : plural(words.length, 'word', 'words')) + '</span>' +
+    '</div>'
+
+  const page = words.length === 0
+    ? '<div class="scroll"><div class="measure"><div class="empty-state">' +
+      '<p>No words have been added yet. Add one above, or right-click a word the editor has marked as a ' +
+      'mistake and choose “Define in Lexicon”.</p>' +
+      '<button class="btn-primary">Add the first word</button></div></div></div>'
+    : '<div class="scroll" id="scroll"><div class="measure">' +
+      lead() + glossary(groups) + namesSection() +
+      '</div></div>'
+
+  // The strip is only drawn when there is something to jump to. An alphabet of
+  // twenty-six dead letters over an empty page would be decoration.
+  const strip = words.length === 0 ? '' : alphaStrip(groups)
+
+  document.getElementById('frame').innerHTML =
+    '<div class="rail">' +
+      '<div class="rail-btn">✎</div><div class="rail-btn">◫</div><div class="rail-btn">⌗</div>' +
+      '<div class="rail-btn">⎘</div><div class="rail-btn">✉</div><div class="rail-btn is-active">≡</div>' +
+    '</div>' +
+    '<div class="main">' + toolbar +
+      (PLACEMENT === 'top' ? strip : '') +
+      '<div class="body">' + page + (PLACEMENT === 'side' ? strip : '') + '</div>' +
+    '</div>'
+
+  wireStrip()
+}
+
+// ---------------------------------------------------------------- behaviour
+function wireStrip() {
+  const scroll = document.getElementById('scroll')
+  if (!scroll) return
+  const letters = [...document.querySelectorAll('.alpha-letter')]
+  const allGroups = [...document.querySelectorAll('.gl-group')]
+
+  // Without trailing space the last few letters cannot reach the top of the
+  // view, so hovering Y would leave you looking at W and the strip would mark
+  // W as where you are. Enough room is added under the page for the final
+  // group to sit at the top like any other.
+  if (allGroups.length) {
+    scroll.style.paddingBottom = ''
+    const last = allGroups[allGroups.length - 1]
+    const lastTop = last.getBoundingClientRect().top - scroll.getBoundingClientRect().top + scroll.scrollTop
+    const below = scroll.scrollHeight - lastTop
+    const needed = Math.max(0, scroll.clientHeight - below - 24)
+    if (needed > 0) scroll.style.paddingBottom = needed + 'px'
+  }
+
+  // Hover, not click. Jumping is instant rather than smoothed, so sweeping the
+  // strip flips through the glossary instead of queueing animations.
+  letters.forEach((el) => {
+    if (el.classList.contains('is-empty')) return
+    el.addEventListener('mouseenter', () => {
+      const group = document.querySelector('.gl-group[data-group="' + el.dataset.letter + '"]')
+      if (!group) return
+      scroll.scrollTop += group.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 16
+    })
+  })
+
+  // Which letter the glossary is currently showing, so the strip reads as a
+  // position as well as a control.
+  const groups = [...document.querySelectorAll('.gl-group')]
+  const markCurrent = () => {
+    const top = scroll.getBoundingClientRect().top
+    let current = groups[0]
+    for (const g of groups) {
+      if (g.getBoundingClientRect().top - top <= 24) current = g
+    }
+    const letter = current ? current.dataset.group : null
+    letters.forEach((el) => el.classList.toggle('is-current', el.dataset.letter === letter))
+  }
+  scroll.addEventListener('scroll', markCurrent)
+  markCurrent()
+}
+
+// ---------------------------------------------------------------- wiring
+function show(which) {
+  PLACEMENT = which
+  document.querySelectorAll('.mock-tab').forEach((t) => t.classList.toggle('is-active', t.dataset.go === which))
+  if (location.hash.slice(1) !== which) history.replaceState(null, '', '#' + which)
+  draw()
+}
+
+document.querySelectorAll('.mock-tab').forEach((t) => t.addEventListener('click', () => show(t.dataset.go)))
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const light = document.documentElement.getAttribute('data-theme') === 'light'
+  document.documentElement.setAttribute('data-theme', light ? 'dark' : 'light')
+  document.getElementById('theme-toggle').textContent = light ? 'Light (t)' : 'Dark (t)'
+})
+
+document.getElementById('empty-toggle').addEventListener('click', () => {
+  EMPTY = !EMPTY
+  const btn = document.getElementById('empty-toggle')
+  btn.classList.toggle('is-on', EMPTY)
+  btn.textContent = EMPTY ? 'Show it full (e)' : 'Show it empty (e)'
+  draw()
+})
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === '1') show('side')
+  if (e.key === '2') show('top')
+  if (e.key === 't') document.getElementById('theme-toggle').click()
+  if (e.key === 'e') document.getElementById('empty-toggle').click()
+})
+
+const hash = location.hash.slice(1)
+show(['side', 'top'].indexOf(hash) !== -1 ? hash : 'side')
+</script>
+</body>
+</html>

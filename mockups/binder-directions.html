@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Binder — three directions</title>
+<style>
+  /* ChapterFlow tokens, copied from src/renderer/src/index.css so the mock
+     is judged in the app's own light. Dark is the default, as in the app.
+     The editor page stays paper across themes, exactly as the real tokens do. */
+  :root {
+    --space-1: 4px; --space-2: 8px; --space-3: 12px;
+    --space-4: 16px; --space-5: 24px; --space-6: 32px;
+    --radius-sm: 4px; --radius-md: 6px;
+    --text-2xs: 10px; --text-xs: 11px; --text-sm: 12px; --text-md: 13px;
+    --text-lg: 14px; --text-xl: 20px;
+    --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-editor: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+
+    --editor-bg: #faf6ec;
+    --editor-surround: #e6e2d9;
+    --editor-page-edge: rgba(43, 38, 32, 0.09);
+    --editor-page-shadow: rgba(43, 38, 32, 0.07);
+    --editor-text: #2b2620;
+    --editor-muted: #8a8270;
+
+    --chrome-bg: #1c1a17;
+    --chrome-bg-elevated: #242119;
+    --chrome-bg-sidebar: #18160f;
+    --chrome-border: #35312a;
+    --chrome-border-strong: #4a4438;
+    --chrome-text: #e8e3d9;
+    --chrome-text-heading: #f0ece2;
+    --chrome-text-muted: #9c9585;
+    --chrome-text-dim: #6b6558;
+    --chrome-control-bg: #262319;
+    --chrome-control-hover: #322d22;
+    --chrome-accent: #6f95b8;
+    --chrome-accent-contrast: #0d1520;
+    --chrome-row-hover: #221f18;
+    --chrome-row-selected: #2a3846;
+  }
+  body.light {
+    --chrome-bg: #f5f1e8;
+    --chrome-bg-elevated: #ece6d8;
+    --chrome-bg-sidebar: #efe9dc;
+    --chrome-border: #ddd4c0;
+    --chrome-border-strong: #c9bea3;
+    --chrome-text: #2b2620;
+    --chrome-text-heading: #1c1812;
+    --chrome-text-muted: #6e6656;
+    --chrome-text-dim: #948c78;
+    --chrome-control-bg: #ece5d3;
+    --chrome-control-hover: #e0d8c2;
+    --chrome-accent: #3d5a7a;
+    --chrome-accent-contrast: #f5f1e8;
+    --chrome-row-hover: #ece5d3;
+    --chrome-row-selected: #d7e0e8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--chrome-bg);
+    color: var(--chrome-text);
+    font-family: var(--font-ui);
+    font-size: var(--text-md);
+    line-height: 1.45;
+    overflow: hidden;
+  }
+
+  /* ── Mock chrome: the switcher bar (same shell as the Progress mock) ── */
+  .mockbar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: var(--space-4);
+    padding: 0 var(--space-4); height: 44px;
+    background: var(--chrome-bg-elevated);
+    border-bottom: 1px solid var(--chrome-border);
+  }
+  .mockbar-title { font-size: var(--text-sm); color: var(--chrome-text-muted); white-space: nowrap; }
+  .mockbar-tabs { display: flex; gap: var(--space-1); margin: 0 auto; }
+  .mockbar-tabs button {
+    font: inherit; font-size: var(--text-sm); color: var(--chrome-text-muted);
+    background: none; border: 1px solid transparent; border-radius: var(--radius-sm);
+    padding: 4px 12px; cursor: pointer;
+  }
+  .mockbar-tabs button:hover { background: var(--chrome-control-hover); }
+  .mockbar-tabs button.is-active {
+    color: var(--chrome-text-heading);
+    background: var(--chrome-control-bg);
+    border-color: var(--chrome-border-strong);
+  }
+  .mockbar-theme {
+    font: inherit; font-size: var(--text-xs); color: var(--chrome-text-muted);
+    background: var(--chrome-control-bg); border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-sm); padding: 3px 10px; cursor: pointer; white-space: nowrap;
+  }
+  .mockbar-theme:hover { background: var(--chrome-control-hover); }
+
+  .direction { display: none; height: calc(100vh - 44px); flex-direction: column; }
+  .direction.is-active { display: flex; }
+  .direction-note {
+    flex-shrink: 0;
+    margin: var(--space-3) var(--space-4);
+    font-size: var(--text-xs); color: var(--chrome-text-dim);
+    border-left: 2px solid var(--chrome-border-strong); padding-left: var(--space-3);
+    max-width: 900px;
+  }
+
+  /* ── The stage: sidebar + faux editor, so layout is judged in context ── */
+  .stage {
+    flex: 1; min-height: 0;
+    display: flex;
+    border-top: 1px solid var(--chrome-border);
+  }
+  .panel {
+    flex-shrink: 0;
+    height: 100%;
+    overflow-y: auto;
+    background: var(--chrome-bg-sidebar);
+    border-right: 1px solid var(--chrome-border);
+    padding: var(--space-2) 0 var(--space-5);
+    scrollbar-width: thin;
+  }
+  .editor {
+    flex: 1; min-width: 0;
+    overflow-y: auto;
+    background: var(--editor-surround);
+    display: flex;
+    justify-content: center;
+    padding: var(--space-6) var(--space-5);
+  }
+  .page {
+    width: 480px; max-width: 100%;
+    flex-shrink: 0;
+    align-self: flex-start;
+    background: var(--editor-bg);
+    color: var(--editor-text);
+    border: 1px solid var(--editor-page-edge);
+    box-shadow: 0 2px 10px var(--editor-page-shadow);
+    padding: 56px 52px 72px;
+    font-family: var(--font-editor);
+    font-size: 15px;
+    line-height: 1.65;
+  }
+  .page h1 { font-size: 20px; font-weight: 600; margin-bottom: 24px; }
+  .page p { margin-bottom: 14px; text-indent: 1.5em; }
+  .page p:first-of-type { text-indent: 0; }
+
+  /* Shared status / tag bits, matching StatusTagBadges */
+  .dot {
+    flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%;
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.25);
+  }
+  .chip {
+    flex-shrink: 0; display: inline-block; max-width: 64px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    height: 16px; line-height: 14px; padding: 0 6px;
+    font-size: var(--text-2xs); font-weight: 600;
+    border-radius: 8px; border: 1px solid transparent;
+  }
+  .chip.is-outline { background: transparent !important; color: var(--chrome-text-muted); }
+  .chip-more {
+    flex-shrink: 0; height: 16px; line-height: 14px; padding: 0 4px;
+    font-size: var(--text-2xs); font-weight: 600; color: var(--chrome-text-muted);
+    background: var(--chrome-control-bg); border: 1px solid var(--chrome-border);
+    border-radius: 8px;
+  }
+
+  svg.icon { width: 14px; height: 14px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.4; }
+  .chev { width: 16px; height: 16px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+          color: var(--chrome-text-dim); transition: transform 0.12s ease; }
+  .chev.is-open { transform: rotate(90deg); }
+  .chev svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+
+  /* ════════ A · RAIL — today's tree, tightened ════════ */
+  #dir-a .panel { width: 280px; }
+  .a-section {
+    display: flex; align-items: center; gap: var(--space-2);
+    margin: var(--space-4) var(--space-2) var(--space-1);
+    padding: 0 var(--space-1);
+    font-size: var(--text-2xs); font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--chrome-text-dim);
+  }
+  .a-section::after { content: ''; flex: 1; border-top: 1px solid var(--chrome-border); }
+  .a-section:first-child { margin-top: var(--space-1); }
+  .a-row {
+    display: flex; align-items: center; gap: var(--space-1);
+    height: 24px; margin: 0 var(--space-1);
+    padding-right: var(--space-2);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: var(--text-sm);
+  }
+  .a-row:hover { background: var(--chrome-row-hover); }
+  .a-row.is-selected { background: var(--chrome-row-selected); }
+  .a-row .node-icon { color: var(--chrome-text-muted); display: inline-flex; }
+  .a-row.is-folder .name { font-weight: 500; }
+  .a-row .num {
+    flex-shrink: 0; width: 14px; text-align: right;
+    font-size: var(--text-2xs); color: var(--chrome-text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .a-row .name {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .a-row.is-active .name { color: var(--chrome-accent); font-weight: 600; }
+  .a-row .badges { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; }
+  .a-row .actions { display: flex; align-items: center; gap: 2px; opacity: 0; }
+  .a-row:hover .actions { opacity: 1; }
+  .a-row .actions button {
+    display: inline-flex; padding: 2px; background: none; border: none;
+    color: var(--chrome-text-dim); cursor: pointer; border-radius: 3px;
+  }
+  .a-row .actions button:hover { color: var(--chrome-text); background: var(--chrome-control-hover); }
+  .a-empty { padding: 2px 0 2px 44px; font-size: var(--text-xs); color: var(--chrome-text-dim); font-style: italic; }
+
+  /* ════════ B · LEDGER — two-line rows, status as an edge, counts always ════════ */
+  #dir-b .panel { width: 330px; }
+  .b-section {
+    display: flex; align-items: baseline;
+    margin: var(--space-4) var(--space-3) var(--space-1);
+    padding-bottom: 3px;
+    border-bottom: 1px solid var(--chrome-border);
+    font-size: var(--text-2xs); font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--chrome-text-dim);
+  }
+  .b-section:first-child { margin-top: var(--space-1); }
+  .b-section .count { margin-left: auto; font-weight: 400; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+  .b-folder {
+    display: flex; align-items: center; gap: var(--space-1);
+    height: 26px; margin: var(--space-1) var(--space-2) 0;
+    padding: 0 var(--space-2) 0 0;
+    border-radius: var(--radius-sm);
+    cursor: pointer; font-size: var(--text-sm); font-weight: 600;
+    color: var(--chrome-text-heading);
+  }
+  .b-folder:hover { background: var(--chrome-row-hover); }
+  .b-folder .count { margin-left: auto; font-weight: 400; font-size: var(--text-2xs);
+                     color: var(--chrome-text-dim); font-variant-numeric: tabular-nums; }
+  .b-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 18px 1fr auto;
+    grid-template-rows: auto auto;
+    align-items: baseline;
+    column-gap: var(--space-1);
+    margin: 1px var(--space-2) 0 var(--space-4);
+    padding: 3px var(--space-2) 4px 6px;
+    border-left: 2px solid var(--chrome-border);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    cursor: pointer;
+  }
+  .b-row:hover { background: var(--chrome-row-hover); }
+  .b-row.is-selected { background: var(--chrome-row-selected); }
+  .b-row .num {
+    grid-row: 1; grid-column: 1;
+    font-size: var(--text-2xs); color: var(--chrome-text-dim);
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+  .b-row .name {
+    grid-row: 1; grid-column: 2;
+    font-size: var(--text-sm); font-weight: 500;
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .b-row.is-active .name { color: var(--chrome-accent); font-weight: 600; }
+  .b-row .count {
+    grid-row: 1; grid-column: 3;
+    font-size: var(--text-2xs); color: var(--chrome-text-dim); font-variant-numeric: tabular-nums;
+  }
+  .b-row .synopsis {
+    grid-row: 2; grid-column: 2 / 4;
+    font-size: var(--text-xs); color: var(--chrome-text-dim);
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .b-plain {
+    display: flex; align-items: center; gap: var(--space-2);
+    height: 24px; margin: 0 var(--space-2) 0 var(--space-4);
+    padding: 0 var(--space-2) 0 8px;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm); color: var(--chrome-text-muted);
+    cursor: pointer;
+  }
+  .b-plain:hover { background: var(--chrome-row-hover); color: var(--chrome-text); }
+
+  /* ════════ C · CONTENTS — a typographic contents page ════════ */
+  #dir-c .panel { width: 300px; padding-left: var(--space-3); padding-right: var(--space-3); }
+  .c-section {
+    display: flex; align-items: center; gap: var(--space-3);
+    margin: var(--space-5) 0 var(--space-2);
+    font-size: var(--text-2xs); font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--chrome-text-dim);
+  }
+  .c-section::before, .c-section::after { content: ''; flex: 1; border-top: 1px solid var(--chrome-border); }
+  .c-section:first-child { margin-top: var(--space-2); }
+  .c-part {
+    display: flex; align-items: baseline;
+    margin-top: var(--space-3);
+    padding: 2px var(--space-1);
+    font-size: var(--text-2xs); font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--chrome-text-muted);
+    cursor: pointer; border-radius: var(--radius-sm);
+  }
+  .c-part:hover { background: var(--chrome-row-hover); }
+  .c-part .fold { margin-right: 4px; color: var(--chrome-text-dim); font-size: 8px; }
+  .c-row {
+    display: flex; align-items: baseline; gap: var(--space-2);
+    padding: 3px var(--space-1);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+  .c-row:hover { background: var(--chrome-row-hover); }
+  .c-row.is-selected { background: var(--chrome-row-selected); }
+  .c-row .dot { width: 6px; height: 6px; align-self: center; }
+  .c-row .name {
+    font-family: var(--font-editor);
+    font-size: var(--text-lg);
+    color: var(--chrome-text);
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .c-row .name .n { color: var(--chrome-text-dim); font-size: var(--text-sm); }
+  .c-row.is-active .name { color: var(--chrome-accent); }
+  .c-row .leader { flex: 1; border-bottom: 1px dotted var(--chrome-border-strong); transform: translateY(-3px); min-width: 12px; }
+  .c-row .folio { font-size: var(--text-2xs); color: var(--chrome-text-dim); font-variant-numeric: tabular-nums; }
+  .c-row.is-active .folio { color: var(--chrome-accent); }
+  .c-part .leader { flex: 1; border-bottom: 1px dotted var(--chrome-border); transform: translateY(-3px); margin: 0 var(--space-2); }
+  .c-part .folio { font-weight: 400; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+  .c-row.is-plain .name { font-family: var(--font-ui); font-size: var(--text-sm); color: var(--chrome-text-muted); }
+  .c-row.is-plain:hover .name { color: var(--chrome-text); }
+</style>
+</head>
+<body>
+
+<div class="mockbar">
+  <span class="mockbar-title">Binder · fake data</span>
+  <div class="mockbar-tabs" id="tabs">
+    <button data-dir="dir-a" class="is-active">A · Rail</button>
+    <button data-dir="dir-b">B · Ledger</button>
+    <button data-dir="dir-c">C · Contents</button>
+  </div>
+  <button class="mockbar-theme" id="themeToggle">Light theme</button>
+</div>
+
+<section class="direction is-active" id="dir-a">
+  <p class="direction-note">A — the rail. Today's tree, tightened: Draft / Notes / Matter become quiet
+    section labels instead of folder rows, giving every real row one level of indent back. Status stays
+    a dot, tags stay chips, split/delete only appear on hover (try it). No word counts — the binder
+    stays a place for names, as it is now.</p>
+  <div class="stage">
+    <aside class="panel" id="panel-a"></aside>
+    <main class="editor"><div class="page" data-page></div></main>
+  </div>
+</section>
+
+<section class="direction" id="dir-b">
+  <p class="direction-note">B — the ledger. Two-line rows: chapter number in its own column, the
+    synopsis under the title, the live word count always visible on the right, and status as a colored
+    left edge instead of a dot. Folders carry rolled-up counts. Densest in information, tallest in
+    rows — the binder becomes half an outliner.</p>
+  <div class="stage">
+    <aside class="panel" id="panel-b"></aside>
+    <main class="editor"><div class="page" data-page></div></main>
+  </div>
+</section>
+
+<section class="direction" id="dir-c">
+  <p class="direction-note">C — the contents page. Typography does all the work: manuscript documents
+    in the page's own serif with dot leaders out to their word counts, parts as small caps with
+    rolled-up folios, sections as centered rules. Status keeps its dot but shrinks; Notes and Matter
+    drop to quiet sans lists — only the manuscript is a page.</p>
+  <div class="stage">
+    <aside class="panel" id="panel-c"></aside>
+    <main class="editor"><div class="page" data-page></div></main>
+  </div>
+</section>
+
+<script>
+/* ── Fake data — the same novel the Progress mock used ─────────────── */
+const STATUSES = {
+  final:    { label: 'Final',    color: '#7a9b6e' },
+  revised:  { label: 'Revised',  color: '#6f95b8' },
+  drafting: { label: 'Drafting', color: '#c9a227' },
+  sketch:   { label: 'Sketch',   color: '#8a8270' }
+}
+const TAGS = {
+  maren:   { label: 'Maren',       color: '#b87f96' },
+  tomas:   { label: 'Tomas',       color: '#7f96b8' },
+  visitor: { label: 'The Visitor', color: '#9b8ab8' },
+  letters: { label: 'Letters',     color: '#b8a17a' }
+}
+
+const doc = (name, num, status, tags, words, synopsis, extra = {}) =>
+  ({ kind: 'doc', name, num, status, tags, mentions: [], words, synopsis, ...extra })
+const note = (name) => ({ kind: 'doc', name, num: null, status: null, tags: [], mentions: [], words: null, synopsis: '' })
+
+const TREE = [
+  { kind: 'section', name: 'Draft', words: 52584, children: [
+    { kind: 'folder', name: 'Part I · The Orchard Year', words: 17664, children: [
+      doc('Prologue', null, 'final', [], 3216, 'A house left to the winter; a letter that should not exist.'),
+      doc('The Orchard', 1, 'final', ['maren'], 4812, 'Maren comes back after seven years and counts what the frost took.'),
+      doc('Low Tide', 2, 'revised', ['maren', 'tomas'], 5244, 'Tomas shows her the flats at dawn; something is buried in the shingle.', { mentions: ['visitor'] }),
+      doc('The Visitor', 3, 'revised', ['visitor'], 4392, 'A stranger asks for lodging and knows too much about the house.')
+    ]},
+    { kind: 'folder', name: 'Part II · What the House Kept', words: 19800, children: [
+      doc('What the House Kept', 4, 'drafting', ['maren', 'visitor'], 6096, 'The attic yields its boxes; the letters begin.', { active: true }),
+      doc('The Letters', null, 'drafting', ['letters'], 3228, 'Interlude — the letters, in their own hand.', { mentions: ['maren', 'tomas'] }),
+      doc('Signal Fires', 5, 'drafting', ['tomas'], 5508, 'The village lights the headland; Maren reads the third letter.', { selected: true }),
+      doc('The Long Field', 6, 'sketch', [], 4968, 'Walking the boundary; what the neighbours will not say.')
+    ]},
+    { kind: 'folder', name: 'Part III · North of Everything', words: 15120, collapsed: true, children: [
+      doc('The Weir', 7, 'sketch', [], 5916, ''),
+      doc('Ashes on the Sill', 8, 'sketch', [], 5160, ''),
+      doc('The Hollow Season', 9, 'sketch', [], 2940, '')
+    ]}
+  ]},
+  { kind: 'section', name: 'Notes', words: null, children: [
+    { kind: 'folder', name: 'Characters', words: null, children: [
+      note('Maren Voss'), note('Tomas Brek'), note('The Visitor')
+    ]},
+    { kind: 'folder', name: 'Places', words: null, collapsed: true, children: [
+      note('The Orchard'), note('The Weir')
+    ]},
+    note('Tides & seasons — research')
+  ]},
+  { kind: 'section', name: 'Matter', words: null, children: [
+    note('Title Page'), note('Dedication'), note('Acknowledgements')
+  ]}
+]
+
+/* ── Shared bits ───────────────────────────────────────────────────── */
+const fmt = (n) => n.toLocaleString('en-US')
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+const CHEV = '<svg viewBox="0 0 10 10"><path d="M3 1.5 L7 5 L3 8.5"/></svg>'
+const ICON_DOC = '<svg class="icon" viewBox="0 0 14 14"><path d="M3 1.5h5.5L11 4v8.5H3z"/><path d="M8.5 1.5V4H11"/></svg>'
+const ICON_FOLDER = '<svg class="icon" viewBox="0 0 14 14"><path d="M1.5 3.5h4l1.5 1.5h5.5v6.5h-11z"/></svg>'
+const ICON_SPLIT = '<svg class="icon" viewBox="0 0 14 14"><rect x="1.5" y="2.5" width="11" height="9" rx="1"/><path d="M7 2.5v9"/></svg>'
+const ICON_TRASH = '<svg class="icon" viewBox="0 0 14 14"><path d="M2.5 4h9M5.5 4V2.5h3V4M4 4l.6 8h4.8L10 4"/></svg>'
+
+function mix(color, pct, base) {
+  return `color-mix(in oklab, ${color} ${pct}%, ${base})`
+}
+function chips(d, max = 2) {
+  const all = [
+    ...d.tags.map((t) => ({ ...TAGS[t], outline: false })),
+    ...d.mentions.map((t) => ({ ...TAGS[t], outline: true }))
+  ]
+  // The real binder folds chips into "+N" before a title ever gives up a
+  // character; at rail width that means one chip at most.
+  const shown = all.slice(0, max)
+  const more = all.length - shown.length
+  return shown.map((c) =>
+    `<span class="chip ${c.outline ? 'is-outline' : ''}" title="${esc(c.label)}"
+       style="background:${mix(c.color, 30, 'var(--chrome-bg-sidebar)')};border-color:${mix(c.color, 55, 'var(--chrome-bg-sidebar)')};color:var(--chrome-text)">${esc(c.label)}</span>`
+  ).join('') + (more > 0 ? `<span class="chip-more">+${more}</span>` : '')
+}
+const statusDot = (d, cls = 'dot') =>
+  d.status ? `<span class="${cls}" title="${STATUSES[d.status].label}" style="background:${STATUSES[d.status].color}"></span>` : ''
+
+/* ── A · Rail ──────────────────────────────────────────────────────── */
+function renderA(el) {
+  let s = ''
+  for (const section of TREE) {
+    s += `<div class="a-section">${esc(section.name)}</div>`
+    s += aChildren(section.children, 0)
+  }
+  el.innerHTML = s
+}
+function aChildren(nodes, depth) {
+  let s = ''
+  for (const node of nodes) {
+    const pad = 4 + depth * 12
+    if (node.kind === 'folder') {
+      const open = !node.collapsed
+      s += `<div class="a-row is-folder" style="padding-left:${pad}px">
+        <span class="chev ${open ? 'is-open' : ''}">${CHEV}</span>
+        <span class="node-icon">${ICON_FOLDER}</span>
+        <span class="name">${esc(node.name)}</span></div>`
+      if (open) s += aChildren(node.children, depth + 1)
+    } else {
+      s += `<div class="a-row ${node.active ? 'is-active' : ''} ${node.selected ? 'is-selected' : ''}"
+        style="padding-left:${pad + 16}px">
+        <span class="node-icon">${ICON_DOC}</span>
+        <span class="num">${node.num ?? ''}</span>
+        <span class="name">${esc(node.name)}</span>
+        <span class="badges">${statusDot(node)}${chips(node, 1)}
+          <span class="actions"><button title="Open in split view">${ICON_SPLIT}</button><button title="Delete">${ICON_TRASH}</button></span>
+        </span></div>`
+    }
+  }
+  return s
+}
+
+/* ── B · Ledger ────────────────────────────────────────────────────── */
+function renderB(el) {
+  let s = ''
+  for (const section of TREE) {
+    s += `<div class="b-section">${esc(section.name)}${section.words != null ? `<span class="count">${fmt(section.words)}</span>` : ''}</div>`
+    s += bChildren(section.children)
+  }
+  el.innerHTML = s
+}
+function bChildren(nodes) {
+  let s = ''
+  for (const node of nodes) {
+    if (node.kind === 'folder') {
+      const open = !node.collapsed
+      s += `<div class="b-folder">
+        <span class="chev ${open ? 'is-open' : ''}">${CHEV}</span>
+        <span>${esc(node.name)}</span>
+        ${node.words != null ? `<span class="count">${fmt(node.words)}</span>` : ''}</div>`
+      if (open) s += bChildren(node.children)
+    } else if (node.words == null) {
+      s += `<div class="b-plain">${esc(node.name)}</div>`
+    } else {
+      const edge = node.status ? STATUSES[node.status].color : 'var(--chrome-border)'
+      s += `<div class="b-row ${node.active ? 'is-active' : ''} ${node.selected ? 'is-selected' : ''}"
+        style="border-left-color:${edge}">
+        <span class="num">${node.num ?? '·'}</span>
+        <span class="name">${esc(node.name)}</span>
+        <span class="count">${fmt(node.words)}</span>
+        ${node.synopsis ? `<span class="synopsis">${esc(node.synopsis)}</span>` : ''}</div>`
+    }
+  }
+  return s
+}
+
+/* ── C · Contents ──────────────────────────────────────────────────── */
+function renderC(el) {
+  let s = ''
+  for (const section of TREE) {
+    s += `<div class="c-section">${esc(section.name)}</div>`
+    s += cChildren(section.children, section.name === 'Draft')
+  }
+  el.innerHTML = s
+}
+function cChildren(nodes, isManuscript) {
+  let s = ''
+  for (const node of nodes) {
+    if (node.kind === 'folder') {
+      const open = !node.collapsed
+      s += `<div class="c-part"><span class="fold">${open ? '▾' : '▸'}</span>${esc(node.name)}
+        ${node.words != null ? `<span class="leader"></span><span class="folio">${fmt(node.words)}</span>` : ''}</div>`
+      if (open) s += cChildren(node.children, isManuscript)
+    } else if (!isManuscript || node.words == null) {
+      s += `<div class="c-row is-plain"><span class="name">${esc(node.name)}</span></div>`
+    } else {
+      const numPrefix = node.num != null ? `<span class="n">${node.num} · </span>` : ''
+      s += `<div class="c-row ${node.active ? 'is-active' : ''} ${node.selected ? 'is-selected' : ''}">
+        ${statusDot(node)}
+        <span class="name">${numPrefix}${esc(node.name)}</span>
+        <span class="leader"></span>
+        <span class="folio">${fmt(node.words)}</span></div>`
+    }
+  }
+  return s
+}
+
+/* ── Faux editor page, shared across directions ────────────────────── */
+const SENTENCE = 'The lamp guttered and went out and she waited in the dark, listening for the tide to turn below the orchard wall. '
+document.querySelectorAll('[data-page]').forEach((el) => {
+  el.innerHTML = `<h1>Chapter 4 · What the House Kept</h1>` +
+    [3, 4, 3, 4, 3].map((n) => `<p>${SENTENCE.repeat(n).trim()}</p>`).join('')
+})
+
+renderA(document.getElementById('panel-a'))
+renderB(document.getElementById('panel-b'))
+renderC(document.getElementById('panel-c'))
+
+/* ── Shell: tabs (keys 1/2/3), theme, deep links (#b, #c-light) ────── */
+const tabs = document.getElementById('tabs')
+function activate(dir) {
+  tabs.querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', b.dataset.dir === dir))
+  document.querySelectorAll('.direction').forEach((sec) => sec.classList.toggle('is-active', sec.id === dir))
+}
+tabs.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-dir]')
+  if (btn) activate(btn.dataset.dir)
+})
+document.addEventListener('keydown', (e) => {
+  const map = { 1: 'dir-a', 2: 'dir-b', 3: 'dir-c' }
+  if (map[e.key]) activate(map[e.key])
+})
+const themeBtn = document.getElementById('themeToggle')
+themeBtn.addEventListener('click', () => {
+  const light = document.body.classList.toggle('light')
+  themeBtn.textContent = light ? 'Dark theme' : 'Light theme'
+})
+{
+  const h = location.hash.slice(1)
+  const dir = { a: 'dir-a', b: 'dir-b', c: 'dir-c' }[h[0]]
+  if (dir) activate(dir)
+  if (h.includes('light')) themeBtn.click()
+}
+</script>
+</body>
+</html>

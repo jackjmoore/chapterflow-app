@@ -16,6 +16,15 @@ export type ImportWarningKind =
   | 'headingsClamped'
   | 'nestedListsFlattened'
   | 'unsupportedFormattingDropped'
+  // Added for the Scrivener importer. Annotations are inline notes in the RTF;
+  // the encoding fallback fires when a file declares a codepage iconv-lite
+  // does not know, so the text may be wrong rather than merely plainer.
+  | 'annotationsDropped'
+  | 'textEncodingFallback'
+  // Scrivener carries per-document metadata this app has no field for, and
+  // per-document compile flags its Draft-scoped compile cannot express.
+  | 'customMetadataDropped'
+  | 'compileFlagsIgnored'
 
 /** Human-readable, past-tense descriptions shown in the post-import summary. */
 export const IMPORT_WARNING_LABELS: Record<ImportWarningKind, string> = {
@@ -28,7 +37,11 @@ export const IMPORT_WARNING_LABELS: Record<ImportWarningKind, string> = {
   hyperlinksFlattened: 'hyperlink(s) — link text kept, the URL was not',
   headingsClamped: 'heading(s) below level 3 — moved up to Heading 3, the deepest level this app has',
   nestedListsFlattened: 'nested list item(s) — flattened to a single level',
-  unsupportedFormattingDropped: 'run(s) with formatting this app has no equivalent for (e.g. strikethrough)'
+  unsupportedFormattingDropped: 'run(s) with formatting this app has no equivalent for (e.g. strikethrough)',
+  annotationsDropped: 'inline annotation(s) dropped',
+  textEncodingFallback: 'file(s) whose text encoding could not be identified, so some characters may be wrong',
+  customMetadataDropped: 'custom metadata field(s) dropped',
+  compileFlagsIgnored: 'document(s) whose Include in Compile setting was not carried across'
 }
 
 export interface ImportedDocument {

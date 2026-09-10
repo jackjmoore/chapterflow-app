@@ -8,8 +8,10 @@ import FontFamily from '@tiptap/extension-font-family'
 import Highlight from '@tiptap/extension-highlight'
 import TextAlign from '@tiptap/extension-text-align'
 import { FontSize } from './extensions/fontSize'
+import { FirstBlockPlaceholder } from './extensions/firstBlockPlaceholder'
 import { LineHeight } from './extensions/lineHeight'
 import { SpanTag } from './extensions/spanTag'
+import { DocumentLink } from './extensions/documentLink'
 import { MentionHighlight } from './extensions/mentionHighlight'
 import { ChapterBreak, ChapterLine, PageBreak } from './extensions/structuralBreaks'
 import { Footnote } from './extensions/footnote'
@@ -35,7 +37,9 @@ export function createEditorExtensions(): AnyExtension[] {
       history: { depth: 100, newGroupDelay: 500 }
     }),
     Underline,
-    Placeholder.configure({ placeholder: 'Start writing...' }),
+    // Not @tiptap/extension-placeholder: that one walks the whole document on
+    // every keystroke to find empty nodes. See firstBlockPlaceholder.ts.
+    FirstBlockPlaceholder.configure({ placeholder: 'Start writing...' }),
     TextStyle,
     Color,
     FontFamily,
@@ -44,6 +48,10 @@ export function createEditorExtensions(): AnyExtension[] {
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
     LineHeight,
     SpanTag,
+    // In the SHARED list on purpose: headless parsing (search & replace, the
+    // draft assembly) must know the mark, or re-serializing a document
+    // through those paths would silently strip every link.
+    DocumentLink,
     MentionHighlight,
     // Insert-menu content. StarterKit's own horizontalRule stays off (above):
     // these three carry distinct data attributes so export can tell a chapter

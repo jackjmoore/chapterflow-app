@@ -33,12 +33,23 @@ export function buildSearchRegex(query: string, options: SearchOptions): RegExp 
   }
 }
 
-interface TextMap {
+export interface TextMap {
   text: string
+  /** `positions[i]` is the document position of `text[i]`, so a match found
+   *  by offset in the flat string maps straight back to a real range. */
   positions: number[]
 }
 
-function extractTextWithPositions(doc: PMNode): TextMap {
+/**
+ * Flattens a document to plain text alongside the position of every
+ * character.
+ *
+ * Exported because revision mode needs the identical extraction: a diff
+ * computed against text that was flattened by different rules would place its
+ * highlights against positions this map never agreed to. One flattening, one
+ * position map, both features.
+ */
+export function extractTextWithPositions(doc: PMNode): TextMap {
   let text = ''
   const positions: number[] = []
 

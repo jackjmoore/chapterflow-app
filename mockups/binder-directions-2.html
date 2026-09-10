@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Binder — round two</title>
+<style>
+  /* ChapterFlow tokens, as before. Dark default; the page stays paper. */
+  :root {
+    --space-1: 4px; --space-2: 8px; --space-3: 12px;
+    --space-4: 16px; --space-5: 24px; --space-6: 32px;
+    --radius-sm: 4px; --radius-md: 6px;
+    --text-2xs: 10px; --text-xs: 11px; --text-sm: 12px; --text-md: 13px;
+    --text-lg: 14px;
+    --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-editor: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+
+    --editor-bg: #faf6ec;
+    --editor-surround: #e6e2d9;
+    --editor-page-edge: rgba(43, 38, 32, 0.09);
+    --editor-page-shadow: rgba(43, 38, 32, 0.07);
+    --editor-text: #2b2620;
+
+    --chrome-bg: #1c1a17;
+    --chrome-bg-elevated: #242119;
+    --chrome-bg-sidebar: #18160f;
+    --chrome-border: #35312a;
+    --chrome-border-strong: #4a4438;
+    --chrome-text: #e8e3d9;
+    --chrome-text-heading: #f0ece2;
+    --chrome-text-muted: #9c9585;
+    --chrome-text-dim: #6b6558;
+    --chrome-control-bg: #262319;
+    --chrome-control-hover: #322d22;
+    --chrome-accent: #6f95b8;
+    --chrome-row-hover: #221f18;
+    --chrome-row-selected: #2a3846;
+  }
+  body.light {
+    --chrome-bg: #f5f1e8;
+    --chrome-bg-elevated: #ece6d8;
+    --chrome-bg-sidebar: #efe9dc;
+    --chrome-border: #ddd4c0;
+    --chrome-border-strong: #c9bea3;
+    --chrome-text: #2b2620;
+    --chrome-text-heading: #1c1812;
+    --chrome-text-muted: #6e6656;
+    --chrome-text-dim: #948c78;
+    --chrome-control-bg: #ece5d3;
+    --chrome-control-hover: #e0d8c2;
+    --chrome-accent: #3d5a7a;
+    --chrome-row-hover: #ece5d3;
+    --chrome-row-selected: #d7e0e8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--chrome-bg);
+    color: var(--chrome-text);
+    font-family: var(--font-ui);
+    font-size: var(--text-md);
+    line-height: 1.45;
+    overflow: hidden;
+  }
+
+  /* ── Shell (same as the other mocks) ─────────────────────────────── */
+  .mockbar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: var(--space-4);
+    padding: 0 var(--space-4); height: 44px;
+    background: var(--chrome-bg-elevated);
+    border-bottom: 1px solid var(--chrome-border);
+  }
+  .mockbar-title { font-size: var(--text-sm); color: var(--chrome-text-muted); white-space: nowrap; }
+  .mockbar-tabs { display: flex; gap: var(--space-1); margin: 0 auto; }
+  .mockbar-tabs button {
+    font: inherit; font-size: var(--text-sm); color: var(--chrome-text-muted);
+    background: none; border: 1px solid transparent; border-radius: var(--radius-sm);
+    padding: 4px 12px; cursor: pointer;
+  }
+  .mockbar-tabs button:hover { background: var(--chrome-control-hover); }
+  .mockbar-tabs button.is-active {
+    color: var(--chrome-text-heading);
+    background: var(--chrome-control-bg);
+    border-color: var(--chrome-border-strong);
+  }
+  .mockbar-theme {
+    font: inherit; font-size: var(--text-xs); color: var(--chrome-text-muted);
+    background: var(--chrome-control-bg); border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-sm); padding: 3px 10px; cursor: pointer; white-space: nowrap;
+  }
+  .mockbar-theme:hover { background: var(--chrome-control-hover); }
+
+  .direction { display: none; height: calc(100vh - 44px); flex-direction: column; }
+  .direction.is-active { display: flex; }
+  .direction-note {
+    flex-shrink: 0;
+    margin: var(--space-3) var(--space-4);
+    font-size: var(--text-xs); color: var(--chrome-text-dim);
+    border-left: 2px solid var(--chrome-border-strong); padding-left: var(--space-3);
+    max-width: 900px;
+  }
+  .stage { flex: 1; min-height: 0; display: flex; border-top: 1px solid var(--chrome-border); }
+  .panel {
+    flex-shrink: 0; width: 300px; height: 100%; overflow-y: auto;
+    background: var(--chrome-bg-sidebar);
+    border-right: 1px solid var(--chrome-border);
+    padding: var(--space-2) 0 var(--space-5);
+    scrollbar-width: thin;
+  }
+  .editor {
+    flex: 1; min-width: 0; overflow-y: auto;
+    background: var(--editor-surround);
+    display: flex; justify-content: center;
+    padding: var(--space-6) var(--space-5);
+  }
+  .page {
+    width: 480px; max-width: 100%; flex-shrink: 0; align-self: flex-start;
+    background: var(--editor-bg); color: var(--editor-text);
+    border: 1px solid var(--editor-page-edge);
+    box-shadow: 0 2px 10px var(--editor-page-shadow);
+    padding: 56px 52px 72px;
+    font-family: var(--font-editor); font-size: 15px; line-height: 1.65;
+  }
+  .page h1 { font-size: 20px; font-weight: 600; margin-bottom: 24px; }
+  .page p { margin-bottom: 14px; text-indent: 1.5em; }
+  .page p:first-of-type { text-indent: 0; }
+
+  svg.icon { width: 14px; height: 14px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.4; }
+  .chev { width: 16px; height: 16px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+          color: var(--chrome-text-dim); transition: transform 0.12s ease; }
+  .chev.is-open { transform: rotate(90deg); }
+  .chev svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+  .chev-spacer { width: 16px; flex-shrink: 0; }
+
+  /* ── Shared row grammar for all three directions ─────────────────── */
+  .row {
+    position: relative;
+    display: flex; align-items: center; gap: var(--space-1);
+    height: 24px;
+    margin: 0 var(--space-1);
+    padding-right: var(--space-2);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: var(--text-sm);
+  }
+  .row:hover { background: var(--chrome-row-hover); }
+  .row.is-selected { background: var(--chrome-row-selected); }
+  .row .node-icon { color: var(--chrome-text-muted); display: inline-flex; flex-shrink: 0; }
+  .row .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row.is-folder .name { font-weight: 500; }
+  .row.is-structural .name { font-weight: 600; letter-spacing: 0.03em; color: var(--chrome-text-heading); }
+  .row.is-active .name { color: var(--chrome-accent); font-weight: 600; }
+  .row .count {
+    margin-left: auto; flex-shrink: 0;
+    font-size: var(--text-2xs); color: var(--chrome-text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .row.is-active .count { color: var(--chrome-accent); }
+  .row .num {
+    flex-shrink: 0; width: 14px; text-align: right;
+    font-size: var(--text-2xs); color: var(--chrome-text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .name .n { color: var(--chrome-text-dim); }
+
+  /* The status edge — the hover target is deliberately wider (12px) than the
+     visible bar, so it's easy to hit without the bar getting loud. */
+  .edge { position: absolute; left: 0; top: 0; bottom: 0; width: 12px; }
+  .edge::before {
+    content: ''; position: absolute; left: 2px; border-radius: 2px;
+    background: var(--edge-color, transparent);
+    transition: width 0.12s ease;
+  }
+  .edge:hover::before { width: 6px !important; }
+
+  /* ════════ A · Ledger — the literal ask ════════ */
+  #dir-a .edge::before { top: 3px; bottom: 3px; width: 4px; }
+
+  /* ════════ B · Inkline — no icons, indent guides, inline numbers ════════ */
+  #dir-b .row { height: 22px; margin: 0; padding-right: var(--space-2); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+  /* One nesting step costs 14px (8px guide offset + 6px padding) — close to
+     the app's current 12px, not the 29px the first cut of this mock spent. */
+  #dir-b .kids {
+    margin-left: 8px;
+    border-left: 1px solid var(--chrome-border);
+  }
+  #dir-b .kids > .row, #dir-b .kids > .node > .row { padding-left: 6px; }
+  #dir-b .edge::before { top: 50%; margin-top: -7px; height: 14px; width: 4px; }
+  #dir-b .row .edge { left: -1px; }
+  #dir-b .kids .edge::before { left: 3px; }
+
+  /* ════════ C · Spine — the edge carries status AND tags ════════ */
+  #dir-c .edge-stack {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 12px;
+  }
+  #dir-c .edge-stack .seg-col {
+    position: absolute; left: 2px; top: 3px; bottom: 3px; width: 4px;
+    display: flex; flex-direction: column; gap: 1px;
+    border-radius: 2px; overflow: hidden;
+    transition: width 0.12s ease;
+  }
+  #dir-c .edge-stack:hover .seg-col { width: 6px; }
+  #dir-c .seg { flex: 1; }
+  #dir-c .seg.is-status { flex: 1.6; }
+  #dir-c .seg.is-mention { opacity: 0.45; }
+
+  /* ── The hover popover: status + tags, like the app's overflow list ── */
+  #pop {
+    position: fixed; z-index: 50; display: none; pointer-events: none;
+    max-width: 240px;
+    padding: var(--space-2);
+    background: var(--chrome-bg-elevated);
+    border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.22), 0 8px 20px rgb(0 0 0 / 0.3);
+  }
+  #pop .pop-status {
+    display: flex; align-items: center; gap: var(--space-2);
+    font-size: var(--text-xs); font-weight: 600; color: var(--chrome-text);
+    margin-bottom: var(--space-1);
+  }
+  #pop .pop-status:last-child { margin-bottom: 0; }
+  #pop .pop-tags { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+  .dot {
+    flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%;
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.25);
+  }
+  .chip {
+    display: inline-block; height: 16px; line-height: 14px; padding: 0 6px;
+    font-size: var(--text-2xs); font-weight: 600; color: var(--chrome-text);
+    border-radius: 8px; border: 1px solid transparent; white-space: nowrap;
+  }
+  .chip.is-outline { background: transparent !important; color: var(--chrome-text-muted); }
+</style>
+</head>
+<body>
+
+<div class="mockbar">
+  <span class="mockbar-title">Binder · round two · fake data</span>
+  <div class="mockbar-tabs" id="tabs">
+    <button data-dir="dir-a">A · Ledger</button>
+    <button data-dir="dir-b" class="is-active">B · Inkline</button>
+    <button data-dir="dir-c">C · Spine</button>
+  </div>
+  <button class="mockbar-theme" id="themeToggle">Light theme</button>
+</div>
+
+<section class="direction" id="dir-a">
+  <p class="direction-note">A — the ledger, single line. The brief, literally: today's anatomy (folders
+    stay folders, Draft / Notes / Matter included), one 24px line per row, no synopsis, word counts and
+    roll-ups on the right, and status as a 4px coloured edge. Hover any edge — it widens and a card
+    names the status and tags.</p>
+  <div class="stage">
+    <aside class="panel" id="panel-a"></aside>
+    <main class="editor"><div class="page" data-page></div></main>
+  </div>
+</section>
+
+<section class="direction is-active" id="dir-b">
+  <p class="direction-note">B — the inkline, indents tightened: one nesting step now costs 14px
+    (about today's 12px), guides kept. No icons, chapter numbers inline ("4 ·"), the edge a short
+    pill beside the name, 22px rows. Edges hover the same way.</p>
+  <div class="stage">
+    <aside class="panel" id="panel-b"></aside>
+    <main class="editor"><div class="page" data-page></div></main>
+  </div>
+</section>
+
+<section class="direction" id="dir-c">
+  <p class="direction-note">C — the spine. The edge does more: status at the top, then one small
+    segment per tag (dimmer for rolled-up mentions), stacked into a single 4px spine — so a row wears
+    everything it knows without a single chip. The whole spine is the hover target; the card spells it
+    out. Rows otherwise identical to A.</p>
+  <div class="stage">
+    <aside class="panel" id="panel-c"></aside>
+    <main class="editor"><div class="page" data-page></div></main>
+  </div>
+</section>
+
+<div id="pop"></div>
+
+<script>
+/* ── Fake data — same novel, structural folders as real folders ────── */
+const STATUSES = {
+  final:    { label: 'Final',    color: '#7a9b6e' },
+  revised:  { label: 'Revised',  color: '#6f95b8' },
+  drafting: { label: 'Drafting', color: '#c9a227' },
+  sketch:   { label: 'Sketch',   color: '#8a8270' }
+}
+const TAGS = {
+  maren:   { label: 'Maren',       color: '#b87f96' },
+  tomas:   { label: 'Tomas',       color: '#7f96b8' },
+  visitor: { label: 'The Visitor', color: '#9b8ab8' },
+  letters: { label: 'Letters',     color: '#b8a17a' }
+}
+
+const doc = (name, num, status, tags, words, extra = {}) =>
+  ({ kind: 'doc', name, num, status, tags, mentions: [], words, ...extra })
+const note = (name) => ({ kind: 'doc', name, num: null, status: null, tags: [], mentions: [], words: null })
+
+const TREE = [
+  { kind: 'folder', structural: true, name: 'Draft', words: 52584, children: [
+    { kind: 'folder', name: 'Part I · The Orchard Year', words: 17664, children: [
+      doc('Prologue', null, 'final', [], 3216),
+      doc('The Orchard', 1, 'final', ['maren'], 4812),
+      doc('Low Tide', 2, 'revised', ['maren', 'tomas'], 5244, { mentions: ['visitor'] }),
+      doc('The Visitor', 3, 'revised', ['visitor'], 4392)
+    ]},
+    { kind: 'folder', name: 'Part II · What the House Kept', words: 19800, children: [
+      doc('What the House Kept', 4, 'drafting', ['maren', 'visitor'], 6096, { active: true }),
+      doc('The Letters', null, 'drafting', ['letters'], 3228, { mentions: ['maren', 'tomas'] }),
+      doc('Signal Fires', 5, 'drafting', ['tomas'], 5508, { selected: true }),
+      doc('The Long Field', 6, 'sketch', [], 4968)
+    ]},
+    { kind: 'folder', name: 'Part III · North of Everything', words: 15120, collapsed: true, children: [
+      doc('The Weir', 7, 'sketch', [], 5916),
+      doc('Ashes on the Sill', 8, 'sketch', [], 5160),
+      doc('The Hollow Season', 9, 'sketch', [], 2940)
+    ]}
+  ]},
+  { kind: 'folder', structural: true, name: 'Notes', words: null, children: [
+    { kind: 'folder', name: 'Characters', words: null, children: [
+      note('Maren Voss'), note('Tomas Brek'), note('The Visitor')
+    ]},
+    { kind: 'folder', name: 'Places', words: null, collapsed: true, children: [
+      note('The Orchard'), note('The Weir')
+    ]},
+    note('Tides & seasons — research')
+  ]},
+  { kind: 'folder', structural: true, name: 'Matter', words: null, children: [
+    note('Title Page'), note('Dedication'), note('Acknowledgements')
+  ]}
+]
+
+/* ── Helpers ───────────────────────────────────────────────────────── */
+const fmt = (n) => n.toLocaleString('en-US')
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+const CHEV = '<svg viewBox="0 0 10 10"><path d="M3 1.5 L7 5 L3 8.5"/></svg>'
+const ICON_DOC = '<svg class="icon" viewBox="0 0 14 14"><path d="M3 1.5h5.5L11 4v8.5H3z"/><path d="M8.5 1.5V4H11"/></svg>'
+const ICON_FOLDER = '<svg class="icon" viewBox="0 0 14 14"><path d="M1.5 3.5h4l1.5 1.5h5.5v6.5h-11z"/></svg>'
+
+const chevron = (node) =>
+  node.kind === 'folder'
+    ? `<span class="chev ${node.collapsed ? '' : 'is-open'}">${CHEV}</span>`
+    : `<span class="chev-spacer"></span>`
+const countSpan = (node) => (node.words != null ? `<span class="count">${fmt(node.words)}</span>` : '')
+const rowClasses = (node) => [
+  'row',
+  node.kind === 'folder' ? 'is-folder' : 'is-doc',
+  node.structural ? 'is-structural' : '',
+  node.active ? 'is-active' : '',
+  node.selected ? 'is-selected' : ''
+].filter(Boolean).join(' ')
+
+/** The popover payload lives on the hover target as a data attribute. */
+const popData = (node) =>
+  node.status
+    ? ` data-pop='${JSON.stringify({ status: node.status, tags: node.tags, mentions: node.mentions })}'`
+    : ''
+
+/* ── A · Ledger: flat DOM, computed indent, 4px full-height edge ───── */
+function renderA(el) {
+  el.innerHTML = walkA(TREE, 0)
+}
+function walkA(nodes, depth) {
+  let s = ''
+  for (const node of nodes) {
+    const edge = node.kind === 'doc' && node.status
+      ? `<span class="edge" style="--edge-color:${STATUSES[node.status].color}"${popData(node)}></span>`
+      : ''
+    s += `<div class="${rowClasses(node)}" style="padding-left:${12 + depth * 12}px">
+      ${edge}${chevron(node)}
+      <span class="node-icon">${node.kind === 'folder' ? ICON_FOLDER : ICON_DOC}</span>
+      ${node.kind === 'doc' && node.words != null ? `<span class="num">${node.num ?? ''}</span>` : ''}
+      <span class="name">${esc(node.name)}</span>
+      ${countSpan(node)}</div>`
+    if (node.kind === 'folder' && !node.collapsed) s += walkA(node.children, depth + 1)
+  }
+  return s
+}
+
+/* ── B · Inkline: nested DOM, indent guides, pill edge, inline num ─── */
+function renderB(el) {
+  el.innerHTML = walkB(TREE)
+}
+function walkB(nodes) {
+  let s = ''
+  for (const node of nodes) {
+    const edge = node.kind === 'doc' && node.status
+      ? `<span class="edge" style="--edge-color:${STATUSES[node.status].color}"${popData(node)}></span>`
+      : ''
+    const num = node.kind === 'doc' && node.num != null ? `<span class="n">${node.num} · </span>` : ''
+    s += `<div class="node">
+      <div class="${rowClasses(node)}">
+        ${edge}${chevron(node)}
+        <span class="name">${num}${esc(node.name)}</span>
+        ${countSpan(node)}</div>`
+    if (node.kind === 'folder' && !node.collapsed) s += `<div class="kids">${walkB(node.children)}</div>`
+    s += `</div>`
+  }
+  return s
+}
+
+/* ── C · Spine: A's rows, but the edge stacks status + tag segments ── */
+function renderC(el) {
+  el.innerHTML = walkC(TREE, 0)
+}
+function walkC(nodes, depth) {
+  let s = ''
+  for (const node of nodes) {
+    let edge = ''
+    if (node.kind === 'doc' && node.status) {
+      const segs =
+        `<span class="seg is-status" style="background:${STATUSES[node.status].color}"></span>` +
+        node.tags.map((t) => `<span class="seg" style="background:${TAGS[t].color}"></span>`).join('') +
+        node.mentions.map((t) => `<span class="seg is-mention" style="background:${TAGS[t].color}"></span>`).join('')
+      edge = `<span class="edge-stack"${popData(node)}><span class="seg-col">${segs}</span></span>`
+    }
+    s += `<div class="${rowClasses(node)}" style="padding-left:${12 + depth * 12}px">
+      ${edge}${chevron(node)}
+      <span class="node-icon">${node.kind === 'folder' ? ICON_FOLDER : ICON_DOC}</span>
+      ${node.kind === 'doc' && node.words != null ? `<span class="num">${node.num ?? ''}</span>` : ''}
+      <span class="name">${esc(node.name)}</span>
+      ${countSpan(node)}</div>`
+    if (node.kind === 'folder' && !node.collapsed) s += walkC(node.children, depth + 1)
+  }
+  return s
+}
+
+/* ── The hover card ────────────────────────────────────────────────── */
+const pop = document.getElementById('pop')
+function showPop(target) {
+  const data = JSON.parse(target.getAttribute('data-pop'))
+  const st = STATUSES[data.status]
+  const tagChips = data.tags.map((t) => {
+    const tag = TAGS[t]
+    return `<span class="chip" style="background:color-mix(in oklab, ${tag.color} 30%, var(--chrome-bg-elevated));border-color:color-mix(in oklab, ${tag.color} 55%, var(--chrome-bg-elevated))">${esc(tag.label)}</span>`
+  })
+  const mentionChips = data.mentions.map((t) => {
+    const tag = TAGS[t]
+    return `<span class="chip is-outline" style="border-color:color-mix(in oklab, ${tag.color} 55%, var(--chrome-bg-elevated))">${esc(tag.label)}</span>`
+  })
+  pop.innerHTML =
+    `<div class="pop-status"><span class="dot" style="background:${st.color}"></span>${st.label}</div>` +
+    (tagChips.length + mentionChips.length
+      ? `<div class="pop-tags">${tagChips.join('')}${mentionChips.join('')}</div>`
+      : '')
+  pop.style.display = 'block'
+  const rect = target.getBoundingClientRect()
+  const pr = pop.getBoundingClientRect()
+  let x = rect.right + 8
+  let y = rect.top + rect.height / 2 - pr.height / 2
+  y = Math.max(8, Math.min(y, window.innerHeight - pr.height - 8))
+  pop.style.left = x + 'px'
+  pop.style.top = y + 'px'
+}
+document.addEventListener('mouseover', (e) => {
+  const t = e.target.closest('[data-pop]')
+  if (t) showPop(t)
+  else pop.style.display = 'none'
+})
+
+/* ── Faux editor page ──────────────────────────────────────────────── */
+const SENTENCE = 'The lamp guttered and went out and she waited in the dark, listening for the tide to turn below the orchard wall. '
+document.querySelectorAll('[data-page]').forEach((el) => {
+  el.innerHTML = `<h1>Chapter 4 · What the House Kept</h1>` +
+    [3, 4, 3, 4, 3].map((n) => `<p>${SENTENCE.repeat(n).trim()}</p>`).join('')
+})
+
+renderA(document.getElementById('panel-a'))
+renderB(document.getElementById('panel-b'))
+renderC(document.getElementById('panel-c'))
+
+/* ── Shell: tabs (keys 1/2/3), theme, deep links (#b, #c-light) ────── */
+const tabs = document.getElementById('tabs')
+function activate(dir) {
+  tabs.querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', b.dataset.dir === dir))
+  document.querySelectorAll('.direction').forEach((sec) => sec.classList.toggle('is-active', sec.id === dir))
+}
+tabs.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-dir]')
+  if (btn) activate(btn.dataset.dir)
+})
+document.addEventListener('keydown', (e) => {
+  const map = { 1: 'dir-a', 2: 'dir-b', 3: 'dir-c' }
+  if (map[e.key]) activate(map[e.key])
+})
+const themeBtn = document.getElementById('themeToggle')
+themeBtn.addEventListener('click', () => {
+  const light = document.body.classList.toggle('light')
+  themeBtn.textContent = light ? 'Dark theme' : 'Light theme'
+})
+{
+  const h = location.hash.slice(1)
+  const dir = { a: 'dir-a', b: 'dir-b', c: 'dir-c' }[h[0]]
+  if (dir) activate(dir)
+  if (h.includes('light')) themeBtn.click()
+  // #a-pop etc: pin the hover card open on the active document's edge, so the
+  // card can be seen (and screenshotted) without holding a hover.
+  if (h.includes('pop') && dir) {
+    const target =
+      document.querySelector(`#${dir} .is-active [data-pop]`) || document.querySelector(`#${dir} [data-pop]`)
+    if (target) showPop(target)
+  }
+}
+</script>
+</body>
+</html>

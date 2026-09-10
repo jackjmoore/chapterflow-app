@@ -4,15 +4,17 @@ export type ExportFormat = 'txt' | 'pdf' | 'docx' | 'md'
 export type ExportScope = 'document' | 'project'
 
 /**
- * How the same content is dressed, not a different export path.
+ * How the same content is dressed — and, for 'book', a different pipeline.
  *
  * 'standard' is the app's own look — the serif page you see in the editor.
  * 'manuscript' is the submission convention agents expect: 12pt Times New
  * Roman, double-spaced, 1-inch margins, a running header, `#` scene breaks.
- * Both run through the identical block model and renderers; only the styling
- * inputs differ.
+ * Those two run through the identical block model and renderers; only the
+ * styling inputs differ. 'book' is the print/POD interior: PDF-only,
+ * compile-only, rendered by the segmented pipeline in main/export/bookPdf.ts
+ * (see SPEC.md) because Chromium cannot express its folio rules directly.
  */
-export type ExportPreset = 'standard' | 'manuscript'
+export type ExportPreset = 'standard' | 'manuscript' | 'book'
 
 export interface ExportResult {
   saved: boolean
@@ -28,6 +30,21 @@ export interface ExportOptions {
   authorName: string | null
   /** Document name for a single export, project name for a whole-project one. */
   title: string
+  /** The project's scene-break marker (a compile setting). Standard and
+   *  book output normalize typed dividers to this; manuscript format always
+   *  uses the conventional `#`. Absent means leave dividers as typed. */
+  sceneBreakMark?: string
+  /** Book preset only: the trim size and whether to render a Contents page.
+   *  Carried here so the compile handler's settings reach the renderer
+   *  without a second options type. Ignored by the other presets. */
+  bookTrim?: import('./book').BookTrim
+  bookIncludeContents?: boolean
+  /** How consecutive Draft documents share pages — every style, uniformly.
+   *  Absent means 'page'. See DocumentSeparation in shared/compile. */
+  documentSeparation?: import('./compile').DocumentSeparation
+  /** Substituted into matter documents' {{name}}/{{contact}}/{{address}}
+   *  markers at render time. Absent means no substitution. */
+  personalDetails?: import('./compile').PersonalDetails
 }
 
 /** Standard manuscript format fixes margins at one inch regardless of the
@@ -51,3 +68,9 @@ export function isSceneBreakText(text: string): boolean {
 }
 
 export const SCENE_BREAK_MARK = '#'
+
+/** The marker a preset actually renders scene breaks as: manuscript format is
+ *  fixed to `#` by convention; standard uses the project's compile setting. */
+export function effectiveSceneBreakMark(options: ExportOptions): string | undefined {
+  return options.preset === 'manuscript' ? SCENE_BREAK_MARK : options.sceneBreakMark
+}

@@ -12,14 +12,14 @@
  * temp directory and talks to it over the Chrome DevTools Protocol. Never
  * touches the user's own projects or preferences.
  */
-import { execFileSync, spawn, type ChildProcess } from 'child_process'
+import { execFileSync, type ChildProcess } from 'child_process'
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { setTimeout as sleep } from 'timers/promises'
 import { assert, createReport, note, section, summarize } from './harness'
+import { spawnApp, waitForDebugPort } from './cdpPort'
 
-const PORT = 9347
 
 async function seedProject(): Promise<{ projectDir: string; userDataDir: string; cleanup: () => Promise<void> }> {
   const base = await mkdtemp(join(tmpdir(), 'chapterflow-searchui-'))
@@ -60,11 +60,12 @@ interface Cdp {
   close: () => void
 }
 
-async function connect(child: ChildProcess): Promise<Cdp> {
+async function connect(child: ChildProcess, userDataDir: string): Promise<Cdp> {
+  const port = await waitForDebugPort(child, userDataDir)
   let target: { webSocketDebuggerUrl: string } | undefined
   for (let attempt = 0; attempt < 80 && !target; attempt += 1) {
     try {
-      const targets = (await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json()) as {
+      const targets = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()) as {
         type: string
         url: string
         webSocketDebuggerUrl: string
@@ -158,14 +159,10 @@ async function main(): Promise<void> {
   const env = { ...process.env }
   delete env.ELECTRON_RUN_AS_NODE
 
-  const child = spawn(
-    electronBinary,
-    ['.', `--remote-debugging-port=${PORT}`, `--user-data-dir=${userDataDir}`],
-    { cwd: process.cwd(), stdio: 'ignore', env }
-  )
+  const child = spawnApp(electronBinary, userDataDir, env)
 
   try {
-    const cdp = await connect(child)
+    const cdp = await connect(child, userDataDir)
 
     let ready = false
     for (let attempt = 0; attempt < 60 && !ready; attempt += 1) {
@@ -184,12 +181,11 @@ async function main(): Promise<void> {
         return true
       })()`)
       await cdp.clearInput()
-      // The scope toggle only exists once the drop-down is open, which
-      // focusing the box does.
+      // The scope is stated in the field itself and toggles when pressed, so
+      // it is only clicked when it is not already on the project.
       await cdp.evaluate(`(() => {
-        const buttons = [...document.querySelectorAll('.find-scope-toggle button')]
-        const project = buttons.find((b) => b.textContent.trim() === 'Whole Project')
-        if (project && !project.classList.contains('is-active')) project.click()
+        const pill = document.querySelector('.find-scope-pill')
+        if (pill && pill.textContent.trim() !== 'The whole project') pill.click()
         return true
       })()`)
       await cdp.evaluate(`document.querySelector('.find-input').focus()`)
@@ -227,10 +223,13 @@ async function main(): Promise<void> {
     await cdp.evaluate(`document.querySelector('.find-input').focus()`)
     await sleep(400)
     const initialScope = await cdp.evaluate<string>(
-      `(() => [...document.querySelectorAll('.find-scope-toggle button')]
-        .find((b) => b.classList.contains('is-active'))?.textContent?.trim() ?? '(none)')()`
+      `(document.querySelector('.find-scope-pill')?.textContent ?? '(none)').trim()`
     )
-    assert(report, initialScope === 'Whole Project', `a freshly opened bar searches the whole project ("${initialScope}")`)
+    assert(
+      report,
+      initialScope === 'The whole project',
+      `a freshly opened bar searches the whole project ("${initialScope}")`
+    )
 
     // ---- every way in reaches the same surface ---------------------------
     // This is the regression that mattered: Ctrl+F used to force document
@@ -242,19 +241,18 @@ async function main(): Promise<void> {
     const surfaceState = async (): Promise<{
       open: boolean
       scope: string
-      chips: number
+      kinds: number
       replaceRow: boolean
+      replaceFocused: boolean
     }> =>
-      cdp.evaluate(`(() => {
-        const active = [...document.querySelectorAll('.find-scope-toggle button')]
-          .find((b) => b.classList.contains('is-active'))
-        return {
-          open: !!document.querySelector('.find-options-popover'),
-          scope: active?.textContent?.trim() ?? '(closed)',
-          chips: document.querySelectorAll('.search-filter').length,
-          replaceRow: !!document.querySelector('.find-replace-row')
-        }
-      })()`)
+      cdp.evaluate(`(() => ({
+        open: !!document.querySelector('.find-options-popover'),
+        scope: (document.querySelector('.find-scope-pill')?.textContent ?? '(closed)').trim(),
+        // Everything, plus one row per filter group.
+        kinds: document.querySelectorAll('.find-rail-item').length,
+        replaceRow: !!document.querySelector('.find-replace-row'),
+        replaceFocused: document.activeElement === document.querySelector('.find-replace-input')
+      }))()`)
 
     const closeBar = async (): Promise<void> => {
       await cdp.evaluate(`document.querySelector('.ProseMirror')?.focus()`)
@@ -267,15 +265,20 @@ async function main(): Promise<void> {
     const viaCtrlF = await surfaceState()
     note(report, `Ctrl+F -> ${JSON.stringify(viaCtrlF)}`)
     assert(report, viaCtrlF.open, 'Ctrl+F opens the bar')
-    assert(report, viaCtrlF.scope === 'Whole Project', `and leaves the scope alone (${viaCtrlF.scope})`)
-    assert(report, viaCtrlF.chips === 6, `so the filter chips are there too (${viaCtrlF.chips})`)
+    assert(report, viaCtrlF.scope === 'The whole project', `and leaves the scope alone (${viaCtrlF.scope})`)
+    assert(report, viaCtrlF.kinds === 7, `so the kinds rail is there too (${viaCtrlF.kinds})`)
+    assert(report, viaCtrlF.replaceRow, 'and replace is on screen without being asked for')
 
     await closeBar()
     await cdp.shortcut('KeyH', 72, 2)
     await sleep(700)
     const viaCtrlH = await surfaceState()
-    assert(report, viaCtrlH.open && viaCtrlH.replaceRow, 'Ctrl+H opens the same bar with Replace expanded')
-    assert(report, viaCtrlH.chips === 6, 'and still shows the rest of the surface')
+    note(report, `Ctrl+H -> ${JSON.stringify(viaCtrlH)}`)
+    assert(report, viaCtrlH.open && viaCtrlH.replaceRow, 'Ctrl+H opens the same bar')
+    // Replace is no longer behind a toggle, so the shortcut puts the cursor
+    // in it rather than revealing it.
+    assert(report, viaCtrlH.replaceFocused, 'and puts the cursor in the replace box')
+    assert(report, viaCtrlH.kinds === 7, 'and still shows the rest of the surface')
 
     await closeBar()
     await cdp.shortcut('KeyF', 70, 10)
@@ -283,7 +286,7 @@ async function main(): Promise<void> {
     const viaProject = await surfaceState()
     assert(
       report,
-      viaProject.open && viaProject.scope === 'Whole Project',
+      viaProject.open && viaProject.scope === 'The whole project',
       `Ctrl+Shift+F opens it scoped to the project (${viaProject.scope})`
     )
 
@@ -562,15 +565,15 @@ async function main(): Promise<void> {
     })()`)
     assert(report, markStyled, 'the highlight is visually distinct from the surrounding text')
 
-    // ---- filters: present, quiet, and on the scope row --------------------
-    section(report, 'filter chips share the scope row and are always visible')
+    // ---- filters: a rail beside the results, always visible ---------------
+    section(report, 'the kinds sit in a rail beside the results, always visible')
     assert(
       report,
       !(await cdp.evaluate<boolean>(`!!document.querySelector('.find-filters-toggle')`)),
       'there is no Filters button to find first'
     )
     const filterLabels = await cdp.evaluate<string[]>(
-      `(() => [...document.querySelectorAll('.search-filter')].map((b) => b.textContent.trim()))()`
+      `(() => [...document.querySelectorAll('.find-rail-item .nm')].map((b) => b.textContent.trim()))()`
     )
     note(report, filterLabels.join(', '))
     assert(
@@ -580,56 +583,59 @@ async function main(): Promise<void> {
       ),
       `all six kinds are on show without opening anything (${filterLabels.length})`
     )
+    assert(
+      report,
+      filterLabels[0] === 'Everything',
+      `and "Everything" leads them, as the way back (${filterLabels[0]})`
+    )
 
-    // One row, no wrapping: the thing that was worth measuring.
-    const rowLayout = await cdp.evaluate<{
-      scopeMid: number
-      chipsMid: number
-      chipRows: number
-      controlRows: number
-      barWidth: number
+    // The rail is a column beside the answers, not a row above them: what is
+    // worth measuring now is that it takes a fixed narrow column and never
+    // pushes the results down the panel.
+    const railLayout = await cdp.evaluate<{
+      railWidth: number
+      railColumns: number
+      resultsLeft: number
+      railRight: number
+      resultsTop: number
+      railTop: number
     }>(`(() => {
-      const bar = document.querySelector('.find-options-bar')
-      const scope = document.querySelector('.find-scope-toggle')
-      const chips = [...document.querySelectorAll('.search-filter')]
-      const chipTops = new Set(chips.map((c) => Math.round(c.getBoundingClientRect().top)))
-      // Vertical centres, bucketed: the controls are deliberately different
-      // heights, so equal tops would mean they were NOT sharing a line.
-      const controlTops = new Set(
-        [...bar.children].map((c) => {
-          const r = c.getBoundingClientRect()
-          return Math.round((r.top + r.height / 2) / 4)
-        })
-      )
+      const rail = document.querySelector('.find-rail')
+      const pane = document.querySelector('.find-results-pane')
+      const items = [...document.querySelectorAll('.find-rail-item')]
+      const lefts = new Set(items.map((i) => Math.round(i.getBoundingClientRect().left)))
+      const railBox = rail.getBoundingClientRect()
+      const paneBox = pane.getBoundingClientRect()
       return {
-        // Centres, not tops: the chips are deliberately shorter than the
-        // toggle, so equal tops would mean they were NOT sharing a row.
-        scopeMid: Math.round(scope.getBoundingClientRect().top + scope.getBoundingClientRect().height / 2),
-        chipsMid: Math.round(chips[0].getBoundingClientRect().top + chips[0].getBoundingClientRect().height / 2),
-        chipRows: chipTops.size,
-        controlRows: controlTops.size,
-        barWidth: Math.round(bar.getBoundingClientRect().width)
+        railWidth: Math.round(railBox.width),
+        railColumns: lefts.size,
+        resultsLeft: Math.round(paneBox.left),
+        railRight: Math.round(railBox.right),
+        resultsTop: Math.round(paneBox.top),
+        railTop: Math.round(railBox.top)
       }
     })()`)
-    note(report, `control row wraps to ${rowLayout.controlRows} line(s) at ${rowLayout.barWidth}px`)
-    assert(report, rowLayout.chipRows === 1, `the chips never split across lines (${rowLayout.chipRows})`)
+    note(report, `rail ${railLayout.railWidth}px wide, results start at ${railLayout.resultsLeft}px`)
     assert(
       report,
-      Math.abs(rowLayout.scopeMid - rowLayout.chipsMid) <= 2,
-      `and sit centred on the scope toggle's row (${rowLayout.scopeMid} vs ${rowLayout.chipsMid})`
+      railLayout.railWidth > 0 && railLayout.railWidth <= 140,
+      `the rail stays a narrow column (${railLayout.railWidth}px)`
     )
-    // Now that every control is present in every scope, the row is allowed to
-    // wrap on a narrow window — but it must wrap, not overflow, and it must
-    // not fragment into more lines than a reader can scan.
+    assert(report, railLayout.railColumns === 1, `its kinds stack in one column (${railLayout.railColumns})`)
     assert(
       report,
-      rowLayout.controlRows <= 2,
-      `the controls occupy at most two lines (${rowLayout.controlRows})`
+      railLayout.resultsLeft >= railLayout.railRight - 1,
+      `the results sit beside it rather than under it (${railLayout.resultsLeft} vs ${railLayout.railRight})`
+    )
+    assert(
+      report,
+      Math.abs(railLayout.resultsTop - railLayout.railTop) <= 2,
+      `and start level with it, so no control row pushes them down (${railLayout.resultsTop} vs ${railLayout.railTop})`
     )
 
-    // The new chip has to actually narrow to document titles.
+    // The rail has to actually narrow to document titles.
     await cdp.evaluate(`(() => {
-      const b = [...document.querySelectorAll('.search-filter')].find((x) => x.textContent.trim() === 'Documents')
+      const b = [...document.querySelectorAll('.find-rail-item')].find((x) => x.textContent.trim().startsWith('Documents'))
       b.click()
       return true
     })()`)
@@ -643,12 +649,12 @@ async function main(): Promise<void> {
       docsOnly.length > 0 && docsOnly.every((r) => r.kind === 'documentTitle'),
       `the Documents chip narrows to titles and synopses (${docsOnly.length} row(s), kinds ${[...new Set(docsOnly.map((r) => r.kind))].join('/')})`
     )
-    await cdp.evaluate(`document.querySelector('.search-filter-clear')?.click()`)
+    await cdp.evaluate(`[...document.querySelectorAll('.find-rail-item')].find((x) => x.textContent.trim().startsWith('Everything'))?.click()`)
     await sleep(300)
 
     // Narrowing to Story Bible must actually drop the prose.
     await cdp.evaluate(`(() => {
-      const b = [...document.querySelectorAll('.search-filter')].find((x) => x.textContent.trim() === 'Story Bible')
+      const b = [...document.querySelectorAll('.find-rail-item')].find((x) => x.textContent.trim().startsWith('Story Bible'))
       b.click()
       return true
     })()`)
@@ -664,7 +670,7 @@ async function main(): Promise<void> {
     )
     // Put it back, so history assertions below are not filtered.
     await cdp.evaluate(`(() => {
-      const clear = document.querySelector('.search-filter-clear')
+      const clear = [...document.querySelectorAll('.find-rail-item')].find((x) => x.textContent.trim().startsWith('Everything'))
       if (clear) clear.click()
       return true
     })()`)
@@ -716,10 +722,9 @@ async function main(): Promise<void> {
       await cdp.evaluate(`document.querySelector('.find-input')?.focus()`)
       await sleep(300)
       const toggled = await cdp.evaluate<boolean>(`(() => {
-        const buttons = [...document.querySelectorAll('.find-scope-toggle button')]
-        const project = buttons.find((b) => b.textContent.trim() === 'Whole Project')
-        if (!project) return false
-        if (!project.classList.contains('is-active')) project.click()
+        const pill = document.querySelector('.find-scope-pill')
+        if (!pill) return false
+        if (pill.textContent.trim() !== 'The whole project') pill.click()
         return true
       })()`)
       if (toggled) break
@@ -760,8 +765,7 @@ async function main(): Promise<void> {
       qualifiersDisabled: number
       chips: number
       chipsDisabled: number
-      nav: number
-      navDisabled: number
+      replaceRow: boolean
       replaceToggle: boolean
     }> =>
       cdp.evaluate(`(() => {
@@ -770,12 +774,11 @@ async function main(): Promise<void> {
         // what is on screen.
         const shown = (el) => el.getClientRects().length > 0
         const q = [...document.querySelectorAll('.find-options button')].filter(shown)
-        const c = [...document.querySelectorAll('.search-filter')].filter(shown)
-        const n = [...document.querySelectorAll('.find-nav button')].filter(shown)
+        const c = [...document.querySelectorAll('.find-rail-item')].filter(shown)
         return {
           qualifiers: q.length, qualifiersDisabled: q.filter((b) => b.disabled).length,
           chips: c.length, chipsDisabled: c.filter((b) => b.disabled).length,
-          nav: n.length, navDisabled: n.filter((b) => b.disabled).length,
+          replaceRow: !!document.querySelector('.find-replace-row'),
           replaceToggle: !!document.querySelector('.find-replace-toggle-btn')
         }
       })()`)
@@ -784,14 +787,18 @@ async function main(): Promise<void> {
       await cdp.evaluate(`document.querySelector('.find-input-wrap').click()`)
       await sleep(400)
       await cdp.evaluate(`(() => {
-        const b = [...document.querySelectorAll('.find-scope-toggle button')].find((x) => x.textContent.trim() === '${label}')
-        if (b && !b.classList.contains('is-active')) b.click()
+        const pill = document.querySelector('.find-scope-pill')
+        if (pill && pill.textContent.trim() !== '${label}') pill.click()
         return true
       })()`)
       await sleep(400)
     }
 
-    await setScope('Whole Project')
+    // A walk may still be docked from the section above, and the drop-down
+    // does not open over its own dock — finish the walk first.
+    await cdp.evaluate(`[...document.querySelectorAll('.find-navigator-text')].find((b) => b.textContent.trim() === 'Done')?.click()`)
+    await sleep(400)
+    await setScope('The whole project')
     assert(
       report,
       await cdp.evaluate<boolean>(`!!document.querySelector('.find-options-popover')`),
@@ -799,38 +806,43 @@ async function main(): Promise<void> {
     )
     const inProject = await controls()
     note(report, `project: ${JSON.stringify(inProject)}`)
-    await setScope('This Document')
+    const documentScopeLabel = await cdp.evaluate<string>(`(() => {
+      const pill = document.querySelector('.find-scope-pill')
+      if (pill && pill.textContent.trim() === 'The whole project') pill.click()
+      return 'clicked'
+    })()`)
+    note(report, `scope pill ${documentScopeLabel}`)
+    await sleep(400)
     const inDocument = await controls()
     note(report, `document: ${JSON.stringify(inDocument)}`)
 
     assert(
       report,
-      inProject.qualifiers === inDocument.qualifiers &&
-        inProject.chips === inDocument.chips &&
-        inProject.nav === inDocument.nav,
-      `every control exists in both scopes (${inProject.qualifiers}/${inProject.chips}/${inProject.nav} vs ${inDocument.qualifiers}/${inDocument.chips}/${inDocument.nav})`
+      inProject.qualifiers === inDocument.qualifiers && inProject.chips === inDocument.chips,
+      `every control exists in both scopes (${inProject.qualifiers}/${inProject.chips} vs ${inDocument.qualifiers}/${inDocument.chips})`
     )
-    assert(report, inProject.replaceToggle && inDocument.replaceToggle, 'Replace is offered in both scopes')
+    // Replace used to hide behind a toggle. It is now simply there, in both
+    // scopes, which is the point of the change.
+    assert(
+      report,
+      inProject.replaceRow && inDocument.replaceRow && !inProject.replaceToggle,
+      'replace is on screen in both scopes, with no toggle to find first'
+    )
     assert(
       report,
       inProject.qualifiersDisabled === 3 && inDocument.qualifiersDisabled === 0,
       `case/whole-word/regex grey out for ranked search only (${inProject.qualifiersDisabled} vs ${inDocument.qualifiersDisabled})`
     )
+    // Everything plus six kinds: all seven grey out when only one document is
+    // being searched, since narrowing by kind has no meaning there.
     assert(
       report,
-      inProject.chipsDisabled === 0 && inDocument.chipsDisabled === 6,
-      `the kind filters grey out in a single document (${inProject.chipsDisabled} vs ${inDocument.chipsDisabled})`
-    )
-    assert(
-      report,
-      inProject.navDisabled === 2 && inDocument.navDisabled === 0,
-      `the match arrows grey out for project search (${inProject.navDisabled} vs ${inDocument.navDisabled})`
+      inProject.chipsDisabled < inDocument.chipsDisabled && inDocument.chipsDisabled >= 6,
+      `the kind rail greys out in a single document (${inProject.chipsDisabled} vs ${inDocument.chipsDisabled})`
     )
     const greyed = await cdp.evaluate<number>(`(() => {
-      const chip = document.querySelector('.search-filter')
-      const group = document.querySelector('.search-filters')
-      if (!chip || !group) return 1
-      return parseFloat(getComputedStyle(chip).opacity) * parseFloat(getComputedStyle(group).opacity)
+      const item = [...document.querySelectorAll('.find-rail-item')].find((b) => b.disabled)
+      return item ? parseFloat(getComputedStyle(item).opacity) : 1
     })()`)
     assert(report, greyed < 1, `and a disabled control looks disabled (opacity ${greyed.toFixed(2)})`)
 
@@ -875,19 +887,27 @@ async function main(): Promise<void> {
     )
     assert(report, docMark.toLowerCase() === word.toLowerCase(), `with the match highlighted ("${docMark}")`)
 
+    // Choosing a row is the handover: the list moves beside the manuscript so
+    // the page it is walking through is not underneath it.
     if (docRows.rows > 1) {
       await cdp.evaluate(`document.querySelectorAll('.search-result[data-kind="documentMatch"]')[1].click()`)
-      await sleep(600)
-      const afterClick = await cdp.evaluate<string>(`(document.querySelector('.find-count')?.textContent ?? '').trim()`)
-      assert(report, afterClick.startsWith('2 of'), `clicking the second row goes to it ("${afterClick}")`)
-      const currentRow = await cdp.evaluate<number>(
-        `[...document.querySelectorAll('.search-result[data-kind="documentMatch"]')].findIndex((r) => r.classList.contains('is-current'))`
-      )
-      assert(report, currentRow === 1, `and the list marks where you are (row ${currentRow})`)
+      await sleep(700)
+      const afterClick = await cdp.evaluate<{ position: string; row: number; covered: boolean }>(`(() => ({
+        position: (document.querySelector('.find-navigator-count')?.textContent ?? '').trim(),
+        row: [...document.querySelectorAll('.search-dock-match')].findIndex((r) => r.classList.contains('is-current')),
+        covered: !!document.querySelector('.find-options-popover')
+      }))()`)
+      note(report, `after choosing the second row: ${JSON.stringify(afterClick)}`)
+      assert(report, afterClick.position.startsWith('Match 2 of'), `clicking the second row goes to it ("${afterClick.position}")`)
+      assert(report, afterClick.row === 1, `and the docked list marks where you are (row ${afterClick.row})`)
+      assert(report, !afterClick.covered, 'and the drop-down is no longer over the page')
+      // Back to the list for the assertions that follow.
+      await cdp.evaluate(`[...document.querySelectorAll('.find-navigator-text')].find((b) => b.textContent.trim() === 'All results')?.click()`)
+      await sleep(500)
     }
 
     // The same collapse affordance as the project groups.
-    await cdp.evaluate(`document.querySelector('.search-result-group[data-tier="document"] .search-result-group-label').click()`)
+    await cdp.evaluate(`document.querySelector('.search-result-group[data-tier="document"] .search-result-group-label')?.click()`)
     await sleep(300)
     const docCollapsed = await cdp.evaluate<{ flag: string; rows: number; state: string }>(`(() => {
       const g = document.querySelector('.search-result-group[data-tier="document"]')
@@ -908,13 +928,41 @@ async function main(): Promise<void> {
     // ---- nothing the three separate menus could do has been lost ---------
     section(report, 'every capability of the old separate menus survives')
 
-    // Arrows still walk the matches.
-    await cdp.evaluate(`document.querySelector('.find-nav button:last-child').click()`)
-    await sleep(400)
-    const afterArrow = await cdp.evaluate<string>(`(document.querySelector('.find-count')?.textContent ?? '').trim()`)
-    assert(report, /^\d+ of \d+$/.test(afterArrow), `the next-match arrow still works ("${afterArrow}")`)
+    // The matches are still walked, and walking them now docks the list
+    // beside the manuscript so the page is not covered while you read it.
+    // Enter is handled by the search box, so it has to be the focused thing.
+    await cdp.evaluate(`document.querySelector('.find-input').focus()`)
+    await sleep(200)
+    await cdp.pressEnter()
+    await sleep(600)
+    const walk = await cdp.evaluate<{ docked: boolean; sidePanel: boolean; position: string }>(`(() => ({
+      docked: !!document.querySelector('.search-dock'),
+      sidePanel: !!document.querySelector('.side-panel'),
+      position: (document.querySelector('.find-navigator-count')?.textContent ?? '').trim()
+    }))()`)
+    note(report, `walking -> ${JSON.stringify(walk)}`)
+    assert(report, walk.docked && !walk.sidePanel, 'walking the matches stands the side panel down for the dock')
+    assert(report, /^Match \d+ of \d+$/.test(walk.position), `and the field says where you are ("${walk.position}")`)
 
-    // Regex, in document scope.
+    await cdp.evaluate(`[...document.querySelectorAll('.find-navigator-step')][1]?.click()`)
+    await sleep(400)
+    const afterArrow = await cdp.evaluate<string>(
+      `(document.querySelector('.find-navigator-count')?.textContent ?? '').trim()`
+    )
+    assert(report, /^Match \d+ of \d+$/.test(afterArrow), `the next-match arrow still works ("${afterArrow}")`)
+
+    // And the page is handed back when the walk is finished.
+    await cdp.evaluate(`[...document.querySelectorAll('.find-navigator-text')].find((b) => b.textContent.trim() === 'Done')?.click()`)
+    await sleep(500)
+    const afterDone = await cdp.evaluate<boolean>(
+      `!document.querySelector('.search-dock') && !!document.querySelector('.side-panel')`
+    )
+    assert(report, afterDone, 'and finishing gives the side panel back')
+
+    // Regex, in document scope. Finishing the walk closed the drop-down, and
+    // the match options live inside it.
+    await cdp.evaluate(`document.querySelector('.find-input-wrap').click()`)
+    await sleep(400)
     await cdp.evaluate(`document.querySelectorAll('.find-options button')[2].click()`)
     await sleep(300)
     await cdp.evaluate(`document.querySelector('.find-input-wrap').click()`)
@@ -936,11 +984,7 @@ async function main(): Promise<void> {
     const beforeReplace = await cdp.evaluate<number>(
       `document.querySelectorAll('.search-result[data-kind="documentMatch"]').length`
     )
-    await cdp.evaluate(`(() => {
-      const b = document.querySelector('.find-replace-toggle-btn')
-      if (!b.classList.contains('is-active')) b.click()
-      return true
-    })()`)
+    // Replace needs no revealing any more; it is already on screen.
     await sleep(400)
     const replaceRow = await cdp.evaluate<{ input: boolean; buttons: string[] }>(`(() => ({
       input: !!document.querySelector('.find-replace-input'),
@@ -949,13 +993,14 @@ async function main(): Promise<void> {
     assert(report, replaceRow.input, 'the replace field is on the same surface')
     assert(
       report,
-      replaceRow.buttons.some((b) => b === 'Replace') && replaceRow.buttons.some((b) => b === 'Replace All'),
+      replaceRow.buttons.some((b) => b === 'Replace this one') &&
+        replaceRow.buttons.some((b) => b.startsWith('Replace all')),
       `with both replace actions (${replaceRow.buttons.join(', ')})`
     )
     await cdp.evaluate(`document.querySelector('.find-replace-input').focus()`)
     await cdp.insertText('zzreplacedzz')
-    await sleep(300)
-    await cdp.evaluate(`[...document.querySelectorAll('.find-replace-row button')].find((b) => b.textContent.trim() === 'Replace').click()`)
+    await sleep(400)
+    await cdp.evaluate(`[...document.querySelectorAll('.find-replace-row button')].find((b) => b.textContent.trim() === 'Replace this one')?.click()`)
     await sleep(800)
     const afterOne = await cdp.evaluate<boolean>(
       `(document.querySelector('.ProseMirror')?.textContent ?? '').includes('zzreplacedzz')`
@@ -963,7 +1008,7 @@ async function main(): Promise<void> {
     assert(report, afterOne, `replacing one match still edits the document (was ${beforeReplace} matches)`)
 
     // Replace All in Project, with its confirmation.
-    await setScope('Whole Project')
+    await setScope('The whole project')
     await sleep(600)
     const projectReplace = await cdp.evaluate<{ label: string; qualifiersDisabled: number }>(`(() => ({
       label: ([...document.querySelectorAll('.find-replace-row button')].pop()?.textContent ?? '').trim(),
@@ -972,7 +1017,7 @@ async function main(): Promise<void> {
     note(report, JSON.stringify(projectReplace))
     assert(
       report,
-      projectReplace.label.startsWith('Replace All in Project'),
+      projectReplace.label.startsWith('Replace all'),
       `replacing across the project is reachable from the same bar ("${projectReplace.label}")`
     )
     assert(

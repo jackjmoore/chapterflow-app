@@ -1,7 +1,8 @@
-import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import type { BinderNode } from '../../shared/binder'
-import type { StoryBibleBlock, StoryBibleItem, StoryBibleTypeDef } from '../../shared/storyBible'
+import type { ItemMentionStat, StoryBibleBlock, StoryBibleItem, StoryBibleTypeDef } from '../../shared/storyBible'
 import type { Relationship } from '../../shared/relationships'
+import { manuscriptDocuments, orderMentionStats, type MentionStatsSummary } from './mentionUtils'
 import StoryBibleBrowseGrid from './StoryBibleBrowseGrid'
 import StoryBibleSheetDetail from './StoryBibleSheetDetail'
 import ManageColorListModal from './ManageColorListModal'
@@ -23,10 +24,6 @@ interface StoryBibleViewProps {
   items: StoryBibleItem[]
   types: StoryBibleTypeDef[]
   onRefreshIndex: () => Promise<void>
-  /** Mirrors the open sheet up to App so the side panel's item list can mark
-   *  it. Selection is still owned here — this reports it, it doesn't move it,
-   *  so there's only ever one source of truth for what's open. */
-  onSelectionChange: (id: string | null) => void
   relationships: Relationship[]
   onAddRelationship: (fromId: string) => void
   onEditRelationship: (relationship: Relationship) => void
@@ -45,7 +42,6 @@ const StoryBibleView = forwardRef<StoryBibleViewHandle, StoryBibleViewProps>(fun
     items,
     types,
     onRefreshIndex: refreshIndex,
-    onSelectionChange,
     relationships,
     onAddRelationship,
     onEditRelationship,
@@ -54,6 +50,10 @@ const StoryBibleView = forwardRef<StoryBibleViewHandle, StoryBibleViewProps>(fun
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [blocks, setBlocks] = useState<StoryBibleBlock[]>([])
   const [manageTypesOpen, setManageTypesOpen] = useState(false)
+  /** Raw per-item statistics for the whole Story Bible, read in one call.
+   *  The wall wears a count and a presence strip on every card, so asking
+   *  per item would be one round trip per entry over the same file. */
+  const [rawStats, setRawStats] = useState<Record<string, ItemMentionStat[]>>({})
 
   const selectedItemIdRef = useRef<string | null>(null)
   const lastSavedBlocksJson = useRef('')
@@ -111,7 +111,6 @@ const StoryBibleView = forwardRef<StoryBibleViewHandle, StoryBibleViewProps>(fun
     lastSavedBlocksJson.current = JSON.stringify(sheet.blocks)
     setBlocks(sheet.blocks)
     setSelectedItemId(id)
-    onSelectionChange(id)
   }
 
   async function closeItem(): Promise<void> {
@@ -119,7 +118,6 @@ const StoryBibleView = forwardRef<StoryBibleViewHandle, StoryBibleViewProps>(fun
     selectedItemIdRef.current = null
     setSelectedItemId(null)
     setBlocks([])
-    onSelectionChange(null)
   }
 
   function handleBlocksChange(next: StoryBibleBlock[]): void {
@@ -169,7 +167,6 @@ const StoryBibleView = forwardRef<StoryBibleViewHandle, StoryBibleViewProps>(fun
     selectedItemIdRef.current = null
     setSelectedItemId(null)
     setBlocks([])
-    onSelectionChange(null)
     await refreshIndex()
   }
 
@@ -178,6 +175,33 @@ const StoryBibleView = forwardRef<StoryBibleViewHandle, StoryBibleViewProps>(fun
     setManageTypesOpen(false)
     await refreshIndex()
   }
+
+  // Mentions are rebuilt whenever a document saves, so the counts refresh on
+  // that signal as well as when the item list changes.
+  useEffect(() => {
+    let cancelled = false
+    const load = (): void => {
+      void window.api.getAllMentionStats().then((next) => {
+        if (!cancelled) setRawStats(next)
+      })
+    }
+    load()
+    const stop = window.api.onMentionsUpdated(load)
+    return () => {
+      cancelled = true
+      stop()
+    }
+  }, [items])
+
+  const documents = useMemo(() => manuscriptDocuments(tree), [tree])
+
+  /** Raw counts joined to manuscript order once, then shared by the wall and
+   *  the open sheet, so a card and a sheet can never disagree about a count. */
+  const statsByItem = useMemo(() => {
+    const out: Record<string, MentionStatsSummary> = {}
+    for (const [itemId, raw] of Object.entries(rawStats)) out[itemId] = orderMentionStats(tree, raw)
+    return out
+  }, [rawStats, tree])
 
   const selectedItem = items.find((i) => i.id === selectedItemId) ?? null
 
@@ -188,7 +212,8 @@ const StoryBibleView = forwardRef<StoryBibleViewHandle, StoryBibleViewProps>(fun
           item={selectedItem}
           types={types}
           blocks={blocks}
-          tree={tree}
+          documents={documents}
+          stats={statsByItem[selectedItem.id] ?? null}
           onBack={() => void closeItem()}
           onRename={(name) => void handleRename(name)}
           onChangeType={(typeId) => void handleChangeType(typeId)}
@@ -207,6 +232,8 @@ const StoryBibleView = forwardRef<StoryBibleViewHandle, StoryBibleViewProps>(fun
         <StoryBibleBrowseGrid
           items={items}
           types={types}
+          documents={documents}
+          statsByItem={statsByItem}
           onOpenItem={(id) => void openItem(id)}
           onCreateItem={(typeId) => void handleCreateItem(typeId)}
           onManageTypes={() => setManageTypesOpen(true)}
@@ -215,8 +242,8 @@ const StoryBibleView = forwardRef<StoryBibleViewHandle, StoryBibleViewProps>(fun
 
       {manageTypesOpen && (
         <ManageColorListModal
-          title="Manage Story Bible Types"
-          message="These categorize your Story Bible items — add your own alongside (or instead of) Character/Location/Object."
+          title="Manage types"
+          message="Types group the Story Bible and colour its cards. Renaming one updates every entry that uses it. You can add your own alongside Character, Location, and Object, or instead of them."
           items={types}
           addLabel="Type"
           defaultColor="#6f95b8"

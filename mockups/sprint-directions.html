@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sprint mode — current and two directions</title>
+<style>
+  /* ChapterFlow tokens, copied from src/renderer/src/index.css. */
+  :root {
+    --space-05: 2px; --space-1: 4px; --space-2: 8px; --space-3: 12px;
+    --space-4: 16px; --space-5: 24px; --space-6: 32px;
+    --radius-sm: 4px; --radius-md: 6px;
+    --text-2xs: 10px; --text-xs: 11px; --text-sm: 12px; --text-md: 13px;
+    --text-lg: 14px; --text-xl: 20px;
+    --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-editor: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+
+    --editor-bg: #faf6ec;
+    --editor-surround: #e6e2d9;
+    --editor-page-edge: rgba(43, 38, 32, 0.09);
+    --editor-text: #2b2620;
+    --editor-dim: #9c9585;
+
+    --chrome-bg: #1c1a17;
+    --chrome-bg-elevated: #242119;
+    --chrome-bg-sidebar: #18160f;
+    --chrome-border: #35312a;
+    --chrome-border-strong: #4a4438;
+    --chrome-text: #e8e3d9;
+    --chrome-text-heading: #f0ece2;
+    --chrome-text-muted: #9c9585;
+    --chrome-text-dim: #6b6558;
+    --chrome-control-bg: #262319;
+    --chrome-control-hover: #322d22;
+    --chrome-control-active-bg: #3a3527;
+    --chrome-accent: #6f95b8;
+    --chrome-accent-contrast: #0d1520;
+    --elev-2: 0 1px 2px rgb(0 0 0 / 0.22), 0 8px 20px rgb(0 0 0 / 0.3);
+    --elev-3: 0 2px 4px rgb(0 0 0 / 0.3), 0 14px 34px rgb(0 0 0 / 0.4);
+  }
+  body.light {
+    --chrome-bg: #f5f1e8;
+    --chrome-bg-elevated: #ece6d8;
+    --chrome-bg-sidebar: #efe9dc;
+    --chrome-border: #ddd4c0;
+    --chrome-border-strong: #c9bea3;
+    --chrome-text: #2b2620;
+    --chrome-text-heading: #1c1812;
+    --chrome-text-muted: #6e6656;
+    --chrome-text-dim: #948c78;
+    --chrome-control-bg: #ece5d3;
+    --chrome-control-hover: #e0d8c2;
+    --chrome-control-active-bg: #d8cdb0;
+    --chrome-accent: #3d5a7a;
+    --chrome-accent-contrast: #f5f1e8;
+    --elev-2: 0 1px 2px rgb(43 38 32 / 0.08), 0 8px 20px rgb(43 38 32 / 0.13);
+    --elev-3: 0 2px 4px rgb(43 38 32 / 0.13), 0 14px 34px rgb(43 38 32 / 0.18);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { background: var(--chrome-bg); color: var(--chrome-text); font-family: var(--font-ui); font-size: var(--text-md); line-height: 1.45; overflow: hidden; }
+
+  /* ── Mock chrome ─────────────────────────────────────────────────── */
+  .mockbar { display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-4); height: 44px; background: var(--chrome-bg-elevated); border-bottom: 1px solid var(--chrome-border); }
+  .mockbar-title { font-size: var(--text-sm); color: var(--chrome-text-muted); white-space: nowrap; }
+  .mockbar-tabs { display: flex; gap: var(--space-1); margin: 0 auto; }
+  .mockbar-tabs button, .mockbar-toggle { font: inherit; font-size: var(--text-sm); color: var(--chrome-text-muted); background: none; border: 1px solid transparent; border-radius: var(--radius-sm); padding: 4px 12px; cursor: pointer; }
+  .mockbar-tabs button:hover, .mockbar-toggle:hover { background: var(--chrome-control-hover); }
+  .mockbar-tabs button.is-active { color: var(--chrome-text-heading); background: var(--chrome-control-bg); border-color: var(--chrome-border-strong); }
+  .mockbar-toggle { font-size: var(--text-xs); background: var(--chrome-control-bg); border-color: var(--chrome-border); padding: 3px 10px; }
+  .states { display: flex; border: 1px solid var(--chrome-border); border-radius: var(--radius-sm); overflow: hidden; }
+  .states button { font: inherit; font-size: var(--text-xs); color: var(--chrome-text-muted); background: none; border: none; padding: 3px 9px; cursor: pointer; }
+  .states button + button { border-left: 1px solid var(--chrome-border); }
+  .states button.is-active { background: var(--chrome-control-active-bg); color: var(--chrome-text-heading); }
+
+  .direction { display: none; height: calc(100vh - 44px); flex-direction: column; }
+  .direction.is-active { display: flex; }
+  .note { flex-shrink: 0; margin: var(--space-3) var(--space-4) 0; font-size: var(--text-xs); line-height: 1.55; color: var(--chrome-text-dim); border-left: 2px solid var(--chrome-border-strong); padding-left: var(--space-3); max-width: 980px; }
+  .note b { color: var(--chrome-text-muted); font-weight: 600; }
+
+  /* ── The faux app ───────────────────────────────────────────────── */
+  .app-frame { flex: 1; min-height: 0; margin: var(--space-3) var(--space-4) var(--space-4); display: flex; flex-direction: column; border: 1px solid var(--chrome-border); border-radius: var(--radius-md); overflow: hidden; background: var(--chrome-bg); position: relative; }
+  .app-titlebar { height: 28px; display: flex; align-items: center; padding: 0 var(--space-3); gap: var(--space-2); font-size: var(--text-sm); font-weight: 600; color: var(--chrome-text-heading); background: var(--chrome-bg); }
+  .app-titlebar i { width: 12px; height: 12px; border: 1.5px solid var(--chrome-text-muted); border-radius: 3px 3px 3px 8px; display: inline-block; }
+  .app-menubar { display: flex; align-items: center; gap: var(--space-4); height: 28px; padding: 0 var(--space-3); border-bottom: 1px solid var(--chrome-border); font-size: var(--text-sm); color: var(--chrome-text); }
+  .app-searchrow { display: flex; align-items: center; gap: var(--space-3); height: 44px; padding: 0 var(--space-3); border-bottom: 1px solid var(--chrome-border); }
+  .app-search { flex: 1; height: 30px; border: 1px solid var(--chrome-accent); border-radius: var(--radius-sm); display: flex; align-items: center; padding: 0 var(--space-3); color: var(--chrome-text-dim); font-size: var(--text-sm); }
+  .app-views { display: flex; gap: var(--space-3); font-size: var(--text-sm); color: var(--chrome-text-muted); }
+  .app-views span.is-active { color: var(--chrome-text-heading); background: var(--chrome-control-active-bg); padding: 3px 8px; border-radius: var(--radius-sm); }
+  .app-body { flex: 1; min-height: 0; display: flex; }
+  .app-rail { width: 40px; flex-shrink: 0; background: var(--chrome-bg-sidebar); border-right: 1px solid var(--chrome-border); display: flex; flex-direction: column; align-items: center; gap: 14px; padding-top: var(--space-3); }
+  .app-rail i { display: block; width: 16px; height: 16px; border-radius: 3px; border: 1.5px solid var(--chrome-text-dim); }
+  .app-rail i.is-active { border-color: var(--chrome-text-heading); }
+  .app-panel { width: 220px; flex-shrink: 0; background: var(--chrome-bg-sidebar); border-right: 1px solid var(--chrome-border); padding: var(--space-3); font-size: var(--text-sm); }
+  .app-panel .ptitle { color: var(--chrome-text-dim); font-size: var(--text-xs); margin-bottom: var(--space-3); }
+  .app-panel .row { display: flex; justify-content: space-between; padding: 3px 0 3px var(--space-3); color: var(--chrome-text); }
+  .app-panel .row.h { padding-left: 0; font-weight: 600; color: var(--chrome-text-heading); }
+  .app-panel .row.is-active { color: var(--chrome-accent); }
+  .app-panel .row .n { color: var(--chrome-text-dim); font-size: var(--text-xs); }
+  .app-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .app-toolbar { height: 40px; flex-shrink: 0; display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3); border-bottom: 1px solid var(--chrome-border); font-size: var(--text-sm); color: var(--chrome-text); }
+  .app-toolbar .sel { height: 26px; padding: 0 var(--space-2); border: 1px solid var(--chrome-border); border-radius: var(--radius-sm); display: inline-flex; align-items: center; gap: 6px; background: var(--chrome-control-bg); }
+  .app-toolbar .sel::after { content: '⌄'; color: var(--chrome-text-dim); }
+  .app-toolbar b, .app-toolbar em, .app-toolbar u { width: 22px; text-align: center; }
+  .app-editor { flex: 1; min-height: 0; background: var(--editor-surround); overflow: hidden; display: flex; justify-content: center; padding: var(--space-4) var(--space-4) 0; position: relative; }
+  .app-page { width: 520px; background: var(--editor-bg); color: var(--editor-text); box-shadow: 0 0 0 1px var(--editor-page-edge), 0 1px 3px rgb(0 0 0 / 0.12); padding: 40px 48px; font-family: var(--font-editor); font-size: 14px; line-height: 1.65; position: relative; }
+  .app-page p { margin: 0 0 0.75em; }
+  .app-page .caret { display: inline-block; width: 1px; height: 1.05em; background: var(--editor-text); vertical-align: -0.2em; margin-left: 1px; }
+  .app-footer { height: 30px; flex-shrink: 0; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--space-4); padding: 0 var(--space-4); border-top: 1px solid var(--chrome-border); background: var(--chrome-bg-elevated); font-size: var(--text-sm); color: var(--chrome-text-muted); position: relative; }
+  .app-footer .left { display: flex; align-items: center; gap: var(--space-3); }
+  .app-footer .right { text-align: right; display: flex; justify-content: flex-end; gap: var(--space-4); }
+  .app-footer .saved { color: #7fae8a; }
+
+  /* Soft lockout as it exists today: chrome at 18% opacity, toolbar and
+     footer untouched. */
+  .dim .app-menubar, .dim .app-searchrow, .dim .app-rail, .dim .app-panel, .dim .app-titlebar { opacity: 0.18; }
+
+  /* ── Modal, as today ────────────────────────────────────────────── */
+  .overlay { position: absolute; inset: 0; background: rgb(0 0 0 / 0.45); display: flex; align-items: center; justify-content: center; }
+  .modal { width: 420px; background: var(--chrome-bg-elevated); border: 1px solid var(--chrome-border); border-radius: var(--radius-md); padding: var(--space-5); box-shadow: var(--elev-3); font-size: var(--text-md); }
+  .modal h2 { font-size: 15px; font-weight: 600; color: var(--chrome-text-heading); margin-bottom: var(--space-4); }
+  .modal .actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-4); }
+  .btn { font: inherit; font-size: var(--text-md); height: 32px; padding: 0 var(--space-4); border-radius: var(--radius-sm); border: 1px solid var(--chrome-border); background: var(--chrome-control-bg); color: var(--chrome-text-heading); cursor: pointer; }
+  .btn.primary { background: var(--chrome-accent); color: var(--chrome-accent-contrast); border-color: transparent; }
+  .btn.ghost { background: none; border-color: transparent; color: var(--chrome-text-muted); }
+  .presets { display: flex; gap: var(--space-2); margin-bottom: var(--space-3); }
+  .preset { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: var(--space-3) 0; background: var(--chrome-control-bg); border: 1px solid var(--chrome-border); border-radius: var(--radius-md); }
+  .preset .v { font-size: var(--text-xl); color: var(--chrome-text-heading); font-variant-numeric: tabular-nums; }
+  .preset .u { font-size: var(--text-xs); color: var(--chrome-text-dim); }
+  .custom { display: flex; gap: var(--space-2); margin-bottom: var(--space-3); }
+  .custom .input { flex: 1; height: 32px; border: 1px solid var(--chrome-border); border-radius: var(--radius-sm); background: var(--chrome-bg); color: var(--chrome-text-dim); display: flex; align-items: center; padding: 0 var(--space-3); }
+  .custom .btn { opacity: 0.55; }
+  .opts { display: flex; flex-direction: column; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--chrome-border); font-size: var(--text-md); }
+  .opts label { display: flex; align-items: center; gap: var(--space-2); }
+  .cb { width: 14px; height: 14px; border: 1px solid var(--chrome-border-strong); border-radius: 3px; display: inline-block; }
+  .cb.on { background: var(--chrome-accent); border-color: var(--chrome-accent); position: relative; }
+  .cb.on::after { content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid var(--chrome-accent-contrast); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .result-line { font-size: var(--text-xl); color: var(--chrome-text-heading); margin: var(--space-3) 0 var(--space-2); }
+  .result-ctx { font-size: var(--text-sm); color: var(--chrome-text-dim); line-height: 1.6; }
+
+  /* Footer countdown pill as it exists today. */
+  .countdown { display: inline-flex; align-items: baseline; gap: var(--space-2); height: 22px; padding: 0 var(--space-2); color: var(--chrome-accent); background: var(--chrome-control-bg); border: 1px solid var(--chrome-border); border-radius: var(--radius-sm); font-size: var(--text-sm); }
+  .countdown .t { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .countdown .s { font-size: var(--text-xs); color: var(--chrome-text-dim); }
+
+  /* ── Direction A: one sentence above the page ──────────────────── */
+  .a-line { flex-shrink: 0; display: flex; align-items: baseline; gap: var(--space-3); height: 34px; padding: 0 var(--space-4); background: var(--editor-surround); color: #5a5346; font-size: var(--text-sm); position: relative; justify-content: center; }
+  body.light .a-line { color: #6e6656; }
+  .a-line .sentence { font-variant-numeric: tabular-nums; }
+  .a-line .sentence b { font-weight: 600; color: #2b2620; }
+  .a-line .stop { color: #3d5a7a; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+  .a-track { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: rgb(43 38 32 / 0.12); }
+  .a-track i { display: block; height: 100%; width: 44%; background: #3d5a7a; }
+  .a-modal { width: 440px; }
+  .a-modal h2 { margin-bottom: var(--space-2); }
+  .a-modal .lead { color: var(--chrome-text-muted); font-size: var(--text-md); line-height: 1.55; margin-bottom: var(--space-4); }
+  .a-row { display: flex; gap: var(--space-2); margin-bottom: var(--space-4); }
+  .a-row .btn { flex: 1; }
+  .a-modal .opts { border-top: none; padding-top: 0; }
+
+  /* ── Direction B: the timer is the window edge ─────────────────── */
+  .b-popover { position: absolute; left: 14px; bottom: 36px; width: 300px; background: var(--chrome-bg-elevated); border: 1px solid var(--chrome-border); border-radius: var(--radius-md); box-shadow: var(--elev-2); padding: var(--space-3); font-size: var(--text-md); }
+  .b-popover .lead { color: var(--chrome-text-muted); font-size: var(--text-sm); line-height: 1.5; margin-bottom: var(--space-3); }
+  .b-popover .row { display: flex; gap: var(--space-2); }
+  .b-popover .row .btn { flex: 1; padding: 0; }
+  .b-popover .foot { margin-top: var(--space-3); font-size: var(--text-xs); color: var(--chrome-text-dim); line-height: 1.5; }
+  .b-frame .app-menubar, .b-frame .app-searchrow, .b-frame .app-rail, .b-frame .app-panel, .b-frame .app-toolbar, .b-frame .app-titlebar { visibility: hidden; }
+  .b-frame .app-body { position: relative; }
+  .b-frame .app-editor { background: var(--editor-surround); }
+  .b-frame .app-footer { background: var(--editor-surround); border-top: none; grid-template-columns: 1fr; text-align: center; color: #5a5346; font-variant-numeric: tabular-nums; height: 34px; }
+  body.light .b-frame .app-footer { color: #6e6656; }
+  .b-frame .app-footer b { font-weight: 600; color: #2b2620; }
+  .b-edge { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgb(43 38 32 / 0.12); }
+  .b-edge i { display: block; height: 100%; width: 44%; background: #3d5a7a; }
+  .b-hover { position: absolute; left: 50%; transform: translateX(-50%); bottom: 42px; font-size: var(--text-xs); color: #6e6656; background: rgb(250 246 236 / 0.9); border: 1px solid var(--editor-page-edge); border-radius: var(--radius-sm); padding: 2px 8px; }
+  .b-ended .app-footer { grid-template-columns: 1fr auto 1fr; text-align: left; }
+  .b-ended .app-footer .left { color: var(--chrome-text); }
+  .b-ended .app-footer .left a { color: var(--chrome-accent); text-decoration: underline; text-underline-offset: 2px; margin-left: var(--space-2); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="mockbar">
+  <span class="mockbar-title">Sprint mode · fake data</span>
+  <div class="mockbar-tabs" id="tabs">
+    <button class="is-active" data-dir="dir-current">Current</button>
+    <button data-dir="dir-a">A · Say it in a sentence</button>
+    <button data-dir="dir-b">B · The timer is the window</button>
+  </div>
+  <div class="states" id="states">
+    <button class="is-active" data-state="start">Starting</button>
+    <button data-state="run">Running</button>
+    <button data-state="end">Ended</button>
+  </div>
+  <button class="mockbar-toggle" id="themeToggle">Light theme</button>
+</div>
+
+<!-- ───────────────────────── CURRENT ───────────────────────── -->
+<section class="direction is-active" id="dir-current">
+  <p class="note"><b>As it is today.</b> Starting is a modal of three number tiles and two checkboxes. While it runs, the only sign is a small pill at the far left of the footer, showing time left and the word “stop”; there is no sense of how far through you are or how much you have written. The dimming option fades the menus, search, rail and binder but leaves the toolbar and footer bright, so the window reads as half-asleep rather than focused. The result comes back as another modal.</p>
+  <div class="app-frame" id="cur-frame">
+    <div class="app-titlebar"><i></i> ChapterFlow</div>
+    <div class="app-menubar"><span>File</span><span>Edit</span><span>Format</span><span>Insert</span><span>View</span><span>Project</span><span>Help</span></div>
+    <div class="app-searchrow"><div class="app-search">Search the whole project...</div><div class="app-views"><span class="is-active">Editor</span><span>Outliner</span><span>Corkboard</span></div></div>
+    <div class="app-body">
+      <div class="app-rail"><i class="is-active"></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="app-panel">
+        <div class="ptitle">The Drowned Mile</div>
+        <div class="row h"><span>Draft</span><span class="n">21,243</span></div>
+        <div class="row h" style="padding-left:12px"><span>Part One</span><span class="n">5,324</span></div>
+        <div class="row is-active" style="padding-left:24px"><span>1. The Drowned Mile</span><span class="n">528</span></div>
+        <div class="row" style="padding-left:24px"><span>2. Soundings</span><span class="n">506</span></div>
+        <div class="row" style="padding-left:24px"><span>3. Kestrel Point</span><span class="n">537</span></div>
+        <div class="row" style="padding-left:24px"><span>4. What the Log Says</span><span class="n">553</span></div>
+        <div class="row" style="padding-left:24px"><span>5. Low Water</span><span class="n">537</span></div>
+        <div class="row h" style="padding-left:12px"><span>Part Two</span><span class="n">5,295</span></div>
+        <div class="row" style="padding-left:24px"><span>11. The Anchorline</span><span class="n">507</span></div>
+        <div class="row" style="padding-left:24px"><span>12. Salvage</span><span class="n">538</span></div>
+      </div>
+      <div class="app-main">
+        <div class="app-toolbar"><span class="sel">Normal text</span><span class="sel">Default font</span><span class="sel">12</span><b>B</b><em>I</em><u>U</u></div>
+        <div class="app-editor">
+          <div class="app-page">
+            <p>Marguerite relented the ruined testament privately. There was a careless haar on the testimonyed, again annotated. There was a windward lantern on the inheritance, openly dredged.</p>
+            <p>Tobias forgot the almanac, in the end, and sounded the countersigned inlet. Tobias recorded the candid fathomed on the record. Wren surveyed the fathomless petrel under protest.</p>
+            <p>At the lantern room, Wren beached a hull nobody had filed. Tobias questioned the derelict plumblines out of habit. Nadia surveyed the undertowed, until the figures agreed.</p>
+            <p>She wrote a few more words before the bell.<span class="caret"></span></p>
+          </div>
+          <!-- Starting: the modal -->
+          <div class="overlay state-start">
+            <div class="modal">
+              <h2>Start a sprint</h2>
+              <div class="presets"><div class="preset"><span class="v">15</span><span class="u">minutes</span></div><div class="preset"><span class="v">25</span><span class="u">minutes</span></div><div class="preset"><span class="v">45</span><span class="u">minutes</span></div></div>
+              <div class="custom"><div class="input">Custom minutes…</div><button class="btn">Start</button></div>
+              <div class="opts"><label><span class="cb on"></span> Dim the rest of the app while the sprint runs</label><label><span class="cb on"></span> Play a tone when it finishes</label></div>
+              <div class="actions"><button class="btn">Cancel</button></div>
+            </div>
+          </div>
+          <!-- Ended: the result modal -->
+          <div class="overlay state-end">
+            <div class="modal" style="width:400px">
+              <h2>Sprint finished</h2>
+              <p class="result-line">1,040 words in 25 minutes.</p>
+              <p class="result-ctx">Planned 25 minutes.</p>
+              <div class="actions"><button class="btn">Start another</button><button class="btn primary">Done</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="app-footer">
+          <div class="left"><span class="countdown state-run"><span class="t">14:02</span><span class="s">stop</span></span></div>
+          <div class="saved">All changes saved</div>
+          <div class="right"><span>546 words</span><span>2 pages</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── DIRECTION A ───────────────────────── -->
+<section class="direction" id="dir-a">
+  <p class="note"><b>Clearer means it tells you, in words, what is happening.</b> Starting opens a dialog that first says what a sprint is, then offers the lengths as plain buttons. While it runs, one sentence sits between the toolbar and the page, at the page's own width, and keeps itself current: time left, words so far, and the way out. A hairline under it fills from left to right. Nothing else in the window changes, and there is no dimming option: focus is the other mode's job. When time is up, the same line reads out the result and offers another; there is no modal to dismiss.</p>
+  <div class="app-frame">
+    <div class="app-titlebar"><i></i> ChapterFlow</div>
+    <div class="app-menubar"><span>File</span><span>Edit</span><span>Format</span><span>Insert</span><span>View</span><span>Project</span><span>Help</span></div>
+    <div class="app-searchrow"><div class="app-search">Search the whole project...</div><div class="app-views"><span class="is-active">Editor</span><span>Outliner</span><span>Corkboard</span></div></div>
+    <div class="app-body">
+      <div class="app-rail"><i class="is-active"></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="app-panel">
+        <div class="ptitle">The Drowned Mile</div>
+        <div class="row h"><span>Draft</span><span class="n">21,243</span></div>
+        <div class="row h" style="padding-left:12px"><span>Part One</span><span class="n">5,324</span></div>
+        <div class="row is-active" style="padding-left:24px"><span>1. The Drowned Mile</span><span class="n">528</span></div>
+        <div class="row" style="padding-left:24px"><span>2. Soundings</span><span class="n">506</span></div>
+        <div class="row" style="padding-left:24px"><span>3. Kestrel Point</span><span class="n">537</span></div>
+        <div class="row" style="padding-left:24px"><span>4. What the Log Says</span><span class="n">553</span></div>
+        <div class="row" style="padding-left:24px"><span>5. Low Water</span><span class="n">537</span></div>
+        <div class="row h" style="padding-left:12px"><span>Part Two</span><span class="n">5,295</span></div>
+        <div class="row" style="padding-left:24px"><span>11. The Anchorline</span><span class="n">507</span></div>
+        <div class="row" style="padding-left:24px"><span>12. Salvage</span><span class="n">538</span></div>
+      </div>
+      <div class="app-main">
+        <div class="app-toolbar"><span class="sel">Normal text</span><span class="sel">Default font</span><span class="sel">12</span><b>B</b><em>I</em><u>U</u></div>
+        <div class="a-line state-run">
+          <span class="sentence">Sprinting for 25 minutes. <b>14:02</b> left, and <b>312 words</b> so far.</span>
+          <span class="stop">Stop early</span>
+          <div class="a-track"><i></i></div>
+        </div>
+        <div class="a-line state-end">
+          <span class="sentence">That sprint ran its 25 minutes and added <b>1,040 words</b>.</span>
+          <span class="stop">Start another</span>
+          <span class="stop" style="color:#6e6656">Dismiss</span>
+        </div>
+        <div class="app-editor">
+          <div class="app-page">
+            <p>Marguerite relented the ruined testament privately. There was a careless haar on the testimonyed, again annotated. There was a windward lantern on the inheritance, openly dredged.</p>
+            <p>Tobias forgot the almanac, in the end, and sounded the countersigned inlet. Tobias recorded the candid fathomed on the record. Wren surveyed the fathomless petrel under protest.</p>
+            <p>At the lantern room, Wren beached a hull nobody had filed. Tobias questioned the derelict plumblines out of habit. Nadia surveyed the undertowed, until the figures agreed.</p>
+            <p>She wrote a few more words before the bell.<span class="caret"></span></p>
+          </div>
+          <div class="overlay state-start">
+            <div class="modal a-modal">
+              <h2>Write without stopping for a while</h2>
+              <p class="lead">A sprint is a timer. When it runs out, you'll see how many words you added while it ran, and the sprint is kept with the writing session it happened in.</p>
+              <div class="a-row"><button class="btn">15 minutes</button><button class="btn">25 minutes</button><button class="btn">45 minutes</button><button class="btn ghost">Other…</button></div>
+              <div class="opts"><label><span class="cb on"></span> Play a soft tone when the time is up.</label></div>
+              <div class="actions"><button class="btn ghost">Not now</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="app-footer">
+          <div class="left"></div>
+          <div class="saved">All changes saved</div>
+          <div class="right"><span>546 words</span><span>2 pages</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── DIRECTION B ───────────────────────── -->
+<section class="direction" id="dir-b">
+  <p class="note"><b>Clearer means there is less to read.</b> A sprint is treated as time-boxed focus: choosing a length in a small popover by the footer is all there is to it, and for as long as it runs the chrome goes away entirely, as in distraction-free mode. The window's bottom edge becomes the timer, a thin line filling from left to right, with one centred line of figures above it. Hovering there reveals the way to stop. When time is up the chrome comes back on its own and the footer says what happened, in one sentence, until you next type. No dialog opens at either end.</p>
+  <div class="app-frame" id="b-frame">
+    <div class="app-titlebar"><i></i> ChapterFlow</div>
+    <div class="app-menubar"><span>File</span><span>Edit</span><span>Format</span><span>Insert</span><span>View</span><span>Project</span><span>Help</span></div>
+    <div class="app-searchrow"><div class="app-search">Search the whole project...</div><div class="app-views"><span class="is-active">Editor</span><span>Outliner</span><span>Corkboard</span></div></div>
+    <div class="app-body">
+      <div class="app-rail"><i class="is-active"></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="app-panel">
+        <div class="ptitle">The Drowned Mile</div>
+        <div class="row h"><span>Draft</span><span class="n">21,243</span></div>
+        <div class="row h" style="padding-left:12px"><span>Part One</span><span class="n">5,324</span></div>
+        <div class="row is-active" style="padding-left:24px"><span>1. The Drowned Mile</span><span class="n">528</span></div>
+        <div class="row" style="padding-left:24px"><span>2. Soundings</span><span class="n">506</span></div>
+        <div class="row" style="padding-left:24px"><span>3. Kestrel Point</span><span class="n">537</span></div>
+        <div class="row" style="padding-left:24px"><span>4. What the Log Says</span><span class="n">553</span></div>
+        <div class="row" style="padding-left:24px"><span>5. Low Water</span><span class="n">537</span></div>
+        <div class="row h" style="padding-left:12px"><span>Part Two</span><span class="n">5,295</span></div>
+        <div class="row" style="padding-left:24px"><span>11. The Anchorline</span><span class="n">507</span></div>
+        <div class="row" style="padding-left:24px"><span>12. Salvage</span><span class="n">538</span></div>
+      </div>
+      <div class="app-main">
+        <div class="app-toolbar"><span class="sel">Normal text</span><span class="sel">Default font</span><span class="sel">12</span><b>B</b><em>I</em><u>U</u></div>
+        <div class="app-editor">
+          <div class="app-page">
+            <p>Marguerite relented the ruined testament privately. There was a careless haar on the testimonyed, again annotated. There was a windward lantern on the inheritance, openly dredged.</p>
+            <p>Tobias forgot the almanac, in the end, and sounded the countersigned inlet. Tobias recorded the candid fathomed on the record. Wren surveyed the fathomless petrel under protest.</p>
+            <p>At the lantern room, Wren beached a hull nobody had filed. Tobias questioned the derelict plumblines out of habit. Nadia surveyed the undertowed, until the figures agreed.</p>
+            <p>She wrote a few more words before the bell.<span class="caret"></span></p>
+          </div>
+          <div class="b-hover state-run">Stop the sprint</div>
+        </div>
+        <div class="app-footer">
+          <!-- Starting: the ordinary footer, with the popover above it -->
+          <div class="left state-start"><span style="color:var(--chrome-accent)">Start a sprint</span></div>
+          <div class="saved state-start">All changes saved</div>
+          <div class="right state-start"><span>546 words</span><span>2 pages</span></div>
+          <!-- Running: one centred line -->
+          <div class="state-run"><b>14:02</b> left · <b>312 words</b> so far</div>
+          <!-- Ended: the footer carries the result -->
+          <div class="left state-end"><span>Your sprint added 1,040 words in 25 minutes.</span><a>Start another</a></div>
+          <div class="saved state-end">All changes saved</div>
+          <div class="right state-end"><span>1,586 words</span><span>4 pages</span></div>
+          <div class="b-edge state-run"><i></i></div>
+        </div>
+        <div class="b-popover state-start">
+          <p class="lead">How long do you want to write without stopping? The rest of the window steps back while the sprint runs.</p>
+          <div class="row"><button class="btn">15 min</button><button class="btn">25 min</button><button class="btn">45 min</button><button class="btn ghost">Other…</button></div>
+          <p class="foot">A soft tone plays when the time is up. You can turn that off in Appearance.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  const tabs = document.querySelectorAll('#tabs button')
+  const states = document.querySelectorAll('#states button')
+  let dir = 'dir-current'
+  let state = 'start'
+  function apply() {
+    document.querySelectorAll('.direction').forEach((s) => s.classList.toggle('is-active', s.id === dir))
+    document.querySelectorAll('[class*="state-"]').forEach((el) => {
+      const own = [...el.classList].filter((c) => c.startsWith('state-')).map((c) => c.slice(6))
+      el.classList.toggle('hidden', !own.includes(state))
+    })
+    // Current: the dimming option is on in the running state.
+    document.getElementById('cur-frame').classList.toggle('dim', state === 'run')
+    // B: chrome gone while running; back otherwise.
+    const b = document.getElementById('b-frame')
+    b.classList.toggle('b-frame', state === 'run')
+    b.classList.toggle('b-ended', state === 'end')
+  }
+  tabs.forEach((btn) => btn.addEventListener('click', () => { tabs.forEach((b) => b.classList.toggle('is-active', b === btn)); dir = btn.dataset.dir; apply() }))
+  states.forEach((btn) => btn.addEventListener('click', () => { states.forEach((b) => b.classList.toggle('is-active', b === btn)); state = btn.dataset.state; apply() }))
+  document.getElementById('themeToggle').addEventListener('click', (e) => { document.body.classList.toggle('light'); e.target.textContent = document.body.classList.contains('light') ? 'Dark theme' : 'Light theme' })
+  apply()
+</script>
+</body>
+</html>

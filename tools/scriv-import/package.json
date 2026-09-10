@@ -1,0 +1,18 @@
+{
+  "name": "scriv-import-lab",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Isolated refinement harness for the Scrivener .scriv importer. Not part of the app build — see README.md.",
+  "type": "commonjs",
+  "dependencies": {
+    "iconv-lite": "^0.7.3",
+    "rtf-stream-parser": "^4.0.0"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node build.mjs test/rtf.test.ts && node .build/test/rtf.test.cjs",
+    "typecheck": "node ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+    "cli": "node build.mjs cli.ts && node .build/cli.cjs",
+    "intake": "node build.mjs intake.ts && node .build/intake.cjs"
+  }
+}

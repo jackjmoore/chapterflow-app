@@ -1,6 +1,8 @@
 import { BrowserWindow } from 'electron'
+import { CHAPTER_DROP_INCHES } from '../../shared/book'
 import { effectiveMarginMm, type ExportOptions } from '../../shared/export'
 import { PAGE_DIMENSIONS_MM } from '../../shared/preferences'
+import { BOOK_BODY_CSS } from './bookPdf'
 
 const MM_PER_INCH = 25.4
 const CSS_PX_PER_INCH = 96
@@ -12,10 +14,27 @@ const SHARED_CSS = `
   blockquote { break-inside: avoid; }
   .chf-section-title { break-before: page; }
   .chf-section-title:first-child { break-before: avoid; }
-  .chf-toc { break-after: page; }
+  /* Document separation (a compile setting): 'page' marks nested document
+     headings with chf-doc-page; 'divider' cancels the level-1 page break on
+     document headings with chf-flow so documents run on. */
+  .chf-doc-page { break-before: page; }
+  .chf-section-title.chf-flow { break-before: auto; }
+  .chf-toc { break-before: page; break-after: page; }
+  .chf-toc:first-child { break-before: avoid; }
   .chf-toc h1 { break-after: avoid; }
   .chf-toc ul { list-style: none; padding-left: 0; }
   .chf-toc li { margin: 0.35em 0; }
+  /* Contents entries are internal links (each targets its section's heading
+     id) — styled as plain text on the page, kept as link annotations in the
+     PDF alongside the document outline printToPDF generates from headings. */
+  .chf-toc a { color: inherit; text-decoration: none; }
+
+  /* Front/back matter pages (title page, copyright, dedication…): each
+     document on its own page, content only — the binder names that label
+     these in the app are navigation, not manuscript text, so no chapter-style
+     heading is printed for them. */
+  .chf-matter { break-before: page; }
+  .chf-matter:first-child { break-before: avoid; }
 
   /* Insert-menu structural blocks. Page and chapter breaks are zero-height —
      they exist only to carry the break, never to add visible space. */
@@ -97,8 +116,9 @@ const MANUSCRIPT_CSS = `
     text-indent: 0.5in;
     text-align: left;
   }
-  /* A paragraph opening a scene or chapter is flush left by convention. */
-  h1 + p, h2 + p, h3 + p, .chf-scene-break + p, body > p:first-child { text-indent: 0; }
+  /* Every body paragraph is indented, including a chapter's or scene's first
+     — the flush-left opening is a book-design convention that does not belong
+     in submission format, and the docx renderer already indents them all. */
   h1, h2, h3 {
     margin: 0 0 2em;
     font-family: 'Times New Roman', Times, serif;
@@ -108,7 +128,18 @@ const MANUSCRIPT_CSS = `
     text-align: center;
     text-transform: uppercase;
   }
-  .chf-section-title { margin-top: 2in; }
+  .chf-section-title { margin-top: ${CHAPTER_DROP_INCHES}in; }
+  /* A nested document heading that opens its own page takes the same drop a
+     chapter title does; one running on mid-flow takes none. */
+  .chf-doc-page { margin-top: ${CHAPTER_DROP_INCHES}in; }
+  .chf-section-title.chf-flow { margin-top: 1.4em; }
+  /* An inserted chapter break opens its next page the same drop down that a
+     section title does — the one shared measurement (CHAPTER_DROP_INCHES),
+     also used by the docx spacer and the book preset. */
+  .chf-chapter-break + * { margin-top: ${CHAPTER_DROP_INCHES}in; }
+  /* Matter pages are display pages (title, copyright), not body prose — the
+     paragraph indent convention doesn't apply on them. */
+  .chf-matter p { text-indent: 0; }
   blockquote { margin: 0 0 0 0.5in; font-style: normal; border: none; padding: 0; }
   ul, ol { margin: 0 0 0 0.5in; padding-left: 1.5em; }
   li { margin: 0; }
@@ -119,9 +150,13 @@ const MANUSCRIPT_CSS = `
 `
 
 function wrapHtml(bodyHtml: string, options: ExportOptions, paddingCss: string): string {
-  const css =
-    SHARED_CSS + (options.preset === 'manuscript' ? MANUSCRIPT_CSS : STANDARD_CSS) + `body { ${paddingCss} }`
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${bodyHtml}</body></html>`
+  // The book branch serves only the stored-compile viewer and its print
+  // fallback: real book output never passes through here (bookPdf.ts renders
+  // its own segments); this keeps the frozen view in the book's typography.
+  const presetCss =
+    options.preset === 'manuscript' ? MANUSCRIPT_CSS : options.preset === 'book' ? BOOK_BODY_CSS : STANDARD_CSS
+  const css = SHARED_CSS + presetCss + `body { ${paddingCss} }`
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>${css}</style></head><body>${bodyHtml}</body></html>`
 }
 
 /** Surname-only is the usual convention; falls back to the whole string. */
@@ -190,6 +225,12 @@ export async function htmlToPdfBuffer(bodyHtml: string, options: ExportOptions):
     return await win.webContents.printToPDF({
       printBackground: true,
       preferCSSPageSize: false,
+      // The PDF's navigation sidebar, built from the page's h1–h3 — chapter
+      // titles become clickable bookmarks. The outline is derived from the
+      // structure tree, which only exists when tagged-PDF generation is on —
+      // the outline flag alone produces nothing (verified against the bytes).
+      generateTaggedPDF: true,
+      generateDocumentOutline: true,
       pageSize,
       displayHeaderFooter: isManuscript,
       headerTemplate: isManuscript ? manuscriptHeaderTemplate(options) : undefined,

@@ -16,7 +16,8 @@ import {
   convertInchesToTwip,
   type ISectionOptions
 } from 'docx'
-import { SCENE_BREAK_MARK, effectiveMarginMm, type ExportOptions } from '../../shared/export'
+import { CHAPTER_DROP_INCHES } from '../../shared/book'
+import { effectiveMarginMm, type ExportOptions } from '../../shared/export'
 import { PAGE_DIMENSIONS_MM } from '../../shared/preferences'
 import { isSceneBreakBlock } from './blocksToHtml'
 import { fitWithin, imageSize } from './imageSize'
@@ -141,12 +142,24 @@ function toChildren(block: Block, footnotes: FootnoteCollector): (TextRun | Foot
   return children.length ? children : [new TextRun('')]
 }
 
-function toParagraph(block: Block, orderedLevel: number, footnotes: FootnoteCollector): Paragraph {
+function toParagraph(
+  block: Block,
+  orderedLevel: number,
+  footnotes: FootnoteCollector,
+  manuscript: boolean
+): Paragraph {
   const children = toChildren(block, footnotes)
-  const alignment = block.align ? ALIGN_MAP[block.align] : undefined
+  // Standard manuscript format is never justified — writer-applied
+  // justification drops to the default left there; other alignments (a
+  // centered dedication line) are kept.
+  const effectiveAlign = manuscript && block.align === 'justify' ? undefined : block.align
+  const alignment = effectiveAlign ? ALIGN_MAP[effectiveAlign] : undefined
 
   if (block.kind === 'heading') {
-    return new Paragraph({ heading: HEADING_LEVELS[(block.level ?? 1) - 1], alignment, children })
+    // keepNext: a heading must never strand alone at a page foot — it stays
+    // with the first paragraph beneath it, matching the PDF's break-after:
+    // avoid.
+    return new Paragraph({ heading: HEADING_LEVELS[(block.level ?? 1) - 1], alignment, keepNext: true, children })
   }
   if (block.kind === 'blockquote') {
     return new Paragraph({ indent: { left: 720 }, alignment, children })
@@ -170,6 +183,10 @@ const MAX_IMAGE_WIDTH_PX = 624
 
 export interface DocxRenderOptions {
   manuscript?: boolean
+  /** Normalize typed scene dividers (`***`, `---`) to this one centered
+   *  marker — `#` for manuscript format, the project's scene-break setting
+   *  for standard. Absent leaves dividers as typed. */
+  sceneBreakMark?: string
   /** Shared across every section of a project export, so footnote numbering
    *  runs continuously through the whole manuscript. */
   footnotes?: FootnoteCollector
@@ -186,9 +203,15 @@ export function blocksToDocxParagraphs(blocks: Block[], options: DocxRenderOptio
   let prevWasOrdered = false
   const paragraphs: Paragraph[] = []
   for (const block of blocks) {
-    if (manuscript && block.kind === 'paragraph' && isSceneBreakBlock(block)) {
+    if (options.sceneBreakMark && block.kind === 'paragraph' && isSceneBreakBlock(block)) {
       paragraphs.push(
-        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(SCENE_BREAK_MARK)] })
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          // Manuscript's default first-line indent would push a centered
+          // marker off-center.
+          indent: { firstLine: 0 },
+          children: [new TextRun(options.sceneBreakMark)]
+        })
       )
       prevWasOrdered = false
       continue
@@ -196,12 +219,14 @@ export function blocksToDocxParagraphs(blocks: Block[], options: DocxRenderOptio
 
     if (block.kind === 'pageBreak' || block.kind === 'chapterBreak') {
       paragraphs.push(new Paragraph({ children: [new PageBreak()] }))
-      // Manuscript convention: a new chapter opens roughly a third of the way
-      // down its page rather than at the top margin. Only chapter breaks get
-      // it — that semantic difference is why they aren't just page breaks.
+      // Manuscript convention: a new chapter opens partway down its page
+      // rather than at the top margin. Only chapter breaks get it — that
+      // semantic difference is why they aren't just page breaks. The drop is
+      // the one shared measurement (CHAPTER_DROP_INCHES), same as the PDF
+      // path's .chf-section-title / .chf-chapter-break rules and book mode.
       if (manuscript && block.kind === 'chapterBreak') {
         paragraphs.push(
-          new Paragraph({ spacing: { before: convertInchesToTwip(2.5) }, children: [new TextRun('')] })
+          new Paragraph({ spacing: { before: convertInchesToTwip(CHAPTER_DROP_INCHES) }, children: [new TextRun('')] })
         )
       }
       prevWasOrdered = false
@@ -254,7 +279,7 @@ export function blocksToDocxParagraphs(blocks: Block[], options: DocxRenderOptio
 
     if (block.kind === 'ordered' && !prevWasOrdered) orderedInstance += 1
     prevWasOrdered = block.kind === 'ordered'
-    paragraphs.push(toParagraph(block, orderedInstance, footnotes))
+    paragraphs.push(toParagraph(block, orderedInstance, footnotes, manuscript))
   }
   return paragraphs
 }
@@ -362,6 +387,9 @@ export async function sectionsToDocxBuffer(
 
   const doc = new Document({
     styles: manuscript ? manuscriptStyles() : undefined,
+    // Asks Word to refresh fields on open — the Contents TOC field a project
+    // export carries has no page numbers until Word lays the document out.
+    features: { updateFields: true },
     footnotes: footnoteConfig,
     numbering: {
       config: [

@@ -9,7 +9,7 @@ import {
 import type { RailSection } from '../../shared/binder'
 import type { StoryBibleTypeDef } from '../../shared/storyBible'
 import { NewDocumentIcon, NewFolderIcon, PlusIcon, PanelCollapseIcon, PanelExpandIcon } from './icons'
-import { useFadePresence } from './useFadePresence'
+import { usePresence, presenceClass } from './usePresence'
 
 /** Width of the collapsed rail. This is reserved, in-flow width — the rail is
  *  a flex sibling of the editor, never an overlay on top of it. At narrow
@@ -22,12 +22,6 @@ export const COLLAPSED_PANEL_WIDTH = 44
 /** Hovering across the rail on the way somewhere else shouldn't summon the
  *  flyout, and clipping a corner on the way back into it shouldn't dismiss it. */
 const FLYOUT_OPEN_DELAY_MS = 120
-/** How long the flyout takes to fade in or out, once scheduleFlyout has
- *  already decided to open or close it — this is a separate, much shorter
- *  delay from FLYOUT_OPEN_DELAY_MS/FLYOUT_CLOSE_DELAY_MS above, which are
- *  hover-intent timers deciding *whether* to open at all. This one just
- *  softens the resulting appear/disappear once that decision is made. */
-const FLYOUT_FADE_MS = 120
 const FLYOUT_CLOSE_DELAY_MS = 200
 
 /** The flyout's own width — independent of the resizable sidebarWidth it
@@ -84,8 +78,11 @@ interface SidePanelProps {
 const SECTION_TITLES: Record<Exclude<RailSection, 'manuscript'>, string> = {
   storyBible: 'Story Bible',
   timeline: 'Continuity Board',
+  compile: 'Compile',
   submissions: 'Query Tracker',
-  lexicon: 'Lexicon'
+  lexicon: 'Lexicon',
+  progress: 'Progress',
+  appearance: 'Appearance'
 }
 
 /**
@@ -123,10 +120,29 @@ function SidePanel(props: SidePanelProps): JSX.Element {
   const newItemPickerRef = useRef<HTMLDivElement>(null)
   const [flyoutOpen, setFlyoutOpen] = useState(false)
   const flyoutTimerRef = useRef<number | null>(null)
-  // See useFadePresence: keeps the flyout mounted for one fade after
-  // flyoutOpen goes false, instead of the instant removal a plain
-  // "flyoutOpen && (...)" gives.
-  const flyoutFade = useFadePresence(flyoutOpen ? true : null, FLYOUT_FADE_MS)
+  // See usePresence: keeps the flyout mounted for one exit after flyoutOpen
+  // goes false, instead of the instant removal a plain "flyoutOpen && (...)"
+  // gives. The fade duration is the app's shared one now, not a private
+  // constant — FLYOUT_OPEN_DELAY_MS/FLYOUT_CLOSE_DELAY_MS above remain
+  // separate, because those are hover-intent timers deciding *whether* to
+  // open at all, not how the opening looks.
+  const flyoutFade = usePresence(flyoutOpen ? true : null)
+
+  /**
+   * Which shape the panel is currently showing. Collapsing is a genuine swap
+   * of one layout for another, not a resize of one — so it runs through the
+   * 'sequential' presence: the outgoing contents finish leaving before the
+   * incoming ones arrive.
+   *
+   * Everything below reads `shown` rather than the `collapsed` prop, the
+   * panel's own width included. That is deliberate. Width cannot be animated
+   * here (not a compositor property — see --motion-enter in index.css), so it
+   * snaps; driving it off `shown` means it snaps during the gap between the
+   * two contents, when there is nothing on screen to be seen squeezed by it,
+   * instead of the instant the prop changes.
+   */
+  const panel = usePresence<'expanded' | 'collapsed'>(collapsed ? 'collapsed' : 'expanded', 'sequential')
+  const shown = panel.rendered ?? (collapsed ? 'collapsed' : 'expanded')
 
   // Same dismiss-on-outside-click contract as the browse grid's New… popover.
   useEffect(() => {
@@ -258,7 +274,7 @@ function SidePanel(props: SidePanelProps): JSX.Element {
   // rail's reserved width is identical whether or not it is open. It carries
   // no header of its own — no title, no create buttons — because it's a
   // compact names-only popover, not a second copy of the full panel.
-  if (collapsed) {
+  if (shown === 'collapsed') {
     // The header doubles as the rail's top zone, stretched to the toolbar's
     // real measured height in page-margin mode so it reads as a continuation
     // of the toolbar rather than a separately-sized strip above it. One
@@ -276,27 +292,32 @@ function SidePanel(props: SidePanelProps): JSX.Element {
         onMouseEnter={() => scheduleFlyout(true)}
         onMouseLeave={() => scheduleFlyout(false)}
       >
-        <div
-          className="side-panel-header side-panel-header--collapsed"
-          style={{ height: collapsedHeaderHeight }}
-        >
-          <button type="button" title="Expand panel" aria-label="Expand panel" onClick={onExpand}>
-            <PanelExpandIcon />
-          </button>
+        <div className={`side-panel-contents ${presenceClass(panel.visible, 'fade')}`}>
+          <div
+            className="side-panel-header side-panel-header--collapsed"
+            style={{ height: collapsedHeaderHeight }}
+          >
+            <button type="button" title="Expand panel" aria-label="Expand panel" onClick={onExpand}>
+              <PanelExpandIcon />
+            </button>
+          </div>
+
+          {railBody}
+
+          {/* Matches the footer's own fixed height, so the rail's page-margin
+              zone spans exactly the page's own visible extent — no more, no
+              less — and the minimap centers on that same extent. */}
+          {isPagedView && (
+            <div className="side-panel-rail-spacer side-panel-rail-spacer--footer" style={{ height: FOOTER_HEIGHT }} />
+          )}
         </div>
-
-        {railBody}
-
-        {/* Matches the footer's own fixed height, so the rail's page-margin
-            zone spans exactly the page's own visible extent — no more, no
-            less — and the minimap centers on that same extent. */}
-        {isPagedView && (
-          <div className="side-panel-rail-spacer side-panel-rail-spacer--footer" style={{ height: FOOTER_HEIGHT }} />
-        )}
 
         {flyoutFade.rendered && (
           <div
-            className={`side-panel-flyout ${flyoutFade.visible ? 'is-visible' : ''}`}
+            /* 'fade' rather than the default 'rise': this element centres
+               itself with translateY(-50%), which a motion transform would
+               overwrite outright. */
+            className={`side-panel-flyout ${presenceClass(flyoutFade.visible, 'fade')}`}
             style={{ width: FLYOUT_WIDTH }}
             onMouseEnter={clearFlyoutTimer}
             onFocus={clearFlyoutTimer}
@@ -310,17 +331,21 @@ function SidePanel(props: SidePanelProps): JSX.Element {
 
   return (
     <div className="side-panel" style={{ width }}>
-      <div className="side-panel-header">
-        {headerTitle}
-        {headerActions}
+      <div className={`side-panel-contents ${presenceClass(panel.visible, 'fade')}`}>
+        <div className="side-panel-header">
+          {headerTitle}
+          {headerActions}
 
-        <button type="button" title="Hide panel" aria-label="Hide panel" onClick={onCollapse}>
-          <PanelCollapseIcon />
-        </button>
+          <button type="button" title="Hide panel" aria-label="Hide panel" onClick={onCollapse}>
+            <PanelCollapseIcon />
+          </button>
+        </div>
+
+        {children}
       </div>
 
-      {children}
-
+      {/* Outside the fading wrapper on purpose: dragging the panel wider must
+          not be interrupted by, or dimmed during, a collapse transition. */}
       <div className="sidebar-resize-handle" onMouseDown={onResizeStart} />
     </div>
   )

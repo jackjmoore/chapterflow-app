@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Landing page — the shelf</title>
+<style>
+  /* ChapterFlow tokens, copied from src/renderer/src/index.css so the mock is
+     judged in the app's own light. Dark is the default, as in the app. */
+  :root {
+    --space-1: 4px; --space-2: 8px; --space-3: 12px;
+    --space-4: 16px; --space-5: 24px; --space-6: 32px; --space-7: 44px; --space-8: 64px;
+    --radius-sm: 4px; --radius-md: 6px; --radius-lg: 10px;
+    --text-2xs: 10px; --text-xs: 11px; --text-sm: 12px; --text-md: 13px;
+    --text-lg: 14px; --text-xl: 20px; --text-2xl: 26px;
+    --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-editor: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+
+    --chrome-bg: #1c1a17;
+    --chrome-bg-elevated: #242119;
+    --chrome-border: #35312a;
+    --chrome-border-strong: #4a4438;
+    --chrome-text: #e8e3d9;
+    --chrome-text-heading: #f0ece2;
+    --chrome-text-muted: #9c9585;
+    --chrome-text-dim: #6b6558;
+    --chrome-control-bg: #262319;
+    --chrome-control-hover: #322d22;
+    --chrome-accent: #6f95b8;
+    --chrome-accent-contrast: #0d1520;
+    --chrome-accent-saved: #7a9b6e;
+    --chrome-accent-error: #c26a5a;
+
+    --motion-enter: 180ms cubic-bezier(0, 0, 0.2, 1);
+    --motion-exit: 150ms cubic-bezier(0.4, 0, 1, 1);
+  }
+  body.light {
+    --chrome-bg: #f5f1e8;
+    --chrome-bg-elevated: #ece6d8;
+    --chrome-border: #ddd4c0;
+    --chrome-border-strong: #c9bea3;
+    --chrome-text: #2b2620;
+    --chrome-text-heading: #1c1812;
+    --chrome-text-muted: #6e6656;
+    --chrome-text-dim: #948c78;
+    --chrome-control-bg: #ece5d3;
+    --chrome-control-hover: #e0d8c2;
+    --chrome-accent: #3d5a7a;
+    --chrome-accent-contrast: #f5f1e8;
+    --chrome-accent-saved: #5a7a4e;
+    --chrome-accent-error: #b0492f;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--chrome-bg);
+    color: var(--chrome-text);
+    font-family: var(--font-ui);
+    font-size: var(--text-md);
+    line-height: 1.5;
+  }
+
+  /* ── Mock chrome ───────────────────────────────────────────────── */
+  .mockbar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; gap: var(--space-4);
+    padding: 0 var(--space-4); height: 44px;
+    background: var(--chrome-bg-elevated);
+    border-bottom: 1px solid var(--chrome-border);
+  }
+  .mockbar-title { font-size: var(--text-sm); color: var(--chrome-text-muted); white-space: nowrap; }
+  .mockbar-tabs { display: flex; gap: var(--space-1); margin: 0 auto; }
+  .mockbar-tabs button, .mockbar-theme {
+    font: inherit; font-size: var(--text-sm); color: var(--chrome-text-muted);
+    background: none; border: 1px solid transparent; border-radius: var(--radius-sm);
+    padding: 4px 12px; cursor: pointer;
+  }
+  .mockbar-tabs button:hover, .mockbar-theme:hover { background: var(--chrome-control-hover); }
+  .mockbar-tabs button.is-active {
+    color: var(--chrome-text-heading);
+    background: var(--chrome-control-bg);
+    border-color: var(--chrome-border-strong);
+  }
+  .mockbar-theme {
+    font-size: var(--text-xs);
+    background: var(--chrome-control-bg); border-color: var(--chrome-border);
+    white-space: nowrap;
+  }
+
+  .state { display: none; min-height: calc(100vh - 44px); }
+  .state.is-active { display: flex; flex-direction: column; }
+
+  /* ── Head: wordmark and splash ─────────────────────────────────── */
+  .head { padding: var(--space-8) var(--space-6) var(--space-5); text-align: center; }
+  .wordmark {
+    font-family: var(--font-editor);
+    font-size: 34px; font-weight: 400; letter-spacing: 0.01em;
+    color: var(--chrome-text-heading); line-height: 1.1;
+  }
+  /* Rotates on each visit, the way a title screen does — company rather than
+     information. */
+  .splash {
+    margin: var(--space-3) auto 0; max-width: 620px;
+    font-family: var(--font-editor);
+    font-size: var(--text-lg); font-style: italic;
+    color: var(--chrome-text-muted);
+  }
+  .splash cite { display: block; margin-top: 4px; font-style: normal; font-size: var(--text-sm); color: var(--chrome-text-dim); }
+  .splash cite::before { content: '— '; }
+
+  /* ── The ticker ────────────────────────────────────────────────── */
+  /* A marquee, inset rather than full-bleed: a component on the page, not a
+     band across it. Every number on this screen lives in here and nowhere
+     else, which is what stops the landing page becoming a second Progress
+     Tracker.
+     Each item is a whole sentence that stands on its own — none of them
+     continues the one before, because on a loop you cannot rely on having
+     seen what came first. */
+  .ticker-wrap { display: flex; justify-content: center; padding: var(--space-2) var(--space-6); }
+  .ticker {
+    position: relative; overflow: hidden;
+    width: 100%; max-width: 720px;
+    border: 1px solid var(--chrome-border);
+    border-radius: 999px;
+    background: var(--chrome-bg-elevated);
+  }
+  /* Duration is set from the measured track width in script, so the pan is a
+     constant, slow speed whatever the stats happen to say — a fixed duration
+     would make a longer list read faster. */
+  .ticker-track { display: flex; width: max-content; animation: ticker-pan linear infinite; }
+  .ticker:hover .ticker-track { animation-play-state: paused; }
+  @keyframes ticker-pan { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .ticker-run { display: flex; flex: none; }
+  /* Not a flex container: flex collapses the whitespace text nodes either
+     side of the bold numbers, which glues them to the words. */
+  .ticker-item {
+    display: block;
+    padding: 8px var(--space-6);
+    font-size: var(--text-sm); color: var(--chrome-text-muted); white-space: nowrap;
+  }
+  .ticker-item b { color: var(--chrome-text-heading); font-weight: 600; font-variant-numeric: tabular-nums; }
+  /* Perpetual motion is a real cost on a screen opened every day, so it stops
+     entirely for anyone who has asked for less of it. */
+  @media (prefers-reduced-motion: reduce) {
+    .ticker { border-radius: var(--radius-lg); max-width: 560px; }
+    .ticker-track { animation: none; flex-wrap: wrap; width: 100%; justify-content: center; }
+    .ticker-run:last-child { display: none; }
+  }
+  .ticker::before, .ticker::after {
+    content: ''; position: absolute; top: 0; bottom: 0; width: 48px; z-index: 1; pointer-events: none;
+  }
+  .ticker::before { left: 0; background: linear-gradient(to right, var(--chrome-bg-elevated), transparent); }
+  .ticker::after { right: 0; background: linear-gradient(to left, var(--chrome-bg-elevated), transparent); }
+
+  /* ── The shelf ─────────────────────────────────────────────────── */
+  .body { flex: 1; padding: var(--space-7) var(--space-6); }
+  .shelf { display: flex; gap: var(--space-4); flex-wrap: wrap; justify-content: center; max-width: 1100px; margin: 0 auto; }
+  .spine {
+    width: 214px; min-height: 210px; display: flex; flex-direction: column;
+    padding: var(--space-4); cursor: pointer; text-align: left;
+    background: var(--chrome-bg-elevated);
+    border: 1px solid var(--chrome-border); border-radius: var(--radius-lg);
+    /* The cloth-spine hint: a heavier band down the binding edge. */
+    border-left: 4px solid var(--chrome-border-strong);
+    transition: transform var(--motion-enter), border-color var(--motion-enter);
+  }
+  .spine:hover { transform: translateY(-3px); border-left-color: var(--chrome-accent); }
+  .spine .title { font-family: var(--font-editor); font-size: var(--text-xl); color: var(--chrome-text-heading); line-height: 1.2; }
+  .spine .sub { font-size: var(--text-xs); color: var(--chrome-text-dim); margin-top: 6px; }
+  .spine .grow { flex: 1; }
+  .spine .bar { height: 3px; border-radius: 2px; background: var(--chrome-control-bg); overflow: hidden; margin-bottom: 6px; }
+  .spine .bar span { display: block; height: 100%; background: var(--chrome-accent); border-radius: 2px; }
+  .spine .count { font-size: var(--text-xs); color: var(--chrome-text-muted); font-variant-numeric: tabular-nums; }
+
+  /* Making one is a card in the same row, so the empty shelf and the full one
+     are the same layout rather than two designs. */
+  .spine.is-new {
+    border-style: dashed; border-left: 1px dashed var(--chrome-border-strong);
+    align-items: center; justify-content: center; gap: var(--space-2);
+    background: none; color: var(--chrome-text-muted); text-align: center;
+  }
+  .spine.is-new:hover { color: var(--chrome-text-heading); border-color: var(--chrome-accent); transform: translateY(-3px); }
+  .spine.is-new .plus { font-size: 22px; line-height: 1; }
+
+  /* ── Secondary actions ─────────────────────────────────────────── */
+  /* Scrivener gets its own button rather than hiding inside "Import": it does
+     something different in kind — it makes a whole project, where the other
+     brings documents into one. */
+  .actions { display: flex; gap: var(--space-2); justify-content: center; flex-wrap: wrap; margin-top: var(--space-7); }
+  .btn {
+    font: inherit; font-size: var(--text-md); color: var(--chrome-text);
+    background: var(--chrome-control-bg); border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-sm); padding: 7px 16px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  }
+  .btn:hover { background: var(--chrome-control-hover); }
+  .btn.primary { background: var(--chrome-accent); color: var(--chrome-accent-contrast); border-color: transparent; }
+  .btn.primary:hover { filter: brightness(1.08); }
+
+  .empty-note {
+    max-width: 460px; margin: var(--space-6) auto 0; text-align: center;
+    font-size: var(--text-md); color: var(--chrome-text-muted);
+  }
+
+  .foot {
+    display: flex; align-items: center; justify-content: center; gap: var(--space-5);
+    padding: var(--space-5) var(--space-4);
+    font-size: var(--text-sm); color: var(--chrome-text-dim);
+  }
+  .foot label { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
+  .foot button { font: inherit; font-size: var(--text-sm); color: inherit; background: none; border: none; cursor: pointer; }
+  .foot button:hover { color: var(--chrome-text); }
+</style>
+</head>
+<body>
+
+<div class="mockbar">
+  <span class="mockbar-title">Landing page · the shelf · fake data</span>
+  <div class="mockbar-tabs" id="tabs">
+    <button data-state="populated" class="is-active">Populated</button>
+    <button data-state="empty">Empty</button>
+  </div>
+  <button class="mockbar-theme" id="themeToggle">Light theme</button>
+</div>
+
+<!-- ══ Populated ═══════════════════════════════════════════════════ -->
+<section class="state is-active" id="state-populated">
+  <div class="head">
+    <div class="wordmark">ChapterFlow</div>
+    <p class="splash" data-splash></p>
+  </div>
+
+  <div class="ticker-wrap"><div class="ticker" data-ticker></div></div>
+
+  <div class="body">
+    <div class="shelf" data-shelf></div>
+    <div class="actions">
+      <button class="btn">Open project…</button>
+      <button class="btn">Import documents…</button>
+      <button class="btn">Import from Scrivener…</button>
+    </div>
+  </div>
+
+  <div class="foot">
+    <button>What’s new in 0.9.4</button>
+    <label><input type="checkbox" /> Skip this and open my last project</label>
+  </div>
+</section>
+
+<!-- ══ Empty ═══════════════════════════════════════════════════════ -->
+<section class="state" id="state-empty">
+  <div class="head">
+    <div class="wordmark">ChapterFlow</div>
+    <p class="splash" data-splash></p>
+  </div>
+
+  <!-- No ticker at all. There are no numbers yet, and an empty marquee would
+       be motion for its own sake. -->
+
+  <div class="body">
+    <div class="shelf">
+      <button class="spine is-new" type="button">
+        <span class="plus">+</span>
+        <span>New project</span>
+      </button>
+    </div>
+    <p class="empty-note">Start something, or bring across work you already have.
+      Once a project is here it keeps its place on this shelf.</p>
+    <div class="actions">
+      <button class="btn">Open project…</button>
+      <button class="btn">Import documents…</button>
+      <button class="btn">Import from Scrivener…</button>
+    </div>
+  </div>
+
+  <div class="foot">
+    <button>What’s new in 0.9.4</button>
+    <label><input type="checkbox" /> Skip this and open my last project</label>
+  </div>
+</section>
+
+<script>
+/* ── Fake data ──────────────────────────────────────────────────── */
+const PROJECTS = [
+  { name: 'The Drowned Mile', words: 52584, target: 90000, opened: 'today', chapters: 65 },
+  { name: 'Sallow Harbour', words: 18204, target: 60000, opened: '6 days ago', chapters: 22 },
+  { name: 'Short stories', words: 9730, target: null, opened: '3 weeks ago', chapters: 11 }
+];
+
+/**
+ * Splash quotes.
+ *
+ * Only lines with solid provenance. Two famous ones are deliberately absent:
+ * "Write drunk, edit sober" is not Hemingway, and "kill your darlings" is
+ * Quiller-Couch rather than Faulkner — so the real one is quoted instead.
+ */
+const SPLASHES = [
+  ['The scariest moment is always just before you start.', 'Stephen King, On Writing'],
+  ['I love deadlines. I love the whooshing noise they make as they go by.', 'Douglas Adams'],
+  ['A word after a word after a word is power.', 'Margaret Atwood'],
+  ['Not that the story need be long, but it will take a long while to make it short.', 'Henry David Thoreau'],
+  ['If there’s a book that you want to read, but it hasn’t been written yet, then you must write it.', 'Toni Morrison'],
+  ['The road to hell is paved with adverbs.', 'Stephen King, On Writing'],
+  ['Get it down. Take chances. It may be bad, but it’s the only way you can do anything really good.', 'William Faulkner'],
+  ['You can’t wait for inspiration. You have to go after it with a club.', 'Jack London'],
+  ['Murder your darlings.', 'Arthur Quiller-Couch, On the Art of Writing'],
+  ['I write entirely to find out what I’m thinking.', 'Joan Didion'],
+  ['Start writing, no matter what. The water does not flow until the faucet is turned on.', 'Louis L’Amour'],
+  ['Sometimes it comes easily and perfectly; sometimes it’s like drilling rock and then blasting it out with charges.', 'Ernest Hemingway']
+];
+
+/**
+ * The ticker's contents.
+ *
+ * Every item is a complete sentence that makes sense read cold. On a loop
+ * there is no "previous" item — whichever one you happen to look up at is the
+ * first one you see — so none of these may lean on the one before it.
+ */
+const TICKER = [
+  'Your three projects hold <b>80,518</b> words between them.',
+  'You have typed <b>61,340</b> words in ChapterFlow.',
+  'You have spent about <b>128</b> hours writing.',
+  'You have written on <b>78</b> of the last <b>112</b> days.',
+  'Your longest draft, The Drowned Mile, runs to <b>65</b> chapters.',
+  'You last opened Sallow Harbour <b>six days</b> ago.'
+];
+
+/** Pixels per second. Slow enough to read a whole sentence as it passes. */
+const TICKER_SPEED = 18;
+
+const fmt = (n) => n.toLocaleString('en-US');
+
+/* ── Splash ─────────────────────────────────────────────────────── */
+function paintSplash() {
+  const [text, who] = SPLASHES[Math.floor(Math.random() * SPLASHES.length)];
+  document.querySelectorAll('[data-splash]').forEach((el) => {
+    el.innerHTML = `“${text}”<cite>${who}</cite>`;
+  });
+}
+
+/* ── Ticker ─────────────────────────────────────────────────────── */
+// The run is rendered twice and the track panned exactly half its width,
+// which is what makes the loop seamless rather than snapping back.
+function paintTickers() {
+  const run = TICKER.map((line) => `<span class="ticker-item">${line}</span>`).join('');
+  document.querySelectorAll('[data-ticker]').forEach((el) => {
+    el.innerHTML = `<div class="ticker-track"><div class="ticker-run">${run}</div><div class="ticker-run">${run}</div></div>`;
+    const track = el.querySelector('.ticker-track');
+    // Duration from measured width, so the speed is constant however much
+    // there is to say.
+    const distance = track.scrollWidth / 2;
+    track.style.animationDuration = `${Math.round(distance / TICKER_SPEED)}s`;
+  });
+}
+
+/* ── Shelf ──────────────────────────────────────────────────────── */
+function paintShelf() {
+  const el = document.querySelector('[data-shelf]');
+  if (!el) return;
+  el.innerHTML =
+    PROJECTS.map((p) => {
+      const pct = p.target ? Math.min(100, (p.words / p.target) * 100).toFixed(1) : null;
+      return `
+      <div class="spine">
+        <div class="title">${p.name}</div>
+        <div class="sub">${p.chapters} chapters · opened ${p.opened}</div>
+        <div class="grow"></div>
+        ${pct !== null ? `<div class="bar"><span style="width:${pct}%"></span></div>` : ''}
+        <div class="count">${fmt(p.words)}${p.target ? ' of ' + fmt(p.target) : ' words'}</div>
+      </div>`;
+    }).join('') +
+    `<button class="spine is-new" type="button">
+        <span class="plus">+</span>
+        <span>New project</span>
+      </button>`;
+}
+
+/* ── Wiring ─────────────────────────────────────────────────────── */
+paintSplash();
+paintShelf();
+paintTickers();
+
+const tabs = document.getElementById('tabs');
+function activate(name) {
+  tabs.querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', b.dataset.state === name));
+  document.querySelectorAll('.state').forEach((s) => s.classList.toggle('is-active', s.id === 'state-' + name));
+  window.scrollTo(0, 0);
+}
+tabs.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-state]');
+  if (btn) activate(btn.dataset.state);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === '1') activate('populated');
+  if (e.key === '2') activate('empty');
+  // Space rerolls the splash, which is the quickest way to read several.
+  if (e.code === 'Space') { e.preventDefault(); paintSplash(); }
+});
+
+const themeBtn = document.getElementById('themeToggle');
+themeBtn.addEventListener('click', () => {
+  const light = document.body.classList.toggle('light');
+  themeBtn.textContent = light ? 'Dark theme' : 'Light theme';
+});
+
+// Deep links: #empty, plus "-light".
+{
+  const h = location.hash.slice(1);
+  if (h.includes('empty')) activate('empty');
+  if (h.includes('light')) themeBtn.click();
+}
+</script>
+</body>
+</html>

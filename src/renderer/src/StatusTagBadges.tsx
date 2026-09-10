@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { StatusDef, TagDef } from '../../shared/binder'
 
 /** Same rendering logic used everywhere a document's status/tags show up
@@ -80,46 +80,82 @@ export interface RowChip {
   filled: boolean
 }
 
-/**
- * How many chips a binder row shows before the rest become a count.
- *
- * Two only fits beside a readable title on a wide panel. Measured at the
- * default 260px, two chips plus a status label leave the title about seventy
- * pixels — enough for "1. The Dro…" — and on some rows nothing at all. So the
- * cap follows the row's usable width, the same measure the status badge
- * already uses: two when there is room, one when there is not.
- *
- * What is fixed either way is the row's height and the fact that the count
- * never grows: a row with eight mentions occupies exactly as much as a row
- * with none.
- */
-export const MAX_ROW_CHIPS = 2
-export const MIN_ROW_CHIPS = 1
-/** Usable row width at which a second chip stops costing the title too much. */
-export const TWO_CHIP_MIN_WIDTH = 330
-
-export function chipCapFor(usableWidth: number): number {
-  return usableWidth >= TWO_CHIP_MIN_WIDTH ? MAX_ROW_CHIPS : MIN_ROW_CHIPS
+function chipElement(chip: RowChip): JSX.Element {
+  return (
+    <span
+      key={chip.id}
+      className={chip.filled ? 'tag-chip' : 'span-tag-rollup-chip'}
+      style={chip.filled ? { backgroundColor: chip.color } : { borderColor: chip.color, color: chip.color }}
+      title={chip.name}
+    >
+      {chip.name}
+    </span>
+  )
 }
 
-export function RowChips({ chips, cap = MAX_ROW_CHIPS }: { chips: RowChip[]; cap?: number }): JSX.Element | null {
+/**
+ * At most ONE visible chip, everything else always a count — and the chip
+ * itself is conditional on measured room, never the title.
+ *
+ * The sacrifice order under width pressure is fixed and runs opposite to
+ * importance: title > status mark > the one chip > "+N". The title renders
+ * at its natural width and is never shortened on a chip's behalf; the chip
+ * folds into the count when the space actually left can't hold both; the
+ * count itself goes before the status mark (which lives outside this
+ * component and is uncounted) is touched. Fit is measured, not guessed:
+ * hidden twins render the [chip "+N"] pair and the bare count at natural
+ * size, and what shows is the richest form the leftover width (parent minus
+ * siblings and gaps) can hold. Row height never changes either way.
+ */
+export function RowChips({ chips }: { chips: RowChip[] }): JSX.Element | null {
+  // 2 = chip + count, 1 = count only, 0 = nothing fits.
+  const [fitLevel, setFitLevel] = useState(2)
+  const hostRef = useRef<HTMLSpanElement>(null)
+  const pairTwinRef = useRef<HTMLSpanElement>(null)
+  const countTwinRef = useRef<HTMLSpanElement>(null)
+
+  useLayoutEffect(() => {
+    const host = hostRef.current
+    const pairTwin = pairTwinRef.current
+    const countTwin = countTwinRef.current
+    const parent = host?.parentElement
+    if (!host || !pairTwin || !countTwin || !parent) return
+    const measure = (): void => {
+      const style = getComputedStyle(parent)
+      const gap = parseFloat(style.columnGap) || 0
+      let available =
+        parent.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0)
+      for (const sibling of parent.children) {
+        if (sibling !== host) available -= sibling.getBoundingClientRect().width + gap
+      }
+      const pairW = pairTwin.getBoundingClientRect().width
+      const countW = countTwin.getBoundingClientRect().width
+      setFitLevel(available >= pairW ? 2 : available >= countW ? 1 : 0)
+    }
+    measure()
+    // The parent is the stretchy element (the host swaps its own content, so
+    // observing the host would loop); the twins resize when chip data does.
+    const observer = new ResizeObserver(measure)
+    observer.observe(parent)
+    observer.observe(pairTwin)
+    return () => observer.disconnect()
+  }, [chips])
+
   if (chips.length === 0) return null
-  const shown = chips.slice(0, cap)
-  const hidden = chips.slice(cap)
+  const [first, ...rest] = chips
+  const hidden = fitLevel === 2 ? rest : chips
 
   return (
-    <span className={`row-chip-row ${cap >= MAX_ROW_CHIPS ? 'is-roomy' : ''}`}>
-      {shown.map((chip) => (
-        <span
-          key={chip.id}
-          className={chip.filled ? 'tag-chip' : 'span-tag-rollup-chip'}
-          style={chip.filled ? { backgroundColor: chip.color } : { borderColor: chip.color, color: chip.color }}
-          title={chip.name}
-        >
-          {chip.name}
-        </span>
-      ))}
-      {hidden.length > 0 && <ChipOverflow chips={hidden} />}
+    <span className="row-chip-row" ref={hostRef}>
+      <span className="row-chip-twin" aria-hidden="true" ref={pairTwinRef}>
+        {chipElement(first)}
+        {rest.length > 0 && <span className="row-chip-overflow">+{rest.length}</span>}
+      </span>
+      <span className="row-chip-twin" aria-hidden="true" ref={countTwinRef}>
+        <span className="row-chip-overflow">+{chips.length}</span>
+      </span>
+      {fitLevel === 2 && chipElement(first)}
+      {fitLevel >= 1 && hidden.length > 0 && <ChipOverflow chips={hidden} />}
     </span>
   )
 }

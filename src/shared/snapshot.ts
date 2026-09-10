@@ -5,25 +5,8 @@ export interface SnapshotMeta {
   auto: boolean
 }
 
-const ENTITY_REPLACEMENTS: Array<[RegExp, string]> = [
-  [/&nbsp;/g, ' '],
-  [/&amp;/g, '&'],
-  [/&lt;/g, '<'],
-  [/&gt;/g, '>'],
-  [/&quot;/g, '"'],
-  [/&#39;/g, "'"]
-]
-
-/** Plain text extraction for snapshot diffing — preserves paragraph breaks
- * (unlike countWords, which only needs a total and collapses everything to
- * spaces), so a word-level diff still reads as prose. */
-export function htmlToPlainText(html: string): string {
-  let text = html
-    .replace(/<\/(p|div|h[1-6]|li|blockquote)>/gi, '\n')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]*>/g, '')
-  for (const [pattern, replacement] of ENTITY_REPLACEMENTS) {
-    text = text.replace(pattern, replacement)
-  }
-  return text.replace(/\n{3,}/g, '\n\n').trim()
-}
+// Plain-text extraction for diffing used to live here as a regex strip. It now
+// lives in the renderer's revisionDiff.ts, which parses through the editor's
+// real schema instead — revision mode needs every character to keep its
+// document position, which a regex pass cannot preserve. Both the inline mode
+// and the Compare Snapshots modal share that one extraction.

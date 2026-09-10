@@ -2,6 +2,7 @@ import { Fragment, type JSX } from 'react'
 import type { Editor } from '@tiptap/react'
 import type { Match } from './searchCore'
 import { DocumentIcon } from '../icons'
+import { usePresence, presenceClass } from '../usePresence'
 
 /**
  * The matches in the open document, as a list.
@@ -29,7 +30,7 @@ interface DocumentSearchResultsProps {
 
 const CONTEXT_RADIUS = 60
 
-interface SnippetParts {
+export interface SnippetParts {
   before: string
   hit: string
   after: string
@@ -37,7 +38,9 @@ interface SnippetParts {
   trailing: boolean
 }
 
-function snippetFor(editor: Editor, match: Match): SnippetParts {
+/** Snippets come from the live document, so the dock and this list can never
+ *  quote a match differently. */
+export function snippetFor(editor: Editor, match: Match): SnippetParts {
   const doc = editor.state.doc
   const from = Math.max(0, match.from - CONTEXT_RADIUS)
   const to = Math.min(doc.content.size, match.to + CONTEXT_RADIUS)
@@ -52,6 +55,10 @@ function snippetFor(editor: Editor, match: Match): SnippetParts {
 
 function DocumentSearchResults(props: DocumentSearchResultsProps): JSX.Element {
   const { editor, matches, currentIndex, documentName, collapsed, onToggleCollapsed, onGoToMatch } = props
+  // The group wrapper already carried .is-collapsed, but the rows themselves
+  // were unmounted the instant collapsed flipped, so that class had nothing
+  // to animate. Holding them through usePresence is what makes it visible.
+  const rows = usePresence(collapsed ? null : true)
 
   return (
     <div className="search-results" role="listbox" aria-label="Matches in this document">
@@ -74,9 +81,9 @@ function DocumentSearchResults(props: DocumentSearchResultsProps): JSX.Element {
           <span className="search-result-group-state">{collapsed ? 'Hidden' : 'Hide'}</span>
         </button>
 
-        {!collapsed &&
-          editor &&
-          matches.map((match, index) => {
+        {rows.rendered && editor && (
+          <div className={`search-result-group-rows ${presenceClass(rows.visible)}`}>
+            {matches.map((match, index) => {
             const parts = snippetFor(editor, match)
             return (
               <button
@@ -105,9 +112,11 @@ function DocumentSearchResults(props: DocumentSearchResultsProps): JSX.Element {
                     {parts.trailing && <Fragment>…</Fragment>}
                   </span>
                 </span>
-              </button>
-            )
-          })}
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )

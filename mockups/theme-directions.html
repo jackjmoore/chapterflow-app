@@ -1,0 +1,670 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Appearance — three directions</title>
+<style>
+:root {
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-sm: 4px; --radius-md: 6px;
+  --motion-fast: 0.12s ease;
+  --text-2xs: 10px; --text-xs: 11px; --text-sm: 12px; --text-md: 13px; --text-lg: 14px;
+  --text-xl: 20px; --text-2xl: 26px;
+  --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-editor: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --page-measure: 1120px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-ui); font-size: var(--text-md); color: #e8e3d9; background: #0f0e0c; }
+
+/* ---------------------------------------------------------------- mock chrome
+   Deliberately outside the theme: these controls must stay legible while the
+   app frame below them repaints. */
+.mock-bar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: #18160f; border-bottom: 1px solid #35312a; color: #e8e3d9;
+}
+.mock-title { font-size: var(--text-md); font-weight: 600; color: #f0ece2; }
+.mock-note { font-size: var(--text-sm); color: #6b6558; }
+.mock-spacer { flex: 1; }
+.mock-tabs { display: flex; gap: var(--space-1); }
+.mock-tab, .mock-toggle {
+  height: 26px; padding: 0 var(--space-3);
+  font-family: var(--font-ui); font-size: var(--text-sm);
+  color: #9c9585; background: #262319; border: 1px solid #35312a; border-radius: 13px; cursor: pointer;
+}
+.mock-tab:hover, .mock-toggle:hover { color: #f0ece2; border-color: #4a4438; }
+.mock-tab.is-active { color: #0d1520; background: #6f95b8; border-color: #6f95b8; }
+
+.stage { padding: var(--space-5); display: flex; justify-content: center; }
+
+/* ---------------------------------------------------------------- the app frame
+   Every colour below comes from a custom property, so applying a preset to
+   this element repaints the whole thing — which is the point of the page. */
+.frame {
+  width: 1400px; height: 880px; display: flex; overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  border: 1px solid var(--chrome-border);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 0.4);
+  transition: background var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast);
+}
+
+.rail {
+  width: 44px; flex: none; display: flex; flex-direction: column; align-items: center;
+  gap: var(--space-1); padding-top: var(--space-3);
+  background: var(--chrome-bg-sidebar); border-right: 1px solid var(--chrome-border);
+}
+.rail-btn { width: 30px; height: 30px; display: grid; place-items: center; font-size: var(--text-md); color: var(--chrome-text-dim); border-radius: var(--radius-sm); }
+.rail-btn.is-active { color: var(--chrome-text-heading); background: var(--chrome-control-active-bg); }
+
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.searchbar {
+  flex: none; height: 46px; margin: var(--space-2) var(--space-3) 0;
+  display: flex; align-items: center; padding: 0 var(--space-3);
+  font-size: var(--text-md); color: var(--chrome-text-dim);
+  background: var(--chrome-control-bg); border: 1px solid var(--chrome-border); border-radius: var(--radius-md);
+}
+.scroll {
+  flex: 1; min-height: 0; overflow: auto;
+  padding: var(--space-5) var(--space-5) var(--space-6);
+  scrollbar-gutter: stable;
+}
+.page-column { width: 100%; max-width: var(--page-measure); margin: 0 auto; }
+
+.section { margin-bottom: var(--space-6); }
+.section-title { margin: 0 0 var(--space-1); font-size: var(--text-lg); font-weight: 600; color: var(--chrome-text-heading); }
+.hint { margin: 0 0 var(--space-3); max-width: 72ch; font-size: var(--text-md); line-height: 1.6; color: var(--chrome-text-muted); }
+
+.mode-row { display: flex; align-items: center; gap: var(--space-4); }
+.switch { display: inline-flex; border: 1px solid var(--chrome-border); border-radius: var(--radius-sm); overflow: hidden; }
+.switch button {
+  height: 28px; padding: 0 var(--space-4);
+  font-family: var(--font-ui); font-size: var(--text-sm);
+  color: var(--chrome-text-muted); background: var(--chrome-control-bg); border: none; cursor: pointer;
+}
+.switch button.is-active { color: var(--chrome-accent-contrast); background: var(--chrome-accent); }
+.check { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-md); color: var(--chrome-text-muted); }
+.check input { accent-color: var(--chrome-accent); }
+.btn {
+  height: 28px; padding: 0 var(--space-3);
+  font-family: var(--font-ui); font-size: var(--text-sm);
+  color: var(--chrome-text-heading); background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border-strong); border-radius: var(--radius-sm); cursor: pointer;
+}
+.btn:hover { background: var(--chrome-control-hover); }
+.link { padding: 0; font-family: var(--font-ui); font-size: var(--text-sm); color: var(--chrome-text-muted); background: none; border: none; cursor: pointer; }
+.link:hover { color: var(--chrome-accent); text-decoration: underline; }
+
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.field { display: inline-flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-sm); color: var(--chrome-text-muted); }
+.field select {
+  height: 28px; padding: 0 var(--space-2);
+  font-family: var(--font-ui); font-size: var(--text-sm);
+  color: var(--chrome-text); background: var(--chrome-control-bg);
+  border: 1px solid var(--chrome-border); border-radius: var(--radius-sm);
+}
+.well { width: 46px; height: 28px; border-radius: var(--radius-sm); border: 1px solid var(--chrome-border-strong); }
+
+/* ---------------------------------------------------------------- the specimen
+   A small true-to-life piece of the app: rail, binder, a manuscript page with
+   real words on it, an accent control, a status line. Every direction uses it;
+   they differ in how big it is and where it sits. */
+.spec {
+  display: flex; overflow: hidden;
+  background: var(--spec-bg); color: var(--spec-text);
+  border: 1px solid var(--spec-border); border-radius: var(--radius-md);
+}
+.spec-rail { width: 10px; flex: none; background: var(--spec-sidebar); border-right: 1px solid var(--spec-border); }
+.spec-binder { width: 92px; flex: none; padding: 6px; background: var(--spec-sidebar); border-right: 1px solid var(--spec-border); }
+.spec-binder i { display: block; height: 5px; margin-bottom: 5px; border-radius: 2px; background: var(--spec-text); opacity: 0.28; }
+.spec-binder i.is-active { background: var(--spec-accent); opacity: 1; }
+.spec-body { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--spec-surround); padding: 8px; gap: 6px; }
+/* A strip of chrome above the page. Without it a specimen is almost entirely
+   paper, and two themes that differ only in their interface look identical. */
+.spec-top {
+  flex: none; height: 12px; display: flex; align-items: center; padding: 0 6px;
+  font-size: 7px; color: var(--spec-text-dim);
+  background: var(--spec-bg); border-bottom: 1px solid var(--spec-border);
+}
+.spec-main { flex: 1; min-height: 0; display: flex; }
+.spec-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.spec-page {
+  flex: 1; min-height: 0; overflow: hidden;
+  padding: 10px 12px; background: var(--spec-page); border-radius: 2px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+}
+.spec-h { font-family: var(--font-editor); font-size: 12px; color: var(--spec-ink); margin-bottom: 6px; }
+/* Clamped rather than clipped: a miniature page should end on a whole line. */
+.spec-p {
+  font-family: var(--font-editor); font-size: 10px; line-height: 1.5; color: var(--spec-ink-muted);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.spec.is-large .spec-p { -webkit-line-clamp: 6; }
+.spec-foot { display: flex; align-items: center; gap: 6px; }
+.spec-btn { height: 14px; padding: 0 8px; display: grid; place-items: center; font-size: 8px; border-radius: 2px; background: var(--spec-accent); color: var(--spec-accent-contrast); }
+.spec-status { font-size: 8px; color: var(--spec-text-dim); }
+
+/* Spans inside the option buttons have to lay out as blocks, or the sheet's
+   heading, its text and the name below it run together on one line. */
+.b-meta, .b-desc,
+.c-sheet, .c-sheet-h, .c-sheet-p, .c-sheet-rule,
+.c-name, .c-desc, .c-mode-label, .c-mode-sub { display: block; }
+
+/* A: the big specimen */
+.spec.is-large { height: 320px; }
+.spec.is-large .spec-top { height: 26px; font-size: 11px; padding: 0 12px; }
+.spec.is-large .spec-rail { width: 22px; }
+.spec.is-large .spec-binder { width: 150px; padding: 10px; }
+.spec.is-large .spec-binder i { height: 8px; margin-bottom: 8px; }
+.spec.is-large .spec-h { font-size: 19px; margin-bottom: 10px; }
+.spec.is-large .spec-p { font-size: 14px; }
+.spec.is-large .spec-btn { height: 22px; font-size: 11px; padding: 0 12px; }
+.spec.is-large .spec-status { font-size: 11px; }
+
+/* A: list beside the specimen */
+.a-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: var(--space-5); align-items: start; }
+/* The specimen stays put while the list of names scrolls past it. */
+.a-stage { position: sticky; top: 0; }
+.a-list { display: flex; flex-direction: column; }
+.a-item {
+  display: block; width: 100%; text-align: left;
+  padding: var(--space-2) var(--space-3);
+  background: none; border: none; border-radius: var(--radius-sm); cursor: pointer;
+}
+.a-item:hover { background: var(--chrome-row-hover); }
+.a-item.is-active { background: var(--chrome-control-active-bg); }
+.a-name { display: block; font-size: var(--text-md); font-weight: 600; color: var(--chrome-text-heading); }
+.a-desc { display: block; margin-top: 2px; font-size: var(--text-sm); line-height: 1.45; color: var(--chrome-text-dim); }
+.a-item.is-active .a-name { color: var(--chrome-accent); }
+.a-preview-note {
+  margin-top: var(--space-2); min-height: 20px;
+  font-size: var(--text-md); color: var(--chrome-text-muted);
+}
+.a-preview-note b { color: var(--chrome-text-heading); font-weight: 600; }
+
+/* B: the wall */
+/* The heading carries the space the removed line used to hold, so the wall
+   does not ride up against it. */
+.b-themes-title { margin-bottom: var(--space-3); }
+.b-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: var(--space-3); align-items: start; }
+.b-card {
+  display: block; width: 100%; text-align: left; padding: 0;
+  background: var(--chrome-bg-elevated); border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md); overflow: hidden; cursor: pointer;
+}
+.b-card:hover { border-color: var(--chrome-border-strong); }
+.b-card.is-active { border-color: var(--chrome-accent); box-shadow: inset 0 0 0 1px var(--chrome-accent); }
+.b-card .spec { border: none; border-radius: 0; height: 118px; border-bottom: 1px solid var(--chrome-border); }
+.b-meta { padding: var(--space-2) var(--space-3) var(--space-3); }
+.b-name { display: flex; align-items: baseline; gap: var(--space-2); font-size: var(--text-md); font-weight: 600; color: var(--chrome-text-heading); }
+.b-tick { font-size: var(--text-sm); color: var(--chrome-accent); }
+.b-desc { margin-top: 2px; font-size: var(--text-sm); line-height: 1.45; color: var(--chrome-text-dim); }
+
+/* C: grouped by what happens to the page */
+.c-group-head {
+  display: flex; align-items: baseline; gap: var(--space-2);
+  margin: var(--space-5) 0 var(--space-2); padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--chrome-border);
+}
+.c-group-name { font-size: var(--text-lg); font-weight: 600; color: var(--chrome-text-heading); }
+.c-group-note { font-size: var(--text-sm); color: var(--chrome-text-dim); }
+.c-strip { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+.c-item {
+  width: 210px; padding: 0; text-align: left; cursor: pointer;
+  background: none; border: none;
+}
+.c-sheet {
+  height: 116px; padding: var(--space-3);
+  background: var(--spec-page); border: 1px solid var(--spec-border); border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.c-item.is-active .c-sheet { border-color: var(--chrome-accent); box-shadow: 0 0 0 1px var(--chrome-accent); }
+.c-sheet-h { font-family: var(--font-editor); font-size: 13px; color: var(--spec-ink); margin-bottom: 6px; }
+.c-sheet-p { font-family: var(--font-editor); font-size: 11px; line-height: 1.5; color: var(--spec-ink-muted); }
+.c-sheet-rule { height: 3px; width: 44px; margin-top: 8px; border-radius: 2px; background: var(--spec-accent); }
+.c-name { margin-top: var(--space-2); font-size: var(--text-md); color: var(--chrome-text-heading); }
+.c-desc { margin-top: 1px; font-size: var(--text-sm); line-height: 1.4; color: var(--chrome-text-dim); }
+
+/* C: the mode switch as its own specimen */
+.c-modes { display: flex; gap: var(--space-3); }
+.c-mode {
+  flex: 1; padding: 0; cursor: pointer; text-align: left;
+  background: none; border: none;
+}
+.c-mode .spec { height: 132px; }
+.c-mode.is-active .spec { border-color: var(--chrome-accent); box-shadow: 0 0 0 1px var(--chrome-accent); }
+.c-mode-label { margin-top: var(--space-2); font-size: var(--text-md); color: var(--chrome-text-heading); }
+.c-mode-sub { font-size: var(--text-sm); color: var(--chrome-text-dim); }
+</style>
+</head>
+<body>
+
+<div class="mock-bar">
+  <span class="mock-title">Appearance</span>
+  <span class="mock-note">hover a theme to try it on · the whole window follows</span>
+  <span class="mock-spacer"></span>
+  <div class="mock-tabs">
+    <button class="mock-tab is-active" data-go="a">1 · Try it on</button>
+    <button class="mock-tab" data-go="b">2 · The wall</button>
+    <button class="mock-tab" data-go="c">3 · What it does to the page</button>
+  </div>
+  <button class="mock-toggle" id="reset">Back to defaults</button>
+</div>
+
+<div class="stage"><div class="frame" id="frame"></div></div>
+
+<script>
+// ---------------------------------------------------------------- the presets
+// The project's real twelve, values copied from src/shared/colorPresets.ts.
+const PRESETS = [
+  ['warm-manuscript', 'Warm Manuscript', 'Warm neutrals and olive accents; paper page in both modes.',
+    { background: '#EDE6D6', text: '#2B2620', accent: '#5C6E4F', page: null },
+    { background: '#211E17', text: '#DDD6C8', accent: '#7C8E6F', page: null }],
+  ['northern-light', 'Northern Light', 'Cool greys and sea-blue accents; paper page in both modes.',
+    { background: '#E9EDEC', text: '#232B2C', accent: '#3D6B7D', page: null },
+    { background: '#191E20', text: '#C9CFD3', accent: '#5D8B9D', page: null }],
+  ['deep-study', 'Deep Study', 'Lamplit browns; the dark variant dims the page for night work.',
+    { background: '#EAE3D4', text: '#2B2620', accent: '#8C6A3E', page: null },
+    { background: '#1C1B19', text: '#DDD6C8', accent: '#9C7A4E', page: '#232019' }],
+  ['slate-draft', 'Slate Draft', 'Blue-grey slate; the dark variant carries a cool dark page.',
+    { background: '#E6E9ED', text: '#22262B', accent: '#4A6B8C', page: null },
+    { background: '#1A1D21', text: '#C9CFD3', accent: '#6B8CAE', page: '#20242A' }],
+  ['terminal-green', 'Terminal Green', 'Phosphor on black — the page goes dark with green ink.',
+    { background: '#E8EDE6', text: '#22301F', accent: '#4A7A41', page: null },
+    { background: '#0E1410', text: '#B8C4B0', accent: '#7A9471', page: '#101812' }],
+  ['vellum-copper', 'Vellum & Copper', 'Aged vellum with a burnished copper accent.',
+    { background: '#EFE4CE', text: '#3A2E1F', accent: '#A65D2E', page: '#F7EFDC' },
+    { background: '#231B12', text: '#E8D9BC', accent: '#C97A42', page: '#2A2015' }],
+  ['cold-press', 'Cold Press', 'Cool paper greys with a muted eucalyptus accent.',
+    { background: '#E4E7E2', text: '#1F2621', accent: '#4A6B5C', page: '#F0F1EC' },
+    { background: '#161A17', text: '#D6DDD5', accent: '#6B9481', page: '#1B211D' }],
+  ['marginalia', 'Marginalia', 'Soft parchment neutrals, annotated in faded sepia.',
+    { background: '#EBE3D8', text: '#2E2822', accent: '#7A6A52', page: '#F5EEE3' },
+    { background: '#1C1815', text: '#DCD2C2', accent: '#9A876A', page: '#221E19' }],
+  ['slate-chalk', 'Slate & Chalk', 'Chalkboard greys cut with one deliberate stroke of red.',
+    { background: '#DDE1E0', text: '#20272A', accent: '#B23A2E', page: '#EEF0EF' },
+    { background: '#191D1C', text: '#D8DEDB', accent: '#D45A46', page: '#1E2322' }],
+  ['nightfall-ledger', 'Nightfall Ledger', 'A closing-time ledger — warm taupe, nothing raised above a murmur.',
+    { background: '#E6E2DA', text: '#26221D', accent: '#5B5347', page: '#F2EFE8' },
+    { background: '#171512', text: '#DCD6C9', accent: '#7A7263', page: '#1D1B17' }],
+  ['oled-void', 'OLED Void', 'True black for OLED power savings — pixels off, brass kept quiet.',
+    { background: '#ECEAE4', text: '#2A261F', accent: '#8A6F4E', page: '#F7F5EF' },
+    { background: '#000000', text: '#C4BEB0', accent: '#8A6F4E', page: '#050503' }],
+  ['amber-hour', 'Amber Hour', 'Warm-shifted dark for late nights — low blue light, easy on tired eyes.',
+    { background: '#EFE8DC', text: '#33291D', accent: '#A05F2E', page: '#F8F2E7' },
+    { background: '#1A1512', text: '#D6C8AE', accent: '#B8794A', page: '#100D0A' }]
+].map(([id, name, description, light, dark]) => ({ id, name, description, variants: { light, dark } }))
+
+/** The stylesheet's own themes, for "no preset chosen". */
+const BASE = {
+  light: { background: '#f5f1e8', text: '#2b2620', accent: '#3d5a7a', page: null },
+  dark: { background: '#1c1a17', text: '#e8e3d9', accent: '#6f95b8', page: null }
+}
+const PAPER = '#faf6ec'
+
+// ---------------------------------------------------------------- derivation
+// The same maths App.tsx applies when a preset is chosen, so what is on screen
+// here is what the app would actually do.
+function shade(hex, amount) {
+  const num = parseInt(hex.replace('#', ''), 16)
+  if (Number.isNaN(num)) return hex
+  const r = Math.min(255, Math.max(0, (num >> 16) + amount))
+  const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amount))
+  const b = Math.min(255, Math.max(0, (num & 0xff) + amount))
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)
+}
+function isDark(hex) {
+  const num = parseInt(hex.replace('#', ''), 16)
+  const r = num >> 16, g = (num >> 8) & 0xff, b = num & 0xff
+  return (r * 299 + g * 587 + b * 114) / 1000 < 128
+}
+
+function tokensFor(palette, theme) {
+  const bg = palette.background
+  const dark = isDark(bg)
+  const shift = dark ? 10 : -10
+  const page = palette.page ?? PAPER
+  const darkPage = isDark(page)
+  return {
+    '--chrome-bg': bg,
+    '--chrome-bg-elevated': shade(bg, shift),
+    '--chrome-bg-sidebar': shade(bg, shift * 2),
+    '--chrome-control-bg': shade(bg, shift),
+    '--chrome-control-hover': shade(bg, Math.round(shift * 2.2)),
+    '--chrome-control-active-bg': shade(bg, shift * 3),
+    '--chrome-row-hover': shade(bg, Math.round(shift * 0.6)),
+    '--chrome-text': palette.text,
+    '--chrome-text-heading': palette.text,
+    '--chrome-text-muted': mix(palette.text, bg, 0.32),
+    '--chrome-text-dim': mix(palette.text, bg, 0.55),
+    // Borders are NOT derived from the preset in the app today: they stay on
+    // the base theme's warm browns. Derived here so the mock can show what it
+    // would look like if they were — see the note in the page.
+    '--chrome-border': BORDERS_FOLLOW ? mix(palette.text, bg, 0.78) : (theme === 'dark' ? '#35312a' : '#ddd4c0'),
+    '--chrome-border-strong': BORDERS_FOLLOW ? mix(palette.text, bg, 0.62) : (theme === 'dark' ? '#4a4438' : '#c9bea3'),
+    '--chrome-accent': palette.accent,
+    '--chrome-accent-contrast': isDark(palette.accent) ? '#f5f1e8' : '#14110c',
+    // The specimen reads from its own names so a card can show one theme while
+    // the window around it shows another.
+    '--spec-bg': bg,
+    '--spec-sidebar': shade(bg, shift * 2),
+    '--spec-border': BORDERS_FOLLOW ? mix(palette.text, bg, 0.78) : (theme === 'dark' ? '#35312a' : '#ddd4c0'),
+    '--spec-text': palette.text,
+    '--spec-text-dim': mix(palette.text, bg, 0.55),
+    '--spec-accent': palette.accent,
+    '--spec-accent-contrast': isDark(palette.accent) ? '#f5f1e8' : '#14110c',
+    '--spec-page': page,
+    '--spec-surround': shade(page, darkPage ? -8 : -18),
+    '--spec-ink': darkPage ? '#d6d0c2' : '#2b2620',
+    '--spec-ink-muted': darkPage ? '#948d7d' : '#6e6656'
+  }
+}
+
+/** Blend two hexes — used only for the tones the app derives implicitly. */
+function mix(a, b, t) {
+  const pa = parseInt(a.replace('#', ''), 16), pb = parseInt(b.replace('#', ''), 16)
+  const ch = (s) => Math.round((((pa >> s) & 0xff) * (1 - t)) + (((pb >> s) & 0xff) * t))
+  return '#' + ((1 << 24) + (ch(16) << 16) + (ch(8) << 8) + ch(0)).toString(16).slice(1)
+}
+
+let BORDERS_FOLLOW = true
+
+// ---------------------------------------------------------------- state
+let direction = 'a'
+let theme = 'dark'
+let trueBlack = false
+let chosen = null          // committed preset id, or null for theme defaults
+let previewing = null      // preset id being hovered
+
+const paletteOf = (id) => (id ? PRESETS.find((p) => p.id === id).variants[theme] : BASE[theme])
+
+/** What the window is wearing right now: the hovered preset if there is one,
+ *  otherwise the chosen one. */
+function activePalette() {
+  const p = paletteOf(previewing ?? chosen)
+  if (theme === 'dark' && trueBlack && !previewing && !chosen) return { ...p, background: '#000000' }
+  return p
+}
+
+function paint() {
+  const frame = document.getElementById('frame')
+  const tokens = tokensFor(activePalette(), theme)
+  for (const [k, v] of Object.entries(tokens)) frame.style.setProperty(k, v)
+}
+
+function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])) }
+
+// ---------------------------------------------------------------- the specimen
+/** A true-to-life scrap of the app: binder, manuscript page with real words,
+ *  an accent control, a status line. Given a palette, it wears it. */
+function specimen(palette, cls) {
+  const t = tokensFor(palette, theme)
+  const vars = ['--spec-bg', '--spec-sidebar', '--spec-border', '--spec-text', '--spec-text-dim', '--spec-accent',
+    '--spec-accent-contrast', '--spec-page', '--spec-surround', '--spec-ink', '--spec-ink-muted']
+    .map((k) => k + ':' + t[k]).join(';')
+  return '<div class="spec ' + (cls || '') + '" style="' + vars + '">' +
+    '<div class="spec-col">' +
+      '<div class="spec-top">Search the whole project…</div>' +
+      '<div class="spec-main">' +
+        '<div class="spec-rail"></div>' +
+        '<div class="spec-binder"><i class="is-active"></i><i></i><i></i><i></i><i></i><i></i></div>' +
+        '<div class="spec-body">' +
+          '<div class="spec-page">' +
+            '<div class="spec-h">4. What the Log Says</div>' +
+            '<div class="spec-p">The lamp was lit at four and the log written up at six, in a hand that ' +
+            'had begun to slope. Ivo read it twice before he understood what had been left out, and then ' +
+            'once more with the chart beside him, in case the omission was his own.</div>' +
+          '</div>' +
+          '<div class="spec-foot"><span class="spec-btn">Compile</span>' +
+          '<span class="spec-status">All changes saved</span></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+  '</div>'
+}
+
+// ---------------------------------------------------------------- shared parts
+function modeSection() {
+  return '<div class="section">' +
+    '<h2 class="section-title">Light or dark</h2>' +
+    '<p class="hint">Every preset has a light and a dark variant, so this switch changes the time of day ' +
+    'rather than the theme.</p>' +
+    '<div class="mode-row">' +
+      '<span class="switch">' +
+        '<button data-mode="light" class="' + (theme === 'light' ? 'is-active' : '') + '">Light</button>' +
+        '<button data-mode="dark" class="' + (theme === 'dark' ? 'is-active' : '') + '">Dark</button>' +
+      '</span>' +
+      '<label class="check"><input type="checkbox" id="true-black"' + (trueBlack ? ' checked' : '') +
+        (theme === 'dark' ? '' : ' disabled') + ' /> True black, for OLED screens</label>' +
+    '</div>' +
+  '</div>'
+}
+
+function tailSections() {
+  return '<div class="section">' +
+      '<h2 class="section-title">Your own colours</h2>' +
+      '<p class="hint">A palette you mix yourself will not hold up everywhere a designed preset does: ' +
+      'contrast and depth are checked for the presets and cannot be for every combination. Changing any ' +
+      'of these leaves the preset behind.</p>' +
+      '<div class="row">' +
+        '<span class="field">Accent<span class="well" style="background:var(--chrome-accent)"></span></span>' +
+        '<span class="field">Background<span class="well" style="background:var(--chrome-bg)"></span></span>' +
+        '<span class="field">Text<span class="well" style="background:var(--chrome-text)"></span></span>' +
+        '<span class="field">Page<span class="well" style="background:var(--spec-page)"></span></span>' +
+        '<button class="link">Back to the theme default</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="section">' +
+      '<h2 class="section-title">Default typography</h2>' +
+      '<p class="hint">Applied to new documents. Text you have already written keeps its own formatting.</p>' +
+      '<div class="row">' +
+        '<span class="field">Font<select><option>App default</option><option>Iowan Old Style</option></select></span>' +
+        '<span class="field">Size<select><option>App default</option><option>12 pt</option></select></span>' +
+        '<span class="field">Line spacing<select><option>App default</option><option>1.5</option></select></span>' +
+      '</div>' +
+    '</div>' +
+    '<div class="section">' +
+      '<h2 class="section-title">Toolbar sections</h2>' +
+      '<p class="hint">Unchecked sections move into the toolbar’s overflow menu.</p>' +
+      '<div class="row">' +
+        ['Formatting', 'Paragraph', 'Insert', 'Marks', 'View'].map((s) =>
+          '<label class="check"><input type="checkbox" checked /> ' + s + '</label>').join('') +
+      '</div>' +
+    '</div>'
+}
+
+function chromeAround(inner) {
+  return '<div class="rail">' +
+      '<div class="rail-btn">✎</div><div class="rail-btn">◫</div><div class="rail-btn">⌗</div>' +
+      '<div class="rail-btn">⎘</div><div class="rail-btn">✉</div><div class="rail-btn">≡</div>' +
+      '<div class="rail-btn is-active" style="margin-top:auto;margin-bottom:12px">◐</div>' +
+    '</div>' +
+    '<div class="main">' +
+      '<div class="searchbar">Search the whole project…</div>' +
+      '<div class="scroll"><div class="page-column">' + inner + '</div></div>' +
+    '</div>'
+}
+
+// ================================================================ A · try it on
+function renderA() {
+  const list = PRESETS.map((p) =>
+    '<button class="a-item ' + (chosen === p.id ? 'is-active' : '') + '" data-preset="' + p.id + '">' +
+      '<span class="a-name">' + esc(p.name) + '</span>' +
+      '<span class="a-desc">' + esc(p.description) + '</span>' +
+    '</button>').join('')
+
+  const shown = previewing ?? chosen
+  const note = previewing
+    ? 'Trying on <b>' + esc(PRESETS.find((p) => p.id === previewing).name) + '</b>. Move away to put it back, or click to keep it.'
+    : chosen
+      ? 'Wearing <b>' + esc(PRESETS.find((p) => p.id === chosen).name) + '</b>.'
+      : 'No preset chosen, so the window is on its plain ' + theme + ' theme.'
+
+  return chromeAround(
+    modeSection() +
+    '<div class="section">' +
+      '<h2 class="section-title">Themes</h2>' +
+      '<p class="hint">Hovering a name puts the whole window into that theme, this page included. ' +
+      'Nothing is kept until you click.</p>' +
+      '<div class="a-layout">' +
+        '<div class="a-list">' + list + '</div>' +
+        '<div class="a-stage">' + specimen(paletteOf(shown), 'is-large') +
+          '<p class="a-preview-note">' + note + '</p></div>' +
+      '</div>' +
+    '</div>' +
+    tailSections()
+  )
+}
+
+// ================================================================ B · the wall
+function renderB() {
+  const cards = PRESETS.map((p) =>
+    '<button class="b-card ' + (chosen === p.id ? 'is-active' : '') + '" data-preset="' + p.id + '">' +
+      specimen(p.variants[theme]) +
+      '<span class="b-meta">' +
+        '<span class="b-name">' + esc(p.name) + (chosen === p.id ? '<span class="b-tick">in use</span>' : '') + '</span>' +
+        '<span class="b-desc">' + esc(p.description) + '</span>' +
+      '</span>' +
+    '</button>').join('')
+
+  return chromeAround(
+    modeSection() +
+    // No line under the heading: each card is the app wearing the theme, which
+    // says what a sentence would have said.
+    '<div class="section">' +
+      '<h2 class="section-title b-themes-title">Themes</h2>' +
+      '<div class="b-grid">' + cards + '</div>' +
+    '</div>' +
+    tailSections()
+  )
+}
+
+// ================================================================ C · the page
+function renderC() {
+  const group = (name, note, list) => list.length === 0 ? '' :
+    '<div class="c-group-head"><span class="c-group-name">' + name + '</span>' +
+    '<span class="c-group-note">' + note + '</span></div>' +
+    '<div class="c-strip">' + list.map((p) => {
+      const t = tokensFor(p.variants[theme], theme)
+      const vars = ['--spec-page', '--spec-ink', '--spec-ink-muted', '--spec-accent', '--spec-border']
+        .map((k) => k + ':' + t[k]).join(';')
+      return '<button class="c-item ' + (chosen === p.id ? 'is-active' : '') + '" data-preset="' + p.id + '">' +
+        '<span class="c-sheet" style="' + vars + '">' +
+          '<span class="c-sheet-h">What the Log Says</span>' +
+          '<span class="c-sheet-p">The lamp was lit at four and the log written up at six, in a hand that had begun to slope.</span>' +
+          '<span class="c-sheet-rule"></span>' +
+        '</span>' +
+        '<span class="c-name">' + esc(p.name) + '</span>' +
+        '<span class="c-desc">' + esc(p.description) + '</span>' +
+      '</button>'
+    }).join('') + '</div>'
+
+  const paper = PRESETS.filter((p) => p.variants[theme].page === null)
+  const tinted = PRESETS.filter((p) => p.variants[theme].page !== null && !isDark(p.variants[theme].page))
+  const darkPage = PRESETS.filter((p) => p.variants[theme].page !== null && isDark(p.variants[theme].page))
+
+  return chromeAround(
+    '<div class="section">' +
+      '<h2 class="section-title">Light or dark</h2>' +
+      '<p class="hint">The one choice that changes everything else. Each theme has both, so this switch ' +
+      'changes the time of day rather than the theme.</p>' +
+      '<div class="c-modes">' +
+        ['light', 'dark'].map((m) => {
+          const p = chosen ? PRESETS.find((x) => x.id === chosen).variants[m] : BASE[m]
+          return '<button class="c-mode ' + (theme === m ? 'is-active' : '') + '" data-mode="' + m + '">' +
+            specimen(p) +
+            '<span class="c-mode-label">' + (m === 'light' ? 'Light' : 'Dark') + '</span>' +
+            '<span class="c-mode-sub">' + (m === 'light'
+              ? 'Daylight, and a paper page.'
+              : 'Low light. Some themes dim the page with it.') + '</span>' +
+          '</button>'
+        }).join('') +
+      '</div>' +
+      '<p class="hint" style="margin-top:var(--space-3)"><label class="check"><input type="checkbox" id="true-black"' +
+        (trueBlack ? ' checked' : '') + (theme === 'dark' ? '' : ' disabled') +
+        ' /> True black, for OLED screens</label></p>' +
+    '</div>' +
+    '<div class="section">' +
+      '<h2 class="section-title">Themes</h2>' +
+      '<p class="hint">Grouped by what each one does to the manuscript page, since that is the part you ' +
+      'look at all day. Hovering tries one on for the whole window.</p>' +
+      group('Paper page', 'The page stays paper whatever the interface does.', paper) +
+      group('Tinted page', 'The page takes a tone from the theme.', tinted) +
+      group('Dark page', 'The page goes dark and the ink lightens with it.', darkPage) +
+    '</div>' +
+    tailSections()
+  )
+}
+
+// ---------------------------------------------------------------- wiring
+function draw() {
+  const frame = document.getElementById('frame')
+  frame.innerHTML = direction === 'a' ? renderA() : direction === 'b' ? renderB() : renderC()
+  paint()
+
+  frame.querySelectorAll('[data-preset]').forEach((el) => {
+    const id = el.dataset.preset
+    el.addEventListener('mouseenter', () => { previewing = id; paint(); updateNote() })
+    el.addEventListener('mouseleave', () => { previewing = null; paint(); updateNote() })
+    el.addEventListener('click', () => { chosen = id; previewing = null; draw() })
+  })
+  frame.querySelectorAll('[data-mode]').forEach((el) => {
+    el.addEventListener('click', () => { theme = el.dataset.mode; draw() })
+  })
+  const tb = frame.querySelector('#true-black')
+  if (tb) tb.addEventListener('change', () => { trueBlack = tb.checked; draw() })
+}
+
+/** A's line under the specimen changes on hover without redrawing the list. */
+function updateNote() {
+  if (direction !== 'a') return
+  const note = document.querySelector('.a-preview-note')
+  const spec = document.querySelector('.spec.is-large')
+  if (!note || !spec) return
+  const shown = previewing ?? chosen
+  note.innerHTML = previewing
+    ? 'Trying on <b>' + esc(PRESETS.find((p) => p.id === previewing).name) + '</b>. Move away to put it back, or click to keep it.'
+    : chosen
+      ? 'Wearing <b>' + esc(PRESETS.find((p) => p.id === chosen).name) + '</b>.'
+      : 'No preset chosen, so the window is on its plain ' + theme + ' theme.'
+  const t = tokensFor(paletteOf(shown), theme)
+  for (const k of ['--spec-bg', '--spec-sidebar', '--spec-border', '--spec-text', '--spec-text-dim', '--spec-accent',
+    '--spec-accent-contrast', '--spec-page', '--spec-surround', '--spec-ink', '--spec-ink-muted']) {
+    spec.style.setProperty(k, t[k])
+  }
+}
+
+document.querySelectorAll('.mock-tab').forEach((t) => {
+  t.addEventListener('click', () => {
+    direction = t.dataset.go
+    document.querySelectorAll('.mock-tab').forEach((x) => x.classList.toggle('is-active', x === t))
+    history.replaceState(null, '', '#' + direction)
+    draw()
+  })
+})
+
+document.getElementById('reset').addEventListener('click', () => {
+  chosen = null; previewing = null; trueBlack = false; draw()
+})
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === '1' || e.key === '2' || e.key === '3') {
+    document.querySelector('.mock-tab[data-go="' + 'abc'[Number(e.key) - 1] + '"]').click()
+  }
+  if (e.key === 't') { theme = theme === 'dark' ? 'light' : 'dark'; draw() }
+  if (e.key === 'b') { BORDERS_FOLLOW = !BORDERS_FOLLOW; draw() }
+})
+
+const hash = location.hash.slice(1)
+if (['a', 'b', 'c'].includes(hash)) {
+  direction = hash
+  document.querySelectorAll('.mock-tab').forEach((x) => x.classList.toggle('is-active', x.dataset.go === hash))
+}
+draw()
+</script>
+</body>
+</html>

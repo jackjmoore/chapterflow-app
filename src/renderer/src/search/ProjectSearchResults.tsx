@@ -16,6 +16,7 @@ import {
   TagSpanIcon,
   TimelineViewIcon
 } from '../icons'
+import { usePresence, presenceClass } from '../usePresence'
 
 /**
  * Ranked project search results, grouped by tier.
@@ -68,7 +69,9 @@ function kindLabel(match: RankedMatch): string {
     case 'prose':
       return `${match.occurrences} mention${match.occurrences === 1 ? '' : 's'}`
     case 'documentTitle':
-      return match.entry.field === 'synopsis' ? 'Synopsis' : 'Document'
+      if (match.entry.field === 'synopsis') return 'Synopsis'
+      if (match.entry.field === 'notes') return 'Notes'
+      return 'Document'
     case 'storyBibleName':
       return 'Story Bible'
     case 'storyBibleAlias':
@@ -146,61 +149,89 @@ function groupByTier(matches: RankedMatch[]): { tier: SearchTier; matches: Ranke
   return groups
 }
 
+/**
+ * One tier's header and its rows.
+ *
+ * Extracted purely so each group can hold its own presence state: collapse is
+ * per-tier, and a hook cannot be called from inside the groups.map() that used
+ * to render these inline.
+ */
+function TierGroup(props: {
+  group: { tier: SearchTier; matches: RankedMatch[] }
+  collapsed: boolean
+  query: string
+  onToggleTier: (tier: SearchTier) => void
+  onNavigate: (match: RankedMatch) => void
+}): JSX.Element {
+  const { group, collapsed, query, onToggleTier, onNavigate } = props
+  const rows = usePresence(collapsed ? null : true)
+
+  return (
+    <div
+      className={`search-result-group ${collapsed ? 'is-collapsed' : ''}`}
+      data-tier={group.tier}
+      data-collapsed={collapsed ? 'true' : 'false'}
+    >
+      {/* The header states the collapsed/expanded condition three ways —
+          the caret's direction, the word, and the shaded bar — because one
+          rotating chevron is easy to miss in a list this dense. */}
+      <button
+        type="button"
+        className="search-result-group-label"
+        aria-expanded={!collapsed}
+        onClick={() => onToggleTier(group.tier)}
+      >
+        <span className="search-result-group-caret" aria-hidden="true">
+          {collapsed ? '▶' : '▼'}
+        </span>
+        <span className="search-result-group-name">{TIER_LABELS[group.tier]}</span>
+        <span className="search-result-group-count">{group.matches.length}</span>
+        <span className="search-result-group-state">{collapsed ? 'Hidden' : 'Hide'}</span>
+      </button>
+      {rows.rendered && (
+      <div className={`search-result-group-rows ${presenceClass(rows.visible)}`}>
+        {group.matches.map((match) => (
+        <button
+          type="button"
+          key={match.entry.id}
+          className="search-result"
+          data-tier={match.tier}
+          data-kind={match.entry.kind}
+          title={match.tierName}
+          onClick={() => onNavigate(match)}
+        >
+          <span className="search-result-icon">{iconFor(match.entry.kind)}</span>
+          <span className="search-result-body">
+            <span className="search-result-heading">
+              {headingFor(match)}
+              <span className="search-result-kind">{kindLabel(match)}</span>
+            </span>
+            {detailFor(match, query)}
+          </span>
+        </button>
+        ))}
+      </div>
+      )}
+    </div>
+  )
+}
+
 function ProjectSearchResults(props: ProjectSearchResultsProps): JSX.Element {
   const { results, onNavigate, collapsedTiers, onToggleTier } = props
   const groups = groupByTier(results.matches)
 
   return (
     <div className="search-results" role="listbox" aria-label="Search results">
-      {groups.map((group) => {
-        const collapsed = collapsedTiers.has(group.tier)
-        return (
-        <div
-          className={`search-result-group ${collapsed ? 'is-collapsed' : ''}`}
+      {groups.map((group) => (
+        <TierGroup
           key={group.tier}
-          data-tier={group.tier}
-          data-collapsed={collapsed ? 'true' : 'false'}
-        >
-          {/* The header states the collapsed/expanded condition three ways —
-              the caret's direction, the word, and the shaded bar — because one
-              rotating chevron is easy to miss in a list this dense. */}
-          <button
-            type="button"
-            className="search-result-group-label"
-            aria-expanded={!collapsed}
-            onClick={() => onToggleTier(group.tier)}
-          >
-            <span className="search-result-group-caret" aria-hidden="true">
-              {collapsed ? '▶' : '▼'}
-            </span>
-            <span className="search-result-group-name">{TIER_LABELS[group.tier]}</span>
-            <span className="search-result-group-count">{group.matches.length}</span>
-            <span className="search-result-group-state">{collapsed ? 'Hidden' : 'Hide'}</span>
-          </button>
-          {!collapsed &&
-            group.matches.map((match) => (
-            <button
-              type="button"
-              key={match.entry.id}
-              className="search-result"
-              data-tier={match.tier}
-              data-kind={match.entry.kind}
-              title={match.tierName}
-              onClick={() => onNavigate(match)}
-            >
-              <span className="search-result-icon">{iconFor(match.entry.kind)}</span>
-              <span className="search-result-body">
-                <span className="search-result-heading">
-                  {headingFor(match)}
-                  <span className="search-result-kind">{kindLabel(match)}</span>
-                </span>
-                {detailFor(match, results.query)}
-              </span>
-            </button>
-          ))}
-        </div>
-        )
-      })}
+          group={group}
+          collapsed={collapsedTiers.has(group.tier)}
+          query={results.query}
+          onToggleTier={onToggleTier}
+          onNavigate={onNavigate}
+        />
+      ))}
       {results.truncated && (
         <div className="search-results-truncated">
           Showing the first {results.matches.length} results — narrow the search to see fewer.

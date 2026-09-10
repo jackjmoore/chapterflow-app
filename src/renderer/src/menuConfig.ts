@@ -1,6 +1,4 @@
-import { COLOR_PRESETS } from '../../shared/colorPresets'
 import { COUNT_ROUNDINGS, roundingLabel } from '../../shared/insertions'
-import { TOOLBAR_SECTIONS } from '../../shared/toolbarSections'
 import type { LayoutPreset } from '../../shared/layoutPresets'
 import type { SavedView } from '../../shared/binder'
 
@@ -58,7 +56,9 @@ const FILE_MENU: MenuDef = {
     item('New Folder', 'newFolder', { ctrl: true, shift: true, code: 'KeyN', display: 'Ctrl+Shift+N' }),
     item('Delete', 'delete'),
     sep,
-    item('New Project from Template…', 'newProjectFromTemplate'),
+    item('New Project…', 'newProject'),
+    // Structure for the project already open, not a way of making one.
+    item('Apply Template…', 'newProjectFromTemplate'),
     item('Open Project…', 'openProject'),
     // Saves and closes out to the dashboard without quitting. The only route
     // back to it for anyone who has turned off showing it on launch.
@@ -67,6 +67,10 @@ const FILE_MENU: MenuDef = {
     item('Save Now', 'saveNow', { ctrl: true, code: 'KeyS', display: 'Ctrl+S' }),
     sep,
     item('Import Files…', 'importFiles'),
+    // Separate from Import Files because it makes a project rather than adding
+    // to one, and because it can also bring across the machine-wide personal
+    // dictionary, which belongs to no single project at all.
+    item('Import from Scrivener…', 'importScrivener'),
     {
       type: 'submenu',
       label: 'Export Document',
@@ -205,40 +209,33 @@ const INSERT_MENU: MenuDef = {
   ]
 }
 
-const COLOR_PRESET_ITEMS: MenuEntry[] = COLOR_PRESETS.map((preset) =>
-  item(preset.name, `colorPreset:${preset.id}`)
-)
-
-const TOOLBAR_SECTION_ITEMS: MenuEntry[] = TOOLBAR_SECTIONS.map((section) =>
-  checkableItem(section.label, `toolbarSection:${section.id}`)
-)
-
 // Layout Presets' saved-preset entries are user data, not static config, so
 // they're spliced in at render time by buildMenus() below rather than listed
 // here — everything else in the menu bar is fixed and known up front.
+// Theme, typography, and toolbar customization all moved to the Appearance
+// panel (bottom of the nav rail) — one home for appearance, no menu twin.
 const VIEW_MENU_BASE: MenuDef = {
   label: 'View',
   items: [
+    item('Page Setup…', 'openPageSetupModal'),
     {
       type: 'submenu',
-      label: 'Theme',
+      label: 'Document View',
       items: [
-        checkableItem('Light', 'setTheme:light'),
-        checkableItem('Dark', 'setTheme:dark'),
-        sep,
-        checkableItem('True Black (OLED)', 'toggleTrueBlack'),
-        sep,
-        item('Accent Color…', 'accentColor'),
-        item('Background Color…', 'backgroundColor'),
-        item('Text Color…', 'textColorTheme'),
-        item('Reset Colors to Theme Default', 'resetColors'),
-        sep,
-        { type: 'submenu', label: 'Color Presets', items: COLOR_PRESET_ITEMS }
+        checkableItem('Continuous', 'pageView:continuous'),
+        checkableItem('Page View', 'pageView:paginated')
       ]
     },
-    item('Default Typography…', 'openTypographyModal'),
-    item('Page Setup…', 'openPageSetupModal'),
-    { type: 'submenu', label: 'Toolbar', items: TOOLBAR_SECTION_ITEMS },
+    // Sits with Document View rather than in the Format menu: like continuous
+    // and page view, it changes what you see, never what the document is.
+    // D for "diff" — R was a collision with the sprint toggle's Ctrl+Alt+R,
+    // which this menu's earlier position in the shortcut table shadowed.
+    checkableItem('Revision Mode', 'toggleRevisionMode', {
+      ctrl: true,
+      alt: true,
+      code: 'KeyD',
+      display: 'Ctrl+Alt+D'
+    }),
     {
       type: 'submenu',
       label: 'Layout Presets',
@@ -261,8 +258,7 @@ const VIEW_MENU_BASE: MenuDef = {
 const PROJECT_MENU_BASE: MenuDef = {
   label: 'Project',
   items: [
-    item('Word Target & Deadline…', 'openProjectTargetModal'),
-    sep,
+    // Word target & deadline moved to the Progress panel (nav-rail bottom).
     item('Manage Statuses…', 'openManageStatusesModal'),
     item('Manage Tags…', 'openManageTagsModal'),
     item('Tagged Spans…', 'showSpanTags'),
@@ -286,6 +282,10 @@ const PROJECT_MENU_BASE: MenuDef = {
       code: 'KeyR',
       display: 'Ctrl+Alt+R'
     }),
+    // Forward-only writing: Backspace and Delete are refused while it is on.
+    // Deliberately no shortcut — it can only be changed between writing
+    // sessions, and a key chord invites toggling it by reflex mid-sentence.
+    checkableItem('Hemingway Mode', 'toggleHemingway'),
     sep,
     {
       type: 'submenu',

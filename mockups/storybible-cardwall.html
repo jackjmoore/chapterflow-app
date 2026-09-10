@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Story Bible — the card wall</title>
+<style>
+  /* ChapterFlow tokens, copied from src/renderer/src/index.css. */
+  :root {
+    --space-1: 4px; --space-2: 8px; --space-3: 12px;
+    --space-4: 16px; --space-5: 24px; --space-6: 32px;
+    --radius-sm: 4px; --radius-md: 6px;
+    --text-2xs: 10px; --text-xs: 11px; --text-sm: 12px; --text-md: 13px;
+    --text-lg: 14px; --text-xl: 20px;
+    --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-editor: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+
+    --chrome-bg: #1c1a17;
+    --chrome-bg-elevated: #242119;
+    --chrome-border: #35312a;
+    --chrome-border-strong: #4a4438;
+    --chrome-text: #e8e3d9;
+    --chrome-text-heading: #f0ece2;
+    --chrome-text-muted: #9c9585;
+    --chrome-text-dim: #6b6558;
+    --chrome-control-bg: #262319;
+    --chrome-control-hover: #322d22;
+    --chrome-control-active-bg: #3a3527;
+    --chrome-accent: #6f95b8;
+    --chrome-accent-contrast: #0d1520;
+    --chrome-accent-error: #c26a5a;
+    --chrome-row-hover: #221f18;
+    --chrome-row-selected: #2a3846;
+    --elev-2: 0 1px 2px rgb(0 0 0 / 0.22), 0 8px 20px rgb(0 0 0 / 0.3);
+  }
+  body.light {
+    --chrome-bg: #f5f1e8;
+    --chrome-bg-elevated: #ece6d8;
+    --chrome-border: #ddd4c0;
+    --chrome-border-strong: #c9bea3;
+    --chrome-text: #2b2620;
+    --chrome-text-heading: #1c1812;
+    --chrome-text-muted: #6e6656;
+    --chrome-text-dim: #948c78;
+    --chrome-control-bg: #ece5d3;
+    --chrome-control-hover: #e0d8c2;
+    --chrome-control-active-bg: #d8cdb0;
+    --chrome-accent: #3d5a7a;
+    --chrome-accent-contrast: #f5f1e8;
+    --chrome-accent-error: #b0492f;
+    --chrome-row-hover: #ece5d3;
+    --chrome-row-selected: #d7e0e8;
+    --elev-2: 0 1px 2px rgb(43 38 32 / 0.08), 0 8px 20px rgb(43 38 32 / 0.13);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--chrome-bg);
+    color: var(--chrome-text);
+    font-family: var(--font-ui);
+    font-size: var(--text-md);
+    line-height: 1.45;
+    overflow: hidden;
+  }
+
+  /* ── Mock chrome ─────────────────────────────────────────────────── */
+  .mockbar {
+    display: flex; align-items: center; gap: var(--space-3);
+    padding: 0 var(--space-4); height: 44px;
+    background: var(--chrome-bg-elevated);
+    border-bottom: 1px solid var(--chrome-border);
+  }
+  .mockbar-title { font-size: var(--text-sm); color: var(--chrome-text-muted); white-space: nowrap; }
+  .mockbar-tabs { display: flex; gap: var(--space-1); margin: 0 auto; }
+  .mockbar-tabs button, .mockbar-toggle {
+    font: inherit; font-size: var(--text-sm); color: var(--chrome-text-muted);
+    background: none; border: 1px solid transparent; border-radius: var(--radius-sm);
+    padding: 4px 12px; cursor: pointer;
+  }
+  .mockbar-tabs button:hover, .mockbar-toggle:hover { background: var(--chrome-control-hover); }
+  .mockbar-tabs button.is-active {
+    color: var(--chrome-text-heading); background: var(--chrome-control-bg);
+    border-color: var(--chrome-border-strong);
+  }
+  .mockbar-toggle {
+    font-size: var(--text-xs); background: var(--chrome-control-bg);
+    border-color: var(--chrome-border); padding: 3px 10px; white-space: nowrap;
+  }
+  .note {
+    flex-shrink: 0; margin: var(--space-3) var(--space-5) 0;
+    font-size: var(--text-xs); color: var(--chrome-text-dim);
+    border-left: 2px solid var(--chrome-border-strong); padding-left: var(--space-3);
+    max-width: 1000px;
+  }
+
+  /* The section fills the window: no side panel, and the scroller is the
+     full width, so the scrollbar sits at the window edge. */
+  .view { display: none; height: calc(100vh - 44px); flex-direction: column; }
+  .view.is-active { display: flex; }
+  .page { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-4) var(--space-5) var(--space-6); }
+
+  /* ── Shared pieces ───────────────────────────────────────────────── */
+  .btn {
+    font: inherit; font-size: var(--text-sm); color: var(--chrome-text);
+    background: var(--chrome-control-bg); border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-sm); padding: 4px 12px; cursor: pointer; white-space: nowrap;
+  }
+  .btn:hover { background: var(--chrome-control-hover); }
+  .btn.primary { background: var(--chrome-accent); color: var(--chrome-accent-contrast); border-color: transparent; font-weight: 600; }
+  .quiet-link {
+    font-family: var(--font-ui); font-size: var(--text-xs); color: var(--chrome-text-muted);
+    background: none; border: none; cursor: pointer; padding: 0;
+    text-decoration: underline; text-underline-offset: 3px;
+    text-decoration-color: var(--chrome-border-strong);
+  }
+  .quiet-link:hover { color: var(--chrome-text); }
+  .quiet-link.is-delete:hover { color: var(--chrome-accent-error); }
+  .sec-label { display: block; font-size: var(--text-xs); font-weight: 600; letter-spacing: 0.02em; color: var(--chrome-text-dim); }
+  .lead { font-size: var(--text-md); color: var(--chrome-text-muted); max-width: 760px; }
+  .swatch { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .type-pill { display: inline-block; padding: 1px 8px; border-radius: 9px; font-size: var(--text-2xs); font-weight: 600; white-space: nowrap; cursor: pointer; }
+  .alias-chip { display: inline-block; padding: 1px 7px; border-radius: 8px; font-size: var(--text-2xs); color: var(--chrome-text-muted); border: 1px solid var(--chrome-border-strong); }
+  .dim { color: var(--chrome-text-dim); }
+
+  .presence { display: flex; gap: 2px; }
+  .presence i { display: block; width: 10px; height: 14px; border-radius: 2px; background: var(--chrome-control-bg); }
+  .presence i.l1 { background: color-mix(in oklab, var(--chrome-accent) 28%, var(--chrome-bg)); }
+  .presence i.l2 { background: color-mix(in oklab, var(--chrome-accent) 52%, var(--chrome-bg)); }
+  .presence i.l3 { background: color-mix(in oklab, var(--chrome-accent) 76%, var(--chrome-bg)); }
+  .presence i.l4 { background: var(--chrome-accent); }
+  /* Not "sm": the card summary owns that class and its clamp rule would win. */
+  .presence.is-small i { width: 6px; height: 10px; border-radius: 1px; }
+
+  .bar-track { flex: 1; height: 4px; border-radius: 2px; background: var(--chrome-control-bg); overflow: hidden; }
+  .bar-fill { display: block; height: 100%; background: var(--chrome-accent); }
+  .portrait {
+    display: flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-md); font-family: var(--font-editor);
+    color: var(--chrome-text-heading); letter-spacing: 0.04em;
+  }
+
+  /* ── The wall ────────────────────────────────────────────────────── */
+  .toolbar { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); position: relative; }
+  .group { margin-top: var(--space-5); }
+  .group-head { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
+  .group-title { font-size: var(--text-xs); font-weight: 600; color: var(--chrome-text-dim); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-3); }
+  .card {
+    display: flex; flex-direction: column; gap: var(--space-2);
+    padding: var(--space-3);
+    background: var(--chrome-bg-elevated);
+    border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-md);
+    cursor: pointer; text-align: left; font: inherit; color: inherit;
+  }
+  .card:hover { border-color: var(--chrome-border-strong); background: var(--chrome-row-hover); }
+  .card .portrait { height: 88px; font-size: 28px; }
+  .card .nm { font-size: var(--text-md); font-weight: 600; color: var(--chrome-text-heading); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card .sm { font-size: var(--text-xs); color: var(--chrome-text-muted); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .card .ft { display: flex; align-items: center; gap: var(--space-2); margin-top: auto; }
+  .card .ct { font-size: var(--text-2xs); color: var(--chrome-text-dim); white-space: nowrap; }
+
+  /* ── A sheet ─────────────────────────────────────────────────────── */
+  .sheet-head { display: flex; gap: var(--space-4); align-items: flex-start; margin-bottom: var(--space-5); }
+  .sheet-head .portrait { width: 112px; height: 112px; flex-shrink: 0; font-size: 34px; }
+  .sheet-id { min-width: 0; flex: 1; }
+  .sheet-name { font-size: var(--text-xl); font-weight: 600; color: var(--chrome-text-heading); }
+  /* Capped to the reading measure: at full width an auto-margined action
+     would drift to the far edge, a thousand pixels from what it acts on. */
+  .identity { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); flex-wrap: wrap; max-width: 640px; }
+  .sheet-sum { margin-top: var(--space-2); font-size: var(--text-md); line-height: 1.6; color: var(--chrome-text); max-width: 620px; }
+  .sheet-body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--space-5) 44px; align-items: start; }
+  .block { margin-bottom: var(--space-4); }
+  .block-label { display: block; margin-bottom: var(--space-1); font-size: var(--text-xs); font-weight: 600; color: var(--chrome-text-dim); }
+  .block-text { font-size: var(--text-md); line-height: 1.6; color: var(--chrome-text); max-width: 640px; }
+  .block-list { margin: 0; padding-left: 18px; font-size: var(--text-md); line-height: 1.7; }
+  .stats-grid { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); }
+  .stat-pair { display: flex; flex-direction: column; gap: 1px; }
+  .stat-pair .k { font-size: var(--text-2xs); color: var(--chrome-text-dim); }
+  .stat-pair .v { font-size: var(--text-md); color: var(--chrome-text); }
+  .rail { display: flex; flex-direction: column; gap: var(--space-5); }
+  .rail-line { margin-top: var(--space-2); font-size: var(--text-sm); color: var(--chrome-text); line-height: 1.55; }
+  .rail-rows { margin-top: var(--space-2); }
+  .rail-row { display: flex; align-items: center; gap: var(--space-2); padding: 3px 0; font-size: var(--text-xs); }
+  .rail-row .nm { width: 130px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--chrome-text-muted); }
+  .rail-row .ct { width: 22px; text-align: right; color: var(--chrome-text-dim); font-variant-numeric: tabular-nums; }
+
+  /* ── Menus, drawn the way the app draws them ─────────────────────── */
+  .menu {
+    position: absolute; z-index: 20; min-width: 180px;
+    padding: var(--space-1);
+    background: var(--chrome-bg-elevated);
+    border: 1px solid var(--chrome-border-strong);
+    border-radius: var(--radius-md);
+    box-shadow: var(--elev-2);
+  }
+  .menu-row {
+    display: flex; align-items: center; gap: var(--space-2);
+    width: 100%; padding: 5px var(--space-2);
+    font: inherit; font-size: var(--text-sm); color: var(--chrome-text);
+    background: none; border: none; border-radius: var(--radius-sm);
+    cursor: pointer; text-align: left;
+  }
+  .menu-row:hover { background: var(--chrome-control-hover); }
+  .menu-row.is-current { background: var(--chrome-row-selected); color: var(--chrome-text-heading); }
+  .menu-row .tick { margin-left: auto; font-size: var(--text-xs); color: var(--chrome-text-muted); }
+  .menu-row .hint { margin-left: auto; font-size: var(--text-2xs); color: var(--chrome-text-dim); }
+  .menu-sep { height: 1px; margin: var(--space-1) 0; background: var(--chrome-border); }
+  .menu-glyph { width: 16px; text-align: center; color: var(--chrome-text-muted); font-size: var(--text-sm); }
+  .anchor { position: relative; display: inline-flex; }
+
+  /* The reference view lays the menus out plainly, side by side. */
+  .menu-specimens { display: flex; flex-wrap: wrap; gap: var(--space-6); margin-top: var(--space-4); }
+  .specimen { display: flex; flex-direction: column; gap: var(--space-2); }
+  .specimen-cap { font-size: var(--text-xs); color: var(--chrome-text-dim); max-width: 260px; }
+  .specimen-stage {
+    position: relative; padding: var(--space-3);
+    border: 1px dashed var(--chrome-border); border-radius: var(--radius-md);
+    background: var(--chrome-bg);
+  }
+  .specimen-stage .menu { position: static; box-shadow: var(--elev-2); }
+  .field-row { display: flex; align-items: center; gap: var(--space-2); }
+  .field {
+    font: inherit; font-size: var(--text-md); color: var(--chrome-text-heading);
+    background: var(--chrome-bg); border: 1px solid var(--chrome-accent);
+    border-radius: var(--radius-sm); padding: 3px var(--space-2); min-width: 220px;
+  }
+  .modal-card {
+    width: 320px; padding: var(--space-4);
+    background: var(--chrome-bg-elevated);
+    border: 1px solid var(--chrome-border-strong);
+    border-radius: var(--radius-md); box-shadow: var(--elev-2);
+  }
+  .modal-title { font-size: var(--text-md); font-weight: 600; color: var(--chrome-text-heading); margin-bottom: var(--space-2); }
+  .modal-msg { font-size: var(--text-sm); color: var(--chrome-text-muted); margin-bottom: var(--space-3); }
+  .type-edit-row { display: flex; align-items: center; gap: var(--space-2); padding: 4px 0; }
+  .type-edit-row + .type-edit-row { border-top: 1px solid var(--chrome-border); }
+  .type-edit-row .nm { flex: 1; font-size: var(--text-sm); }
+  .modal-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-3); }
+
+  @media (max-width: 1080px) { .sheet-body { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="mockbar">
+  <span class="mockbar-title">Story Bible · card wall · fake data</span>
+  <div class="mockbar-tabs" id="tabs">
+    <button data-view="view-wall" class="is-active">The wall</button>
+    <button data-view="view-sheet">A sheet</button>
+    <button data-view="view-menus">Menus, open</button>
+  </div>
+  <button class="mockbar-toggle" id="emptyToggle">Empty state</button>
+  <button class="mockbar-toggle" id="themeToggle">Light theme</button>
+</div>
+
+<section class="view is-active" id="view-wall">
+  <p class="note">The wall, at full width with no side panel. Cards are live: click one to open its sheet.
+    Each card now says how many mentions it has in words, not just a number.</p>
+  <div class="page" data-pane="wall"></div>
+</section>
+
+<section class="view" id="view-sheet">
+  <p class="note">A sheet. The portrait sits beside the identity, the blocks take the measure on the left,
+    and the evidence sits in a rail on the right. The type pill and the add-block link both open real
+    menus here, so you can try them.</p>
+  <div class="page" data-pane="sheet"></div>
+</section>
+
+<section class="view" id="view-menus">
+  <p class="note">Every menu that editing an entry can open, drawn plainly and side by side. In the app
+    each one is anchored to the control that opens it; here they are laid out flat so the contents can be
+    read at once.</p>
+  <div class="page" data-pane="menus"></div>
+</section>
+
+<script>
+/* ── Fake data — the same novel as the other mocks ─────────────────── */
+const TYPES = [
+  { id: 'character', name: 'Character', color: '#6f95b8' },
+  { id: 'location', name: 'Location', color: '#4b9363' },
+  { id: 'object', name: 'Object', color: '#d9a441' }
+]
+
+const DOCS = [
+  'Prologue', 'The Orchard', 'Low Tide', 'The Visitor', 'What the House Kept',
+  'The Letters', 'Signal Fires', 'The Long Field', 'The Weir', 'Ashes on the Sill',
+  'The Hollow Season'
+]
+
+const ITEMS = [
+  { id: 'maren', typeId: 'character', name: 'Maren Voss', aliases: ['Maren', 'Miss Voss'],
+    summary: 'The elder Voss daughter, back at the orchard after seven years away.',
+    mentions: [24, 41, 33, 18, 46, 12, 29, 22, 9, 14, 7],
+    blocks: [
+      { kind: 'text', label: 'Who she is', html: 'Maren left at nineteen and came back at twenty-six, which is long enough for a house to forget someone and short enough that the village has not. She counts things when she is frightened: apples, tides, the days since the last letter.' },
+      { kind: 'stats', label: 'At a glance', pairs: [['Age', '26'], ['Home', 'The orchard house'], ['First appears', 'Prologue'], ['Status', 'Living']] },
+      { kind: 'list', label: 'What she wants', items: ['To know who has been writing the letters.', 'To sell the orchard before another winter.', 'To be wrong about her mother.'] }
+    ],
+    rels: [
+      { who: 'Tomas Brek', reads: 'is her oldest friend', mutual: false },
+      { who: 'Eda Voss', reads: 'is her mother', mutual: false },
+      { who: 'The Visitor', reads: 'are strangers to each other', mutual: true }
+    ] },
+  { id: 'tomas', typeId: 'character', name: 'Tomas Brek', aliases: ['Tom'],
+    summary: 'A fisherman who never left, and who knows what the flats give up at low tide.',
+    mentions: [0, 14, 38, 9, 21, 4, 33, 27, 11, 6, 3],
+    blocks: [
+      { kind: 'text', label: 'Who he is', html: 'Tomas has worked the flats since he was twelve and can read the water the way Maren reads a page. He is patient in a way that reads as slowness to people who do not know him.' },
+      { kind: 'stats', label: 'At a glance', pairs: [['Age', '28'], ['Home', 'Brek cottage, the harbour'], ['First appears', 'The Orchard'], ['Status', 'Living']] }
+    ],
+    rels: [
+      { who: 'Maren Voss', reads: 'is his oldest friend', mutual: false },
+      { who: 'Halvard Brek', reads: 'is his father', mutual: false }
+    ] },
+  { id: 'visitor', typeId: 'character', name: 'The Visitor', aliases: ['The stranger', 'Mr Ash'],
+    summary: 'Arrives asking for lodging, and knows the house better than he should.',
+    mentions: [0, 0, 6, 44, 31, 18, 12, 5, 16, 22, 9],
+    blocks: [
+      { kind: 'text', label: 'Who he is', html: 'He gives a different name in each chapter he appears in, and none of them are checked. What he wants from the house is the question the second half of the book is built on.' },
+      { kind: 'list', label: 'Names he gives', items: ['Mr Ash, at the door.', 'Mr Aster, to the harbourmaster.', 'No name at all, to Maren.'] }
+    ],
+    rels: [
+      { who: 'Maren Voss', reads: 'are strangers to each other', mutual: true },
+      { who: 'The Letters', reads: 'wrote', mutual: false }
+    ] },
+  { id: 'eda', typeId: 'character', name: 'Eda Voss', aliases: ['Mother'],
+    summary: 'Maren’s mother, dead a year before the book opens, and present on every page of it.',
+    mentions: [8, 11, 4, 2, 27, 33, 6, 9, 3, 12, 5],
+    blocks: [{ kind: 'text', label: 'Who she was', html: 'Eda kept the orchard alone for eleven years. Everything the reader learns about her arrives second-hand, through the letters and through what Maren refuses to say.' }],
+    rels: [{ who: 'Maren Voss', reads: 'is her daughter', mutual: false }] },
+  { id: 'halvard', typeId: 'character', name: 'Halvard Brek', aliases: [],
+    summary: 'Tomas’s father, harbourmaster, and the last person to see Eda alive.',
+    mentions: [0, 0, 5, 0, 8, 0, 14, 3, 7, 4, 2],
+    blocks: [], rels: [{ who: 'Tomas Brek', reads: 'is his son', mutual: false }] },
+  { id: 'orchard', typeId: 'location', name: 'The Orchard', aliases: ['The Voss orchard', 'Home'],
+    summary: 'Sixty trees on a slope above the water, most of them past bearing.',
+    mentions: [12, 46, 8, 14, 22, 5, 11, 31, 4, 9, 16],
+    blocks: [
+      { kind: 'text', label: 'The place', html: 'The orchard runs downhill toward the sea wall, and the last four rows are salt-burned. It is worth more as land than as trees, which is the argument the book keeps having with itself.' },
+      { kind: 'stats', label: 'At a glance', pairs: [['Trees', 'About sixty'], ['Held since', '1897'], ['First appears', 'Prologue']] }
+    ],
+    rels: [{ who: 'Maren Voss', reads: 'belongs to', mutual: false }] },
+  { id: 'weir', typeId: 'location', name: 'The Weir', aliases: [],
+    summary: 'Where the river is made to slow down, and where the second letter was found.',
+    mentions: [0, 0, 3, 0, 6, 2, 9, 4, 38, 12, 7],
+    blocks: [{ kind: 'text', label: 'The place', html: 'Built in the 1920s and half-derelict now. It appears in three chapters and is the setting of the book’s only violence.' }],
+    rels: [] },
+  { id: 'house', typeId: 'location', name: 'The Hollow House', aliases: ['The house'],
+    summary: 'The building the book is named for, empty since the spring.',
+    mentions: [6, 3, 0, 12, 41, 9, 4, 7, 2, 18, 27],
+    blocks: [], rels: [] },
+  { id: 'letters', typeId: 'object', name: 'The Letters', aliases: ['The correspondence'],
+    summary: 'Nineteen letters in a hand Maren does not recognise, found in the attic.',
+    mentions: [3, 6, 9, 21, 34, 48, 17, 8, 11, 19, 14],
+    blocks: [
+      { kind: 'text', label: 'What they are', html: 'Nineteen letters, none of them signed, arranged in the box by date rather than by sender. Two are missing, and the gap is deliberate.' },
+      { kind: 'list', label: 'What they establish', items: ['Someone was writing to Eda for eleven years.', 'The writer knew the orchard was being sold.', 'The last letter was written after Eda died.'] }
+    ],
+    rels: [{ who: 'The Visitor', reads: 'were written by', mutual: false }] },
+  { id: 'key', typeId: 'object', name: 'The Brass Key', aliases: [],
+    summary: 'Opens nothing in the house, which is the point.',
+    mentions: [0, 0, 0, 7, 12, 3, 0, 5, 9, 14, 6],
+    blocks: [], rels: [] },
+  { id: 'fire', typeId: 'object', name: 'The Signal Fire', aliases: [],
+    summary: 'Lit on the headland when a boat is overdue, and lit twice in this book.',
+    mentions: [0, 0, 0, 0, 0, 0, 22, 4, 0, 3, 8],
+    blocks: [], rels: [] }
+]
+
+/* ── Helpers ───────────────────────────────────────────────────────── */
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+const fmt = (n) => n.toLocaleString('en-US')
+const typeOf = (item) => TYPES.find((t) => t.id === item.typeId)
+const total = (item) => item.mentions.reduce((a, b) => a + b, 0)
+const docCount = (item) => item.mentions.filter((n) => n > 0).length
+const firstDoc = (item) => DOCS[item.mentions.findIndex((n) => n > 0)] ?? null
+const lastDoc = (item) => { for (let i = item.mentions.length - 1; i >= 0; i--) if (item.mentions[i] > 0) return DOCS[i]; return null }
+const SMALL = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve']
+const countWord = (n) => (n < SMALL.length ? SMALL[n] : fmt(n))
+const tint = (color, pct) => `color-mix(in oklab, ${color} ${pct}%, var(--chrome-bg-elevated))`
+
+function typePill(item, clickable) {
+  const t = typeOf(item)
+  return `<span class="type-pill" ${clickable ? 'data-open="type"' : ''} style="background:${tint(t.color, 26)};color:var(--chrome-text)">${esc(t.name)}</span>`
+}
+function presence(item, small) {
+  const max = Math.max(...item.mentions, 1)
+  return `<span class="presence ${small ? 'is-small' : ''}" title="Where ${esc(item.name)} appears, in reading order">` +
+    item.mentions.map((n, i) => {
+      const lvl = n === 0 ? '' : n <= max * 0.25 ? 'l1' : n <= max * 0.5 ? 'l2' : n <= max * 0.75 ? 'l3' : 'l4'
+      return `<i class="${lvl}" title="${esc(DOCS[i])}: ${n === 0 ? 'no mentions' : n + ' mentions'}"></i>`
+    }).join('') + `</span>`
+}
+function portrait(item) {
+  const t = typeOf(item)
+  const initials = item.name.replace(/^The\s+/i, '').split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+  return `<span class="portrait" style="background:${tint(t.color, 22)};border:1px solid ${tint(t.color, 40)}">${initials}</span>`
+}
+/** The count as words, so a card states a fact rather than showing a figure. */
+function mentionLabel(item) {
+  const n = total(item)
+  return n === 0 ? 'Not mentioned yet' : `${fmt(n)} ${n === 1 ? 'mention' : 'mentions'}`
+}
+function appearanceSentence(item) {
+  const n = total(item)
+  if (n === 0) return `${item.name} has not been mentioned in the manuscript yet.`
+  const docs = docCount(item)
+  return `${item.name} appears ${fmt(n)} times across ${countWord(docs)} ${docs === 1 ? 'document' : 'documents'}. ` +
+    `The first mention is in ${firstDoc(item)} and the last is in ${lastDoc(item)}.`
+}
+function relSentence(item, rel) {
+  return rel.mutual
+    ? `${esc(item.name)} and <span style="color:var(--chrome-accent)">${esc(rel.who)}</span> ${esc(rel.reads)}.`
+    : `<span style="color:var(--chrome-accent)">${esc(rel.who)}</span> ${esc(rel.reads)}.`
+}
+function blocksHtml(item) {
+  if (item.blocks.length === 0) {
+    return `<p class="dim" style="font-size:var(--text-sm)">This sheet has no blocks yet. Add text, an image, a list, or a set of stats to start filling it in.</p>`
+  }
+  return item.blocks.map((b) => {
+    if (b.kind === 'text') return `<div class="block"><span class="block-label">${esc(b.label)}</span><p class="block-text">${esc(b.html)}</p></div>`
+    if (b.kind === 'list') return `<div class="block"><span class="block-label">${esc(b.label)}</span><ul class="block-list">${b.items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul></div>`
+    if (b.kind === 'stats') return `<div class="block"><span class="block-label">${esc(b.label)}</span><div class="stats-grid">${b.pairs.map(([k, v]) => `<span class="stat-pair"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></span>`).join('')}</div></div>`
+    return ''
+  }).join('')
+}
+function appearRows(item) {
+  const max = Math.max(...item.mentions, 1)
+  return item.mentions.map((n, i) => n === 0 ? '' : `
+    <div class="rail-row">
+      <span class="nm">${esc(DOCS[i])}</span>
+      <span class="bar-track"><span class="bar-fill" style="width:${Math.max(6, (n / max) * 100)}%"></span></span>
+      <span class="ct">${n}</span>
+    </div>`).join('')
+}
+
+/* ── The menus, as the app draws them ──────────────────────────────── */
+function typeMenu(item) {
+  return `<div class="menu" data-menu="type" style="top:100%;left:0;margin-top:4px">
+    ${TYPES.map((t) => `<button class="menu-row ${item && t.id === item.typeId ? 'is-current' : ''}">
+      <span class="swatch" style="background:${t.color}"></span>${esc(t.name)}
+      ${item && t.id === item.typeId ? '<span class="tick">Current</span>' : ''}
+    </button>`).join('')}
+    <div class="menu-sep"></div>
+    <button class="menu-row"><span class="menu-glyph">+</span>Manage types…</button>
+  </div>`
+}
+const BLOCK_KINDS = [
+  { glyph: '¶', label: 'Text', hint: 'A paragraph' },
+  { glyph: '▣', label: 'Image', hint: 'A picture' },
+  { glyph: '•', label: 'List', hint: 'Bullets' },
+  { glyph: '≡', label: 'Stat or tracker', hint: 'Label and value' }
+]
+function blockMenu(placement = 'top:100%;left:0;margin-top:4px') {
+  return `<div class="menu" data-menu="block" style="${placement}">
+    ${BLOCK_KINDS.map((k) => `<button class="menu-row"><span class="menu-glyph">${k.glyph}</span>${k.label}<span class="hint">${k.hint}</span></button>`).join('')}
+  </div>`
+}
+function newEntryMenu(placement = 'top:100%;left:0;margin-top:4px') {
+  return `<div class="menu" data-menu="new" style="${placement}">
+    ${TYPES.map((t) => `<button class="menu-row"><span class="swatch" style="background:${t.color}"></span>New ${esc(t.name.toLowerCase())}</button>`).join('')}
+  </div>`
+}
+
+/* ── State ─────────────────────────────────────────────────────────── */
+let openId = 'maren'
+let empty = false
+let menu = null   // 'type' | 'block' | 'new'
+
+/* ── The wall ──────────────────────────────────────────────────────── */
+function renderWall(el) {
+  if (empty) {
+    el.innerHTML = `
+      <div class="toolbar"><span class="anchor"><button class="btn primary" data-open="new">Add an entry</button>${menu === 'new' ? newEntryMenu() : ''}</span><button class="btn" data-open="types">Manage types</button></div>
+      <p class="lead">Nothing has been added to the Story Bible yet. Add a character, a location, or an object,
+        and it will appear here as a card and be found in the manuscript automatically.</p>`
+    return
+  }
+  el.innerHTML = `
+    <div class="toolbar">
+      <span class="anchor"><button class="btn primary" data-open="new">Add an entry</button>${menu === 'new' ? newEntryMenu() : ''}</span>
+      <button class="btn" data-open="types">Manage types</button>
+    </div>
+    <p class="lead">The Story Bible holds ${countWord(ITEMS.length)} entries. Each card shows how often that entry
+      appears in the manuscript and where those appearances fall.</p>
+    ${TYPES.map((t) => {
+      const list = ITEMS.filter((i) => i.typeId === t.id)
+      if (!list.length) return ''
+      return `<div class="group">
+        <div class="group-head"><span class="swatch" style="background:${t.color}"></span>
+          <span class="group-title">${esc(t.name)}</span>
+          <span class="group-title dim">${countWord(list.length)} ${list.length === 1 ? 'entry' : 'entries'}</span>
+        </div>
+        <div class="grid">
+          ${list.map((i) => `<button class="card" data-item="${i.id}">
+            ${portrait(i)}
+            <span class="nm">${esc(i.name)}</span>
+            <span class="sm">${esc(i.summary)}</span>
+            <span class="ft">${presence(i, true)}<span class="ct">${mentionLabel(i)}</span></span>
+          </button>`).join('')}
+        </div>
+      </div>`
+    }).join('')}`
+}
+
+/* ── A sheet ───────────────────────────────────────────────────────── */
+function renderSheet(el) {
+  const item = ITEMS.find((i) => i.id === openId)
+  el.innerHTML = `
+    <button class="quiet-link" data-back style="margin-bottom:var(--space-4)">Back to the Story Bible</button>
+    <div class="sheet-head">
+      ${portrait(item)}
+      <div class="sheet-id">
+        <div class="sheet-name">${esc(item.name)}</div>
+        <div class="identity">
+          <span class="anchor">${typePill(item, true)}${menu === 'type' ? typeMenu(item) : ''}</span>
+          ${item.aliases.map((a) => `<span class="alias-chip">${esc(a)}</span>`).join('')}
+          <button class="quiet-link">Add another name</button>
+          <button class="quiet-link is-delete" style="margin-left:auto">Delete this entry</button>
+        </div>
+        <p class="sheet-sum">${esc(item.summary)}</p>
+        <div style="margin-top:var(--space-3)">${presence(item)}</div>
+      </div>
+    </div>
+    <div class="sheet-body">
+      <div>
+        ${blocksHtml(item)}
+        <span class="anchor"><button class="quiet-link" data-open="block">Add a block</button>${menu === 'block' ? blockMenu() : ''}</span>
+      </div>
+      <div class="rail">
+        <div>
+          <span class="sec-label">Where it appears</span>
+          <p class="rail-line">${esc(appearanceSentence(item))}</p>
+          <div class="rail-rows">${appearRows(item)}</div>
+        </div>
+        <div>
+          <span class="sec-label">Relationships</span>
+          <div class="rail-rows">
+            ${item.rels.length === 0
+              ? '<p class="rail-line dim">Nothing has been linked to this entry yet.</p>'
+              : item.rels.map((r) => `<p class="rail-line">${relSentence(item, r)}</p>`).join('')}
+          </div>
+          <div style="margin-top:var(--space-3)"><button class="quiet-link">Add a relationship</button></div>
+        </div>
+      </div>
+    </div>`
+}
+
+/* ── The menus, laid out plainly ───────────────────────────────────── */
+function renderMenus(el) {
+  const item = ITEMS.find((i) => i.id === openId)
+  el.innerHTML = `
+    <p class="lead">These are the menus and inline fields that editing an entry can open. In the app each one
+      is anchored to the control that opens it and closes when you click away.</p>
+    <div class="menu-specimens">
+      <div class="specimen">
+        <span class="sec-label">Changing the type</span>
+        <p class="specimen-cap">Opens from the type pill on a sheet. The current type is marked, and the last row
+          leads to the type editor.</p>
+        <div class="specimen-stage">${typeMenu(item).replace('data-menu="type"', 'data-menu="type-specimen"')}</div>
+      </div>
+
+      <div class="specimen">
+        <span class="sec-label">Adding a block</span>
+        <p class="specimen-cap">Opens from “Add a block” at the end of a sheet. These are the four kinds a sheet
+          can hold.</p>
+        <div class="specimen-stage">${blockMenu('')}</div>
+      </div>
+
+      <div class="specimen">
+        <span class="sec-label">Adding an entry</span>
+        <p class="specimen-cap">Opens from “Add an entry” on the wall. Picking a type creates the entry and opens
+          its sheet straight away.</p>
+        <div class="specimen-stage">${newEntryMenu('')}</div>
+      </div>
+
+      <div class="specimen">
+        <span class="sec-label">Editing in place</span>
+        <p class="specimen-cap">The name, summary, and names it is also known by are edited where they sit, rather
+          than in a dialog.</p>
+        <div class="specimen-stage">
+          <div class="field-row" style="margin-bottom:var(--space-2)"><input class="field" value="Maren Voss" /></div>
+          <div class="field-row" style="margin-bottom:var(--space-2)"><input class="field" style="min-width:280px" value="The elder Voss daughter, back at the orchard after seven years away." /></div>
+          <div class="field-row">
+            <span class="alias-chip">Maren ×</span><span class="alias-chip">Miss Voss ×</span>
+            <input class="field" style="min-width:120px;font-size:var(--text-sm)" placeholder="Another name" />
+          </div>
+        </div>
+      </div>
+
+      <div class="specimen">
+        <span class="sec-label">Managing the types</span>
+        <p class="specimen-cap">Opens from “Manage types” on the wall. Types are shared by every entry, so this is
+          a small editor rather than a menu.</p>
+        <div class="specimen-stage">
+          <div class="modal-card">
+            <div class="modal-title">Manage types</div>
+            <p class="modal-msg">Types group the Story Bible and colour its cards. Renaming one updates every entry
+              that uses it.</p>
+            ${TYPES.map((t) => `<div class="type-edit-row">
+              <span class="swatch" style="background:${t.color}"></span>
+              <span class="nm">${esc(t.name)}</span>
+              <button class="quiet-link">Rename</button>
+              <button class="quiet-link is-delete">Remove</button>
+            </div>`).join('')}
+            <div class="modal-actions"><button class="btn">Add a type</button><button class="btn primary">Done</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="specimen">
+        <span class="sec-label">Deleting an entry</span>
+        <p class="specimen-cap">Deleting asks first, and says what else is affected, the way the compile panel does.</p>
+        <div class="specimen-stage">
+          <div class="modal-card">
+            <div class="modal-title">Delete Maren Voss?</div>
+            <p class="modal-msg">The sheet and everything on it will be removed permanently. Three relationships point
+              at this entry and will be left broken. The manuscript itself is not changed.</p>
+            <div class="modal-actions"><button class="btn">Cancel</button><button class="btn primary">Delete</button></div>
+          </div>
+        </div>
+      </div>
+    </div>`
+}
+
+/* ── Render + wiring ───────────────────────────────────────────────── */
+function render() {
+  renderWall(document.querySelector('[data-pane="wall"]'))
+  renderSheet(document.querySelector('[data-pane="sheet"]'))
+  renderMenus(document.querySelector('[data-pane="menus"]'))
+  emptyBtn.textContent = empty ? 'Filled state' : 'Empty state'
+}
+
+const tabs = document.getElementById('tabs')
+const emptyBtn = document.getElementById('emptyToggle')
+const themeBtn = document.getElementById('themeToggle')
+
+function activate(view) {
+  tabs.querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', b.dataset.view === view))
+  document.querySelectorAll('.view').forEach((sec) => sec.classList.toggle('is-active', sec.id === view))
+}
+tabs.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-view]')
+  if (btn) { menu = null; render(); activate(btn.dataset.view) }
+})
+
+/* Cards open their sheet; the menus open and close like the app's do. */
+document.addEventListener('click', (e) => {
+  const card = e.target.closest('.card[data-item]')
+  if (card) { openId = card.dataset.item; menu = null; render(); activate('view-sheet'); return }
+  if (e.target.closest('[data-back]')) { menu = null; render(); activate('view-wall'); return }
+  const opener = e.target.closest('[data-open]')
+  if (opener) {
+    const which = opener.dataset.open
+    if (which === 'types') { menu = null; render(); activate('view-menus'); return }
+    menu = menu === which ? null : which
+    render()
+    return
+  }
+  if (!e.target.closest('.menu')) { if (menu) { menu = null; render() } }
+})
+
+emptyBtn.addEventListener('click', () => { empty = !empty; menu = null; render() })
+themeBtn.addEventListener('click', () => {
+  const light = document.body.classList.toggle('light')
+  themeBtn.textContent = light ? 'Dark theme' : 'Light theme'
+})
+document.addEventListener('keydown', (e) => {
+  const map = { 1: 'view-wall', 2: 'view-sheet', 3: 'view-menus' }
+  if (map[e.key]) activate(map[e.key])
+})
+
+render()
+{
+  const h = location.hash.slice(1)
+  const v = { wall: 'view-wall', sheet: 'view-sheet', menus: 'view-menus' }[h.split('-')[0]]
+  if (v) activate(v)
+  if (h.includes('empty')) emptyBtn.click()
+  if (h.includes('light')) themeBtn.click()
+}
+</script>
+</body>
+</html>

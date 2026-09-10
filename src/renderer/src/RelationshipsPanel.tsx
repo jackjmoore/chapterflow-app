@@ -27,15 +27,15 @@ function RelationshipsPanel(props: RelationshipsPanelProps): JSX.Element {
 
   return (
     <div className="story-bible-relationships">
-      <div className="story-bible-appearances-header">
-        <span className="story-bible-appearances-title">Relationships</span>
+      <div className="story-bible-rail-header">
+        <span className="story-bible-rail-label">Relationships</span>
         <button type="button" className="relationship-add-button" onClick={onAdd}>
           <PlusIcon /> Add
         </button>
       </div>
 
       {sides.length === 0 ? (
-        <p className="relationship-empty">No relationships yet.</p>
+        <p className="relationship-empty">Nothing has been linked to this entry yet.</p>
       ) : (
         <div className="relationship-rows">
           {sides.map((side) => {

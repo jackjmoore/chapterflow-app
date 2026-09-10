@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Story Bible — three directions</title>
+<style>
+  /* ChapterFlow tokens, copied from src/renderer/src/index.css so the mock is
+     judged in the app's own light. Dark is the default, as in the app. */
+  :root {
+    --space-1: 4px; --space-2: 8px; --space-3: 12px;
+    --space-4: 16px; --space-5: 24px; --space-6: 32px;
+    --radius-sm: 4px; --radius-md: 6px;
+    --text-2xs: 10px; --text-xs: 11px; --text-sm: 12px; --text-md: 13px;
+    --text-lg: 14px; --text-xl: 20px; --text-2xl: 26px;
+    --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-editor: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+
+    --chrome-bg: #1c1a17;
+    --chrome-bg-elevated: #242119;
+    --chrome-bg-sidebar: #18160f;
+    --chrome-border: #35312a;
+    --chrome-border-strong: #4a4438;
+    --chrome-text: #e8e3d9;
+    --chrome-text-heading: #f0ece2;
+    --chrome-text-muted: #9c9585;
+    --chrome-text-dim: #6b6558;
+    --chrome-control-bg: #262319;
+    --chrome-control-hover: #322d22;
+    --chrome-control-active-bg: #3a3527;
+    --chrome-accent: #6f95b8;
+    --chrome-accent-contrast: #0d1520;
+    --chrome-row-hover: #221f18;
+    --chrome-row-selected: #2a3846;
+  }
+  body.light {
+    --chrome-bg: #f5f1e8;
+    --chrome-bg-elevated: #ece6d8;
+    --chrome-bg-sidebar: #efe9dc;
+    --chrome-border: #ddd4c0;
+    --chrome-border-strong: #c9bea3;
+    --chrome-text: #2b2620;
+    --chrome-text-heading: #1c1812;
+    --chrome-text-muted: #6e6656;
+    --chrome-text-dim: #948c78;
+    --chrome-control-bg: #ece5d3;
+    --chrome-control-hover: #e0d8c2;
+    --chrome-control-active-bg: #d8cdb0;
+    --chrome-accent: #3d5a7a;
+    --chrome-accent-contrast: #f5f1e8;
+    --chrome-row-hover: #ece5d3;
+    --chrome-row-selected: #d7e0e8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--chrome-bg);
+    color: var(--chrome-text);
+    font-family: var(--font-ui);
+    font-size: var(--text-md);
+    line-height: 1.45;
+    overflow: hidden;
+  }
+
+  /* ── Mock chrome ─────────────────────────────────────────────────── */
+  .mockbar {
+    display: flex; align-items: center; gap: var(--space-3);
+    padding: 0 var(--space-4); height: 44px;
+    background: var(--chrome-bg-elevated);
+    border-bottom: 1px solid var(--chrome-border);
+  }
+  .mockbar-title { font-size: var(--text-sm); color: var(--chrome-text-muted); white-space: nowrap; }
+  .mockbar-tabs { display: flex; gap: var(--space-1); margin: 0 auto; }
+  .mockbar-tabs button, .mockbar-toggle {
+    font: inherit; font-size: var(--text-sm); color: var(--chrome-text-muted);
+    background: none; border: 1px solid transparent; border-radius: var(--radius-sm);
+    padding: 4px 12px; cursor: pointer;
+  }
+  .mockbar-tabs button:hover, .mockbar-toggle:hover { background: var(--chrome-control-hover); }
+  .mockbar-tabs button.is-active {
+    color: var(--chrome-text-heading);
+    background: var(--chrome-control-bg);
+    border-color: var(--chrome-border-strong);
+  }
+  .mockbar-toggle {
+    font-size: var(--text-xs);
+    background: var(--chrome-control-bg); border-color: var(--chrome-border);
+    padding: 3px 10px; white-space: nowrap;
+  }
+
+  .direction { display: none; height: calc(100vh - 44px); flex-direction: column; }
+  .direction.is-active { display: flex; }
+  .direction-note {
+    flex-shrink: 0;
+    margin: var(--space-3) var(--space-4);
+    font-size: var(--text-xs); color: var(--chrome-text-dim);
+    border-left: 2px solid var(--chrome-border-strong); padding-left: var(--space-3);
+    max-width: 1000px;
+  }
+
+  /* ── The stage: the side panel stays (DESIGN.md keeps it here) ───── */
+  .stage { flex: 1; min-height: 0; display: flex; border-top: 1px solid var(--chrome-border); }
+  .panel {
+    flex-shrink: 0; width: 232px; height: 100%; overflow-y: auto;
+    background: var(--chrome-bg-sidebar);
+    border-right: 1px solid var(--chrome-border);
+    padding: var(--space-2) 0 var(--space-5);
+  }
+  .panel-label {
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-2xs); font-weight: 600; letter-spacing: 0.03em;
+    color: var(--chrome-text-dim);
+  }
+  .panel-row {
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: 3px var(--space-3); font-size: var(--text-sm);
+    color: var(--chrome-text); cursor: pointer;
+  }
+  .panel-row:hover { background: var(--chrome-row-hover); }
+  .panel-row.is-active { background: var(--chrome-row-selected); color: var(--chrome-text-heading); }
+  .panel-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .panel-empty { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); color: var(--chrome-text-dim); }
+  .main { flex: 1; min-width: 0; overflow-y: auto; }
+
+  /* ── Shared pieces ───────────────────────────────────────────────── */
+  .btn {
+    font: inherit; font-size: var(--text-sm); color: var(--chrome-text);
+    background: var(--chrome-control-bg); border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-sm); padding: 4px 12px; cursor: pointer; white-space: nowrap;
+  }
+  .btn:hover { background: var(--chrome-control-hover); }
+  .btn.primary { background: var(--chrome-accent); color: var(--chrome-accent-contrast); border-color: transparent; font-weight: 600; }
+  .quiet-link {
+    font-family: var(--font-ui); font-size: var(--text-xs); color: var(--chrome-text-muted);
+    background: none; border: none; cursor: pointer; padding: 0;
+    text-decoration: underline; text-underline-offset: 3px;
+    text-decoration-color: var(--chrome-border-strong);
+  }
+  .quiet-link:hover { color: var(--chrome-text); }
+  .sec-label {
+    display: block; font-size: var(--text-xs); font-weight: 600;
+    letter-spacing: 0.02em; color: var(--chrome-text-dim);
+  }
+  .type-pill {
+    display: inline-block; padding: 1px 8px; border-radius: 9px;
+    font-size: var(--text-2xs); font-weight: 600; white-space: nowrap;
+  }
+  .swatch { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .alias-chip {
+    display: inline-block; padding: 1px 7px; border-radius: 8px;
+    font-size: var(--text-2xs); color: var(--chrome-text-muted);
+    border: 1px solid var(--chrome-border-strong);
+  }
+  .prose { font-size: var(--text-md); color: var(--chrome-text); }
+  .muted { color: var(--chrome-text-muted); }
+  .dim { color: var(--chrome-text-dim); }
+
+  /* The manuscript presence strip: one cell per document in reading order,
+     shaded by how often the item is mentioned there. */
+  .presence { display: flex; gap: 2px; }
+  .presence i {
+    display: block; width: 10px; height: 14px; border-radius: 2px;
+    background: var(--chrome-control-bg);
+  }
+  .presence i.l1 { background: color-mix(in oklab, var(--chrome-accent) 28%, var(--chrome-bg)); }
+  .presence i.l2 { background: color-mix(in oklab, var(--chrome-accent) 52%, var(--chrome-bg)); }
+  .presence i.l3 { background: color-mix(in oklab, var(--chrome-accent) 76%, var(--chrome-bg)); }
+  .presence i.l4 { background: var(--chrome-accent); }
+  /* The modifier is deliberately not called "sm": the card summary already
+     owns that class, and its line-clamp rule would win and stack the strip. */
+  .presence.is-small i { width: 6px; height: 10px; border-radius: 1px; }
+
+  .bar-track { flex: 1; height: 4px; border-radius: 2px; background: var(--chrome-control-bg); overflow: hidden; }
+  .bar-fill { display: block; height: 100%; background: var(--chrome-accent); }
+
+  /* Sheet blocks, shared by all three directions */
+  .block { margin-top: var(--space-4); }
+  .block-label { display: block; margin-bottom: var(--space-1); font-size: var(--text-xs); font-weight: 600; color: var(--chrome-text-dim); }
+  .block-text { font-size: var(--text-md); line-height: 1.6; color: var(--chrome-text); }
+  .block-list { margin: 0; padding-left: 18px; font-size: var(--text-md); line-height: 1.7; }
+  .stats-grid { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); }
+  .stat-pair { display: flex; flex-direction: column; gap: 1px; }
+  .stat-pair .k { font-size: var(--text-2xs); color: var(--chrome-text-dim); }
+  .stat-pair .v { font-size: var(--text-md); color: var(--chrome-text); }
+  .portrait {
+    display: flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-md); font-family: var(--font-editor);
+    color: var(--chrome-text-heading); letter-spacing: 0.04em;
+  }
+
+  /* ════════ A · The dossier ════════ */
+  #dir-a .main { padding: var(--space-5) var(--space-6) var(--space-6); }
+  .a-wrap { max-width: 760px; }
+  .a-lead { font-size: var(--text-xl); line-height: 1.6; color: var(--chrome-text-heading); max-width: 620px; }
+  .a-actions { display: flex; gap: var(--space-3); margin-top: var(--space-3); }
+  .a-group { margin-top: var(--space-6); }
+  .a-group-head { display: flex; align-items: baseline; gap: var(--space-2); padding-bottom: var(--space-1); border-bottom: 1px solid var(--chrome-border); }
+  .a-group-title { font-size: var(--text-md); font-weight: 600; color: var(--chrome-text-heading); }
+  .a-group-count { margin-left: auto; font-size: var(--text-xs); color: var(--chrome-text-dim); }
+  .a-item { display: flex; align-items: baseline; gap: var(--space-3); padding: var(--space-2) var(--space-2) var(--space-2) 0; cursor: pointer; }
+  .a-item + .a-item { border-top: 1px solid var(--chrome-border); }
+  .a-item:hover { background: var(--chrome-row-hover); }
+  .a-item .nm { font-family: var(--font-editor); font-size: var(--text-lg); color: var(--chrome-text-heading); white-space: nowrap; }
+  .a-item .sm { flex: 1; min-width: 0; font-size: var(--text-sm); color: var(--chrome-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .a-item .ct { font-size: var(--text-xs); color: var(--chrome-text-dim); white-space: nowrap; }
+  /* Sheet */
+  .a-back { margin-bottom: var(--space-4); }
+  .a-name { font-family: var(--font-editor); font-size: var(--text-2xl); font-weight: 400; color: var(--chrome-text-heading); }
+  .a-identity { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); flex-wrap: wrap; }
+  .a-sum { margin-top: var(--space-3); font-size: var(--text-md); line-height: 1.6; color: var(--chrome-text); max-width: 620px; }
+  .a-section { margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--chrome-border); }
+  .a-appear-row { display: flex; align-items: center; gap: var(--space-3); padding: 4px 0; font-size: var(--text-sm); }
+  .a-appear-row .nm { width: 190px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .a-appear-row .ct { width: 28px; text-align: right; font-size: var(--text-xs); color: var(--chrome-text-dim); font-variant-numeric: tabular-nums; }
+  .a-rel { padding: var(--space-2) 0; font-size: var(--text-md); }
+  .a-rel + .a-rel { border-top: 1px solid var(--chrome-border); }
+  .a-rel .who { color: var(--chrome-accent); cursor: pointer; }
+
+  /* ════════ B · The cast list ════════ */
+  #dir-b .main { padding: var(--space-4) var(--space-5) var(--space-6); }
+  .b-toolbar { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
+  .b-toolbar .grow { flex: 1; }
+  .b-lead { font-size: var(--text-md); color: var(--chrome-text-muted); margin-bottom: var(--space-4); max-width: 700px; }
+  table.b-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+  table.b-table th {
+    text-align: left; font-weight: 500; font-size: var(--text-xs); color: var(--chrome-text-dim);
+    padding: 4px 12px 6px 0; border-bottom: 1px solid var(--chrome-border); white-space: nowrap;
+  }
+  table.b-table td { padding: 7px 12px 7px 0; border-bottom: 1px solid var(--chrome-border); vertical-align: middle; }
+  table.b-table tr { cursor: pointer; }
+  table.b-table tbody tr:hover { background: var(--chrome-row-hover); }
+  table.b-table .nm { font-weight: 500; color: var(--chrome-text-heading); white-space: nowrap; }
+  table.b-table .al { font-size: var(--text-xs); color: var(--chrome-text-dim); }
+  table.b-table .num { text-align: right; font-variant-numeric: tabular-nums; color: var(--chrome-text-muted); white-space: nowrap; }
+  .b-group-row td {
+    padding-top: var(--space-4); font-size: var(--text-xs); font-weight: 600;
+    color: var(--chrome-text-dim); border-bottom: 1px solid var(--chrome-border);
+  }
+  /* Sheet: blocks left, a rail of where-it-appears right */
+  .b-sheet { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--space-5) 40px; align-items: start; }
+  .b-rail { display: flex; flex-direction: column; gap: var(--space-5); }
+  .b-rail-block { }
+  .b-rail-line { margin-top: var(--space-2); font-size: var(--text-sm); color: var(--chrome-text); line-height: 1.55; }
+  .b-rail-rows { margin-top: var(--space-2); }
+  .b-rail-row { display: flex; align-items: center; gap: var(--space-2); padding: 3px 0; font-size: var(--text-xs); }
+  .b-rail-row .nm { width: 120px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--chrome-text-muted); }
+  .b-rail-row .ct { width: 22px; text-align: right; color: var(--chrome-text-dim); font-variant-numeric: tabular-nums; }
+  .b-head { display: flex; align-items: baseline; gap: var(--space-3); }
+  .b-name { font-size: var(--text-xl); font-weight: 600; color: var(--chrome-text-heading); }
+  .b-sum { margin-top: var(--space-2); font-size: var(--text-md); line-height: 1.6; color: var(--chrome-text); }
+
+  /* ════════ C · The card wall ════════ */
+  #dir-c .main { padding: var(--space-4) var(--space-5) var(--space-6); }
+  .c-lead { font-size: var(--text-md); color: var(--chrome-text-muted); margin-bottom: var(--space-4); max-width: 700px; }
+  .c-group { margin-bottom: var(--space-5); }
+  .c-group-head { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
+  .c-group-title { font-size: var(--text-xs); font-weight: 600; color: var(--chrome-text-dim); }
+  .c-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--space-3); }
+  .c-card {
+    display: flex; flex-direction: column; gap: var(--space-2);
+    padding: var(--space-3);
+    background: var(--chrome-bg-elevated);
+    border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-md);
+    cursor: pointer; text-align: left;
+  }
+  .c-card:hover { border-color: var(--chrome-border-strong); }
+  .c-card .portrait { height: 84px; font-size: 28px; }
+  .c-card .nm { font-size: var(--text-md); font-weight: 600; color: var(--chrome-text-heading); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .c-card .sm {
+    font-size: var(--text-xs); color: var(--chrome-text-muted); line-height: 1.45;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .c-card .ft { display: flex; align-items: center; gap: var(--space-2); margin-top: auto; }
+  .c-card .ct { font-size: var(--text-2xs); color: var(--chrome-text-dim); white-space: nowrap; }
+  /* Sheet: portrait header over the two-column body */
+  .c-sheet-head { display: flex; gap: var(--space-4); align-items: flex-start; margin-bottom: var(--space-4); }
+  .c-sheet-head .portrait { width: 108px; height: 108px; flex-shrink: 0; font-size: 34px; }
+  .c-sheet-id { min-width: 0; }
+  .c-name { font-size: var(--text-xl); font-weight: 600; color: var(--chrome-text-heading); }
+  .c-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--space-5) 40px; align-items: start; }
+
+  @media (max-width: 1080px) {
+    .b-sheet, .c-body { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="mockbar">
+  <span class="mockbar-title">Story Bible · fake data</span>
+  <div class="mockbar-tabs" id="tabs">
+    <button data-dir="dir-a" class="is-active">A · Dossier</button>
+    <button data-dir="dir-b">B · Cast list</button>
+    <button data-dir="dir-c">C · Card wall</button>
+  </div>
+  <button class="mockbar-toggle" id="modeToggle">Show a sheet</button>
+  <button class="mockbar-toggle" id="emptyToggle">Empty state</button>
+  <button class="mockbar-toggle" id="themeToggle">Light theme</button>
+</div>
+
+<section class="direction is-active" id="dir-a">
+  <p class="direction-note">A is the dossier. It applies the whitespace pattern to this screen: browse
+    becomes a typographic index grouped by type, with hairlines instead of cards, and a sheet is one
+    unbroken column that reads top to bottom. The item's name is set in the page serif, the way the
+    progress hero is.</p>
+  <div class="stage"><aside class="panel" data-panel></aside><main class="main" data-pane="a"></main></div>
+</section>
+
+<section class="direction" id="dir-b">
+  <p class="direction-note">B is the cast list. Browse becomes a table that answers questions the cards
+    could not: how often each item appears, where it first and last appears, and how many relationships
+    it has. A sheet keeps its blocks on the left and moves appearances and relationships into a right
+    rail, so editing and evidence sit side by side.</p>
+  <div class="stage"><aside class="panel" data-panel></aside><main class="main" data-pane="b"></main></div>
+</section>
+
+<section class="direction" id="dir-c">
+  <p class="direction-note">C is the card wall. It keeps the cards but makes them earn their place: each
+    one carries a portrait, a two-line summary, and a strip showing where the item appears across the
+    manuscript. A sheet opens with the portrait beside the identity, then the same two-column body.</p>
+  <div class="stage"><aside class="panel" data-panel></aside><main class="main" data-pane="c"></main></div>
+</section>
+
+<script>
+/* ── Fake data — the same novel as the other mocks ─────────────────── */
+const TYPES = [
+  { id: 'character', name: 'Character', color: '#6f95b8' },
+  { id: 'location', name: 'Location', color: '#4b9363' },
+  { id: 'object', name: 'Object', color: '#d9a441' }
+]
+
+/* The manuscript in reading order, for the presence strips. */
+const DOCS = [
+  'Prologue', 'The Orchard', 'Low Tide', 'The Visitor', 'What the House Kept',
+  'The Letters', 'Signal Fires', 'The Long Field', 'The Weir', 'Ashes on the Sill',
+  'The Hollow Season'
+]
+
+const ITEMS = [
+  {
+    id: 'maren', typeId: 'character', name: 'Maren Voss',
+    aliases: ['Maren', 'Miss Voss'],
+    summary: 'The elder Voss daughter, back at the orchard after seven years away.',
+    mentions: [24, 41, 33, 18, 46, 12, 29, 22, 9, 14, 7],
+    blocks: [
+      { kind: 'text', label: 'Who she is', html: 'Maren left at nineteen and came back at twenty-six, which is long enough for a house to forget someone and short enough that the village has not. She counts things when she is frightened: apples, tides, the days since the last letter.' },
+      { kind: 'stats', label: 'At a glance', pairs: [['Age', '26'], ['Home', 'The orchard house'], ['First appears', 'Prologue'], ['Status', 'Living']] },
+      { kind: 'list', label: 'What she wants', items: ['To know who has been writing the letters.', 'To sell the orchard before another winter.', 'To be wrong about her mother.'] }
+    ],
+    rels: [
+      { who: 'Tomas Brek', reads: 'is her oldest friend', mutual: false },
+      { who: 'Eda Voss', reads: 'is her mother', mutual: false },
+      { who: 'The Visitor', reads: 'are strangers to each other', mutual: true }
+    ]
+  },
+  {
+    id: 'tomas', typeId: 'character', name: 'Tomas Brek',
+    aliases: ['Tom'],
+    summary: 'A fisherman who never left, and who knows what the flats give up at low tide.',
+    mentions: [0, 14, 38, 9, 21, 4, 33, 27, 11, 6, 3],
+    blocks: [
+      { kind: 'text', label: 'Who he is', html: 'Tomas has worked the flats since he was twelve and can read the water the way Maren reads a page. He is patient in a way that reads as slowness to people who do not know him.' },
+      { kind: 'stats', label: 'At a glance', pairs: [['Age', '28'], ['Home', 'Brek cottage, the harbour'], ['First appears', 'The Orchard'], ['Status', 'Living']] }
+    ],
+    rels: [
+      { who: 'Maren Voss', reads: 'is his oldest friend', mutual: false },
+      { who: 'Halvard Brek', reads: 'is his father', mutual: false }
+    ]
+  },
+  {
+    id: 'visitor', typeId: 'character', name: 'The Visitor',
+    aliases: ['The stranger', 'Mr Ash'],
+    summary: 'Arrives asking for lodging, and knows the house better than he should.',
+    mentions: [0, 0, 6, 44, 31, 18, 12, 5, 16, 22, 9],
+    blocks: [
+      { kind: 'text', label: 'Who he is', html: 'He gives a different name in each chapter he appears in, and none of them are checked. What he wants from the house is the question the second half of the book is built on.' },
+      { kind: 'list', label: 'Names he gives', items: ['Mr Ash, at the door.', 'Mr Aster, to the harbourmaster.', 'No name at all, to Maren.'] }
+    ],
+    rels: [
+      { who: 'Maren Voss', reads: 'are strangers to each other', mutual: true },
+      { who: 'The Letters', reads: 'wrote', mutual: false }
+    ]
+  },
+  {
+    id: 'eda', typeId: 'character', name: 'Eda Voss',
+    aliases: ['Mother'],
+    summary: 'Maren’s mother, dead a year before the book opens, and present on every page of it.',
+    mentions: [8, 11, 4, 2, 27, 33, 6, 9, 3, 12, 5],
+    blocks: [
+      { kind: 'text', label: 'Who she was', html: 'Eda kept the orchard alone for eleven years. Everything the reader learns about her arrives second-hand, through the letters and through what Maren refuses to say.' }
+    ],
+    rels: [{ who: 'Maren Voss', reads: 'is her daughter', mutual: false }]
+  },
+  {
+    id: 'halvard', typeId: 'character', name: 'Halvard Brek',
+    aliases: [],
+    summary: 'Tomas’s father, harbourmaster, and the last person to see Eda alive.',
+    mentions: [0, 0, 5, 0, 8, 0, 14, 3, 7, 4, 2],
+    blocks: [],
+    rels: [{ who: 'Tomas Brek', reads: 'is his son', mutual: false }]
+  },
+  {
+    id: 'orchard', typeId: 'location', name: 'The Orchard',
+    aliases: ['The Voss orchard', 'Home'],
+    summary: 'Sixty trees on a slope above the water, most of them past bearing.',
+    mentions: [12, 46, 8, 14, 22, 5, 11, 31, 4, 9, 16],
+    blocks: [
+      { kind: 'text', label: 'The place', html: 'The orchard runs downhill toward the sea wall, and the last four rows are salt-burned. It is worth more as land than as trees, which is the argument the book keeps having with itself.' },
+      { kind: 'stats', label: 'At a glance', pairs: [['Trees', 'About sixty'], ['Held since', '1897'], ['First appears', 'Prologue']] }
+    ],
+    rels: [{ who: 'Maren Voss', reads: 'belongs to', mutual: false }]
+  },
+  {
+    id: 'weir', typeId: 'location', name: 'The Weir',
+    aliases: [],
+    summary: 'Where the river is made to slow down, and where the second letter was found.',
+    mentions: [0, 0, 3, 0, 6, 2, 9, 4, 38, 12, 7],
+    blocks: [{ kind: 'text', label: 'The place', html: 'Built in the 1920s and half-derelict now. It appears in three chapters and is the setting of the book’s only violence.' }],
+    rels: []
+  },
+  {
+    id: 'letters', typeId: 'object', name: 'The Letters',
+    aliases: ['The correspondence'],
+    summary: 'Nineteen letters in a hand Maren does not recognise, found in the attic.',
+    mentions: [3, 6, 9, 21, 34, 48, 17, 8, 11, 19, 14],
+    blocks: [
+      { kind: 'text', label: 'What they are', html: 'Nineteen letters, none of them signed, arranged in the box by date rather than by sender. Two are missing, and the gap is deliberate.' },
+      { kind: 'list', label: 'What they establish', items: ['Someone was writing to Eda for eleven years.', 'The writer knew the orchard was being sold.', 'The last letter was written after Eda died.'] }
+    ],
+    rels: [{ who: 'The Visitor', reads: 'were written by', mutual: false }]
+  },
+  {
+    id: 'key', typeId: 'object', name: 'The Brass Key',
+    aliases: [],
+    summary: 'Opens nothing in the house, which is the point.',
+    mentions: [0, 0, 0, 7, 12, 3, 0, 5, 9, 14, 6],
+    blocks: [],
+    rels: []
+  }
+]
+
+/* ── Helpers ───────────────────────────────────────────────────────── */
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+const fmt = (n) => n.toLocaleString('en-US')
+const typeOf = (item) => TYPES.find((t) => t.id === item.typeId)
+const total = (item) => item.mentions.reduce((a, b) => a + b, 0)
+const docCount = (item) => item.mentions.filter((n) => n > 0).length
+const firstDoc = (item) => DOCS[item.mentions.findIndex((n) => n > 0)] ?? null
+const lastDoc = (item) => {
+  for (let i = item.mentions.length - 1; i >= 0; i--) if (item.mentions[i] > 0) return DOCS[i]
+  return null
+}
+const SMALL = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve']
+const countWord = (n) => (n < SMALL.length ? SMALL[n] : fmt(n))
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1)
+
+function tint(color, pct) {
+  return `color-mix(in oklab, ${color} ${pct}%, var(--chrome-bg-elevated))`
+}
+function typePill(item) {
+  const t = typeOf(item)
+  return `<span class="type-pill" style="background:${tint(t.color, 26)};color:var(--chrome-text)">${esc(t.name)}</span>`
+}
+function presence(item, small) {
+  const max = Math.max(...item.mentions, 1)
+  return `<span class="presence ${small ? 'is-small' : ''}" title="Where ${esc(item.name)} appears, in reading order">` +
+    item.mentions.map((n, i) => {
+      const lvl = n === 0 ? '' : n <= max * 0.25 ? 'l1' : n <= max * 0.5 ? 'l2' : n <= max * 0.75 ? 'l3' : 'l4'
+      return `<i class="${lvl}" title="${esc(DOCS[i])}: ${n === 0 ? 'no mentions' : n + ' mentions'}"></i>`
+    }).join('') + `</span>`
+}
+function portrait(item, extra = '') {
+  const t = typeOf(item)
+  const initials = item.name.replace(/^The\s+/i, '').split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+  return `<span class="portrait" style="background:${tint(t.color, 22)};border:1px solid ${tint(t.color, 40)};${extra}">${initials}</span>`
+}
+
+/** One sentence describing where an item appears. Counted, so it is exact. */
+function appearanceSentence(item) {
+  const n = total(item)
+  if (n === 0) return `${item.name} has not been mentioned in the manuscript yet.`
+  const docs = docCount(item)
+  return `${item.name} appears ${fmt(n)} times across ${countWord(docs)} ${docs === 1 ? 'document' : 'documents'}. ` +
+    `The first mention is in ${firstDoc(item)} and the last is in ${lastDoc(item)}.`
+}
+
+function relSentence(item, rel) {
+  const who = `<span class="who">${esc(rel.who)}</span>`
+  return rel.mutual
+    ? `${esc(item.name)} and ${who} ${esc(rel.reads.replace(/^are /, 'are '))}.`
+    : `${who} ${esc(rel.reads)}.`
+}
+
+function blocksHtml(item) {
+  if (item.blocks.length === 0) {
+    return `<p class="dim" style="margin-top:var(--space-4);font-size:var(--text-sm)">This sheet has no blocks yet. Add text, an image, a list, or a set of stats to start filling it in.</p>`
+  }
+  return item.blocks.map((b) => {
+    if (b.kind === 'text') return `<div class="block"><span class="block-label">${esc(b.label)}</span><p class="block-text">${esc(b.html)}</p></div>`
+    if (b.kind === 'list') return `<div class="block"><span class="block-label">${esc(b.label)}</span><ul class="block-list">${b.items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul></div>`
+    if (b.kind === 'stats') return `<div class="block"><span class="block-label">${esc(b.label)}</span><div class="stats-grid">${b.pairs.map(([k, v]) => `<span class="stat-pair"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></span>`).join('')}</div></div>`
+    return ''
+  }).join('')
+}
+
+function appearRows(item, cls) {
+  const max = Math.max(...item.mentions, 1)
+  return item.mentions.map((n, i) => n === 0 ? '' : `
+    <div class="${cls}">
+      <span class="nm">${esc(DOCS[i])}</span>
+      <span class="bar-track"><span class="bar-fill" style="width:${Math.max(6, (n / max) * 100)}%"></span></span>
+      <span class="ct">${n}</span>
+    </div>`).join('')
+}
+
+/* ── State ─────────────────────────────────────────────────────────── */
+let mode = 'browse'
+let empty = false
+const OPEN_ID = 'maren'
+const openItem = () => ITEMS.find((i) => i.id === OPEN_ID)
+
+/* ── The side panel, shared (DESIGN.md keeps it on this screen) ────── */
+function renderPanel() {
+  document.querySelectorAll('[data-panel]').forEach((el) => {
+    if (empty) {
+      el.innerHTML = `<div class="panel-label">Story Bible</div><p class="panel-empty">Nothing has been added yet.</p>`
+      return
+    }
+    el.innerHTML = TYPES.map((t) => {
+      const list = ITEMS.filter((i) => i.typeId === t.id)
+      if (list.length === 0) return ''
+      return `<div class="panel-label">${esc(t.name)}</div>` + list.map((i) => `
+        <div class="panel-row ${mode === 'sheet' && i.id === OPEN_ID ? 'is-active' : ''}">
+          <span class="swatch" style="background:${t.color}"></span>
+          <span class="nm">${esc(i.name)}</span>
+        </div>`).join('')
+    }).join('')
+  })
+}
+
+/* ── A · The dossier ───────────────────────────────────────────────── */
+function renderA(el) {
+  if (empty) {
+    el.innerHTML = `<div class="a-wrap">
+      <p class="a-lead">Nothing has been added to the Story Bible yet.</p>
+      <p class="prose muted" style="margin-top:var(--space-3);max-width:560px">
+        The Story Bible keeps what you need to stay consistent: who people are, where places sit,
+        and what objects matter. Anything you add here is detected in the manuscript automatically.
+      </p>
+      <div class="a-actions"><button class="btn primary">Add a character</button><button class="btn">Add something else</button></div>
+    </div>`
+    return
+  }
+  if (mode === 'browse') {
+    const counted = ITEMS.filter((i) => total(i) > 0).length
+    const coverage = counted === ITEMS.length ? 'all of them' : `${countWord(counted)} of them`
+    el.innerHTML = `<div class="a-wrap">
+      <p class="a-lead">The Story Bible holds ${countWord(ITEMS.length)} entries, and ${coverage} appear in the manuscript so far.</p>
+      <div class="a-actions"><button class="btn primary">Add an entry</button><button class="btn">Manage types</button></div>
+      ${TYPES.map((t) => {
+        const list = ITEMS.filter((i) => i.typeId === t.id)
+        if (!list.length) return ''
+        return `<div class="a-group">
+          <div class="a-group-head">
+            <span class="swatch" style="background:${t.color}"></span>
+            <span class="a-group-title">${esc(t.name)}</span>
+            <span class="a-group-count">${countWord(list.length)} ${list.length === 1 ? 'entry' : 'entries'}</span>
+          </div>
+          ${list.map((i) => `<div class="a-item">
+            <span class="nm">${esc(i.name)}</span>
+            <span class="sm">${esc(i.summary)}</span>
+            <span class="ct">${total(i) === 0 ? 'Not mentioned yet' : fmt(total(i)) + ' mentions'}</span>
+          </div>`).join('')}
+        </div>`
+      }).join('')}
+    </div>`
+    return
+  }
+  const item = openItem()
+  el.innerHTML = `<div class="a-wrap">
+    <button class="quiet-link a-back">Back to the Story Bible</button>
+    <div class="a-name">${esc(item.name)}</div>
+    <div class="a-identity">
+      ${typePill(item)}
+      ${item.aliases.map((a) => `<span class="alias-chip">${esc(a)}</span>`).join('')}
+      <button class="quiet-link">Add another name</button>
+    </div>
+    <p class="a-sum">${esc(item.summary)}</p>
+    ${blocksHtml(item)}
+    <div style="margin-top:var(--space-4)"><button class="quiet-link">Add a block</button></div>
+
+    <div class="a-section">
+      <span class="sec-label">Where she appears</span>
+      <p class="prose" style="margin-top:var(--space-2);max-width:620px">${esc(appearanceSentence(item))}</p>
+      <div style="margin-top:var(--space-3)">${appearRows(item, 'a-appear-row')}</div>
+    </div>
+
+    <div class="a-section">
+      <span class="sec-label">Relationships</span>
+      <div style="margin-top:var(--space-2)">
+        ${item.rels.map((r) => `<div class="a-rel">${relSentence(item, r)}</div>`).join('')}
+      </div>
+      <div style="margin-top:var(--space-3)"><button class="quiet-link">Add a relationship</button></div>
+    </div>
+  </div>`
+}
+
+/* ── B · The cast list ─────────────────────────────────────────────── */
+function renderB(el) {
+  if (empty) {
+    el.innerHTML = `<div class="b-toolbar"><button class="btn primary">Add an entry</button><span class="grow"></span></div>
+      <p class="b-lead">Nothing has been added to the Story Bible yet. Once you add a character, a location, or an object,
+      this table will show how often each one appears in the manuscript and where it first turns up.</p>`
+    return
+  }
+  if (mode === 'browse') {
+    const rows = TYPES.map((t) => {
+      const list = ITEMS.filter((i) => i.typeId === t.id)
+      if (!list.length) return ''
+      return `<tr class="b-group-row"><td colspan="6">${esc(t.name)}</td></tr>` + list.map((i) => `
+        <tr>
+          <td><span class="nm">${esc(i.name)}</span>${i.aliases.length ? `<div class="al">Also called ${i.aliases.map(esc).join(' and ')}.</div>` : ''}</td>
+          <td class="dim" style="font-size:var(--text-xs)">${esc(i.summary)}</td>
+          <td>${presence(i, true)}</td>
+          <td class="num">${total(i) === 0 ? '—' : fmt(total(i))}</td>
+          <td class="dim" style="font-size:var(--text-xs);white-space:nowrap">${firstDoc(i) ? esc(firstDoc(i)) : 'Not yet'}</td>
+          <td class="num">${i.rels.length || '—'}</td>
+        </tr>`).join('')
+    }).join('')
+    el.innerHTML = `
+      <div class="b-toolbar"><button class="btn primary">Add an entry</button><button class="btn">Manage types</button><span class="grow"></span></div>
+      <p class="b-lead">The Story Bible holds ${countWord(ITEMS.length)} entries. The strip in each row shows where that
+        entry appears across the manuscript, from the Prologue on the left to the last chapter on the right.</p>
+      <table class="b-table">
+        <thead><tr><th>Name</th><th>Summary</th><th>Where it appears</th><th class="num">Mentions</th><th>First seen</th><th class="num">Links</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`
+    return
+  }
+  const item = openItem()
+  el.innerHTML = `
+    <button class="quiet-link" style="margin-bottom:var(--space-4)">Back to the Story Bible</button>
+    <div class="b-sheet">
+      <div>
+        <div class="b-head"><span class="b-name">${esc(item.name)}</span>${typePill(item)}</div>
+        <div class="a-identity" style="margin-top:var(--space-2)">
+          ${item.aliases.map((a) => `<span class="alias-chip">${esc(a)}</span>`).join('')}
+          <button class="quiet-link">Add another name</button>
+        </div>
+        <p class="b-sum">${esc(item.summary)}</p>
+        ${blocksHtml(item)}
+        <div style="margin-top:var(--space-4)"><button class="quiet-link">Add a block</button></div>
+      </div>
+      <div class="b-rail">
+        <div class="b-rail-block">
+          <span class="sec-label">Where she appears</span>
+          <p class="b-rail-line">${esc(appearanceSentence(item))}</p>
+          <div style="margin-top:var(--space-3)">${presence(item)}</div>
+          <div class="b-rail-rows">${appearRows(item, 'b-rail-row')}</div>
+        </div>
+        <div class="b-rail-block">
+          <span class="sec-label">Relationships</span>
+          <div class="b-rail-rows">
+            ${item.rels.map((r) => `<p class="b-rail-line">${relSentence(item, r)}</p>`).join('')}
+          </div>
+          <div style="margin-top:var(--space-3)"><button class="quiet-link">Add a relationship</button></div>
+        </div>
+      </div>
+    </div>`
+}
+
+/* ── C · The card wall ─────────────────────────────────────────────── */
+function renderC(el) {
+  if (empty) {
+    el.innerHTML = `<div class="b-toolbar"><button class="btn primary">Add an entry</button><span class="grow"></span></div>
+      <p class="c-lead">Nothing has been added to the Story Bible yet. Add a character, a location, or an object,
+      and it will appear here as a card and be detected in the manuscript automatically.</p>`
+    return
+  }
+  if (mode === 'browse') {
+    el.innerHTML = `
+      <div class="b-toolbar"><button class="btn primary">Add an entry</button><button class="btn">Manage types</button><span class="grow"></span></div>
+      <p class="c-lead">The Story Bible holds ${countWord(ITEMS.length)} entries. Each card shows how often that entry
+        appears in the manuscript and where those appearances fall.</p>
+      ${TYPES.map((t) => {
+        const list = ITEMS.filter((i) => i.typeId === t.id)
+        if (!list.length) return ''
+        return `<div class="c-group">
+          <div class="c-group-head"><span class="swatch" style="background:${t.color}"></span>
+            <span class="c-group-title">${esc(t.name)}</span>
+            <span class="c-group-title dim">${countWord(list.length)} ${list.length === 1 ? 'entry' : 'entries'}</span>
+          </div>
+          <div class="c-grid">
+            ${list.map((i) => `<div class="c-card">
+              ${portrait(i)}
+              <span class="nm">${esc(i.name)}</span>
+              <span class="sm">${esc(i.summary)}</span>
+              <span class="ft">${presence(i, true)}<span class="ct">${total(i) === 0 ? 'Not mentioned yet' : fmt(total(i))}</span></span>
+            </div>`).join('')}
+          </div>
+        </div>`
+      }).join('')}`
+    return
+  }
+  const item = openItem()
+  el.innerHTML = `
+    <button class="quiet-link" style="margin-bottom:var(--space-4)">Back to the Story Bible</button>
+    <div class="c-sheet-head">
+      ${portrait(item)}
+      <div class="c-sheet-id">
+        <div class="c-name">${esc(item.name)}</div>
+        <div class="a-identity" style="margin-top:var(--space-2)">
+          ${typePill(item)}
+          ${item.aliases.map((a) => `<span class="alias-chip">${esc(a)}</span>`).join('')}
+        </div>
+        <p class="b-sum" style="max-width:560px">${esc(item.summary)}</p>
+        <div style="margin-top:var(--space-2)">${presence(item)}</div>
+      </div>
+    </div>
+    <div class="c-body">
+      <div>
+        ${blocksHtml(item)}
+        <div style="margin-top:var(--space-4)"><button class="quiet-link">Add a block</button></div>
+      </div>
+      <div class="b-rail">
+        <div class="b-rail-block">
+          <span class="sec-label">Where she appears</span>
+          <p class="b-rail-line">${esc(appearanceSentence(item))}</p>
+          <div class="b-rail-rows">${appearRows(item, 'b-rail-row')}</div>
+        </div>
+        <div class="b-rail-block">
+          <span class="sec-label">Relationships</span>
+          <div class="b-rail-rows">${item.rels.map((r) => `<p class="b-rail-line">${relSentence(item, r)}</p>`).join('')}</div>
+          <div style="margin-top:var(--space-3)"><button class="quiet-link">Add a relationship</button></div>
+        </div>
+      </div>
+    </div>`
+}
+
+/* ── Render everything ─────────────────────────────────────────────── */
+function render() {
+  renderPanel()
+  renderA(document.querySelector('[data-pane="a"]'))
+  renderB(document.querySelector('[data-pane="b"]'))
+  renderC(document.querySelector('[data-pane="c"]'))
+  modeBtn.textContent = mode === 'browse' ? 'Show a sheet' : 'Show the list'
+  emptyBtn.textContent = empty ? 'Filled state' : 'Empty state'
+}
+
+/* ── Shell: tabs (keys 1/2/3), mode, empty, theme, deep links ──────── */
+const tabs = document.getElementById('tabs')
+const modeBtn = document.getElementById('modeToggle')
+const emptyBtn = document.getElementById('emptyToggle')
+const themeBtn = document.getElementById('themeToggle')
+
+function activate(dir) {
+  tabs.querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', b.dataset.dir === dir))
+  document.querySelectorAll('.direction').forEach((sec) => sec.classList.toggle('is-active', sec.id === dir))
+}
+tabs.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-dir]')
+  if (btn) activate(btn.dataset.dir)
+})
+document.addEventListener('keydown', (e) => {
+  const map = { 1: 'dir-a', 2: 'dir-b', 3: 'dir-c' }
+  if (map[e.key]) activate(map[e.key])
+})
+modeBtn.addEventListener('click', () => { mode = mode === 'browse' ? 'sheet' : 'browse'; render() })
+emptyBtn.addEventListener('click', () => { empty = !empty; render() })
+themeBtn.addEventListener('click', () => {
+  const light = document.body.classList.toggle('light')
+  themeBtn.textContent = light ? 'Dark theme' : 'Light theme'
+})
+
+render()
+{
+  const h = location.hash.slice(1)
+  const dir = { a: 'dir-a', b: 'dir-b', c: 'dir-c' }[h[0]]
+  if (dir) activate(dir)
+  if (h.includes('sheet')) modeBtn.click()
+  if (h.includes('empty')) emptyBtn.click()
+  if (h.includes('light')) themeBtn.click()
+}
+</script>
+</body>
+</html>

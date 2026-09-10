@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { BinderNode } from '../../shared/binder'
+import type { CompiledDraftMeta } from '../../shared/compile'
 import type { SnapshotMeta } from '../../shared/snapshot'
 import type { Submission, SubmissionStatus } from '../../shared/submissions'
 import { collectAllDocuments } from './search/projectSearch'
@@ -11,6 +12,9 @@ interface SubmissionEditModalProps {
   existing: Submission | null
   statuses: SubmissionStatus[]
   tree: BinderNode[]
+  /** The project's compiled drafts, newest first, for attribution — a real
+   *  id-based reference to a stored artifact, the strongest "what was sent". */
+  compiles: CompiledDraftMeta[]
   onSave: (draft: SubmissionDraft, captureSnapshot: boolean) => Promise<void>
   onClose: () => void
 }
@@ -37,15 +41,26 @@ function formatSnapshotLabel(snapshot: SnapshotMeta): string {
 
 const NEW_SNAPSHOT = '__capture__'
 
+function formatDraftLabel(meta: CompiledDraftMeta): string {
+  const when = new Date(meta.createdAt).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  })
+  return `${meta.name || 'Untitled'} — ${when} · ${meta.format.toUpperCase()}`
+}
+
 function SubmissionEditModal(props: SubmissionEditModalProps): JSX.Element {
-  const { existing, statuses, tree, onSave, onClose } = props
+  const { existing, statuses, tree, compiles, onSave, onClose } = props
 
   const [recipient, setRecipient] = useState(existing?.recipient ?? '')
   const [dateSent, setDateSent] = useState(existing?.dateSent || todayString())
+  const [repliedOn, setRepliedOn] = useState(existing?.repliedOn ?? '')
   const [statusId, setStatusId] = useState(existing?.statusId ?? statuses[0]?.id ?? '')
   const [notes, setNotes] = useState(existing?.notes ?? '')
   const [documentId, setDocumentId] = useState<string>(existing?.documentId ?? '')
   const [snapshotChoice, setSnapshotChoice] = useState<string>(existing?.snapshotId ?? '')
+  const [compiledDraftId, setCompiledDraftId] = useState<string>(existing?.compiledDraftId ?? '')
   const [snapshots, setSnapshots] = useState<SnapshotMeta[]>([])
   const [saving, setSaving] = useState(false)
 
@@ -75,17 +90,23 @@ function SubmissionEditModal(props: SubmissionEditModalProps): JSX.Element {
   async function handleSave(): Promise<void> {
     setSaving(true)
     const chosenDoc = documents.find((d) => d.id === documentId) ?? null
+    const chosenDraft = compiles.find((m) => m.id === compiledDraftId) ?? null
     const captureSnapshot = snapshotChoice === NEW_SNAPSHOT
     const draft: SubmissionDraft = {
       recipient: recipient.trim() || 'Untitled',
       dateSent: dateSent || todayString(),
+      repliedOn: repliedOn || null,
       statusId,
       notes,
       documentId: documentId || null,
       // A capture is created by the caller (it needs the new snapshot's id),
       // so leave it null here and let onSave fill it in.
       snapshotId: captureSnapshot || !snapshotChoice ? null : snapshotChoice,
-      documentNameAtSend: chosenDoc?.name ?? existing?.documentNameAtSend ?? null
+      documentNameAtSend: chosenDoc?.name ?? existing?.documentNameAtSend ?? null,
+      compiledDraftId: compiledDraftId || null,
+      // Same tombstone pattern as documentNameAtSend: the name at attach
+      // time, kept for when the id stops resolving.
+      compiledDraftNameAtAttach: chosenDraft?.name ?? existing?.compiledDraftNameAtAttach ?? null
     }
     await onSave(draft, captureSnapshot)
     setSaving(false)
@@ -119,6 +140,25 @@ function SubmissionEditModal(props: SubmissionEditModalProps): JSX.Element {
               value={dateSent}
               onChange={(e) => setDateSent(e.target.value)}
             />
+          </label>
+
+          {/* Left empty until a reply actually arrives. The tracker's reply
+              times are only as real as what is entered here, so nothing fills
+              this in on the writer's behalf. */}
+          <label className="typography-field">
+            <span>Date replied</span>
+            <input
+              type="date"
+              className="typography-field-input"
+              style={{ marginBottom: 0 }}
+              min={dateSent || undefined}
+              value={repliedOn}
+              onChange={(e) => setRepliedOn(e.target.value)}
+            />
+            <span className="submission-field-hint">
+              Leave this empty until they answer. Filling it in is what lets the tracker say how long
+              replies usually take.
+            </span>
           </label>
 
           <label className="typography-field">
@@ -174,6 +214,30 @@ function SubmissionEditModal(props: SubmissionEditModalProps): JSX.Element {
               </select>
             </label>
           )}
+
+          <label className="typography-field">
+            <span>Compiled draft sent</span>
+            <select
+              className="typography-field-input"
+              style={{ marginBottom: 0 }}
+              value={compiledDraftId}
+              onChange={(e) => setCompiledDraftId(e.target.value)}
+            >
+              <option value="">None</option>
+              {/* An attached draft that was since deleted still needs a row,
+                  or opening the modal would silently drop the attribution. */}
+              {existing?.compiledDraftId && !compiles.some((m) => m.id === existing.compiledDraftId) && (
+                <option value={existing.compiledDraftId}>
+                  {existing.compiledDraftNameAtAttach || 'Compiled draft'} (deleted)
+                </option>
+              )}
+              {compiles.map((meta) => (
+                <option key={meta.id} value={meta.id}>
+                  {formatDraftLabel(meta)}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <label className="typography-field">
             <span>Notes</span>

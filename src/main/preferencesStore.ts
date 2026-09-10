@@ -19,12 +19,16 @@ import {
   DEFAULT_PAGE_MARGIN_MM,
   DEFAULT_PAGE_SIZE,
   isPageSize,
+  DEFAULT_PAGE_VIEW_MODE,
+  isPageViewMode,
   type Theme,
   type TypographyDefaults,
-  type PageSize
+  type PageSize,
+  type PageViewMode
 } from '../shared/preferences'
 import type { ToolbarSectionId } from '../shared/toolbarSections'
 import type { LayoutPreset } from '../shared/layoutPresets'
+import { isCustomTheme, type CustomTheme } from '../shared/customThemes'
 import {
   DEFAULT_IDLE_GAP_MINUTES,
   MIN_IDLE_GAP_MINUTES,
@@ -59,11 +63,16 @@ interface Preferences {
   accentColor: string | null
   backgroundColor: string | null
   textColor: string | null
-  trueBlack: boolean
+  /** The custom editor-page (sheet) color; null = the stylesheet's paper. */
+  pageBackgroundColor: string | null
+  /** Which color preset is active, so the light/dark switch can swap to its
+   *  paired variant. null = custom colors (or none). */
+  colorPresetId: string | null
   zoomPercent: number
   defaultTypography: TypographyDefaults
   hiddenToolbarSections: ToolbarSectionId[]
   layoutPresets: LayoutPreset[]
+  customThemes: CustomTheme[]
   projectRoot: string | null
   /** Load straight into the last project instead of showing the dashboard. */
   skipDashboardOnLaunch: boolean
@@ -72,6 +81,7 @@ interface Preferences {
   cardWidth: number
   pageSize: PageSize
   pageMarginMm: number
+  pageViewMode: PageViewMode
 }
 
 function clampSidebarWidth(width: number): number {
@@ -106,17 +116,20 @@ let state: Preferences = {
   accentColor: null,
   backgroundColor: null,
   textColor: null,
-  trueBlack: false,
+  pageBackgroundColor: null,
+  colorPresetId: null,
   zoomPercent: DEFAULT_ZOOM_PERCENT,
   defaultTypography: { fontFamily: null, fontSizePt: null, lineHeight: null },
   hiddenToolbarSections: [],
   layoutPresets: [],
+  customThemes: [],
   projectRoot: null,
   skipDashboardOnLaunch: false,
   classicMode: false,
   cardWidth: DEFAULT_CARD_WIDTH,
   pageSize: DEFAULT_PAGE_SIZE,
-  pageMarginMm: DEFAULT_PAGE_MARGIN_MM
+  pageMarginMm: DEFAULT_PAGE_MARGIN_MM,
+  pageViewMode: DEFAULT_PAGE_VIEW_MODE
 }
 let loaded = false
 
@@ -140,7 +153,12 @@ function applyParsed(parsed: Record<string, unknown>): void {
   if (typeof parsed.textColor === 'string' || parsed.textColor === null) {
     state.textColor = parsed.textColor as string | null
   }
-  if (typeof parsed.trueBlack === 'boolean') state.trueBlack = parsed.trueBlack
+  if (typeof parsed.pageBackgroundColor === 'string' || parsed.pageBackgroundColor === null) {
+    state.pageBackgroundColor = parsed.pageBackgroundColor as string | null
+  }
+  if (typeof parsed.colorPresetId === 'string' || parsed.colorPresetId === null) {
+    state.colorPresetId = parsed.colorPresetId as string | null
+  }
   if (typeof parsed.zoomPercent === 'number') state.zoomPercent = clampZoom(parsed.zoomPercent)
   if (parsed.defaultTypography && typeof parsed.defaultTypography === 'object') {
     const t = parsed.defaultTypography as Record<string, unknown>
@@ -158,6 +176,11 @@ function applyParsed(parsed: Record<string, unknown>): void {
   if (Array.isArray(parsed.layoutPresets)) {
     state.layoutPresets = parsed.layoutPresets as LayoutPreset[]
   }
+  // Filtered rather than trusted: a theme that cannot be painted from is
+  // dropped, never carried along to fail later at the palette effects.
+  if (Array.isArray(parsed.customThemes)) {
+    state.customThemes = parsed.customThemes.filter(isCustomTheme)
+  }
   if (typeof parsed.projectRoot === 'string' || parsed.projectRoot === null) {
     state.projectRoot = parsed.projectRoot as string | null
   }
@@ -166,6 +189,7 @@ function applyParsed(parsed: Record<string, unknown>): void {
   if (typeof parsed.cardWidth === 'number') state.cardWidth = clampCardWidth(parsed.cardWidth)
   if (isPageSize(parsed.pageSize)) state.pageSize = parsed.pageSize
   if (typeof parsed.pageMarginMm === 'number') state.pageMarginMm = clampPageMargin(parsed.pageMarginMm)
+  if (isPageViewMode(parsed.pageViewMode)) state.pageViewMode = parsed.pageViewMode
 }
 
 async function load(): Promise<void> {
@@ -297,14 +321,25 @@ export async function setTextColor(color: string | null): Promise<void> {
   await persist()
 }
 
-export async function getTrueBlack(): Promise<boolean> {
+export async function getPageBackgroundColor(): Promise<string | null> {
   await load()
-  return state.trueBlack
+  return state.pageBackgroundColor
 }
 
-export async function setTrueBlack(enabled: boolean): Promise<void> {
+export async function setPageBackgroundColor(color: string | null): Promise<void> {
   await load()
-  state.trueBlack = enabled
+  state.pageBackgroundColor = color
+  await persist()
+}
+
+export async function getColorPresetId(): Promise<string | null> {
+  await load()
+  return state.colorPresetId
+}
+
+export async function setColorPresetId(id: string | null): Promise<void> {
+  await load()
+  state.colorPresetId = id
   await persist()
 }
 
@@ -349,6 +384,17 @@ export async function getLayoutPresets(): Promise<LayoutPreset[]> {
 export async function setLayoutPresets(presets: LayoutPreset[]): Promise<void> {
   await load()
   state.layoutPresets = presets
+  await persist()
+}
+
+export async function getCustomThemes(): Promise<CustomTheme[]> {
+  await load()
+  return state.customThemes
+}
+
+export async function setCustomThemes(themes: CustomTheme[]): Promise<void> {
+  await load()
+  state.customThemes = themes.filter(isCustomTheme)
   await persist()
 }
 
@@ -415,5 +461,16 @@ export async function getPageMarginMm(): Promise<number> {
 export async function setPageMarginMm(mm: number): Promise<void> {
   await load()
   state.pageMarginMm = clampPageMargin(mm)
+  await persist()
+}
+
+export async function getPageViewMode(): Promise<PageViewMode> {
+  await load()
+  return state.pageViewMode
+}
+
+export async function setPageViewMode(mode: PageViewMode): Promise<void> {
+  await load()
+  state.pageViewMode = mode
   await persist()
 }

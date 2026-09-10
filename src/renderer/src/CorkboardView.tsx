@@ -4,7 +4,7 @@ import type { StoryBibleItem, StoryBibleTypeDef } from '../../shared/storyBible'
 import { MIN_CARD_WIDTH, MAX_CARD_WIDTH, CARD_WIDTH_STEP } from '../../shared/preferences'
 import { groupDocumentsForCorkboard, type CorkboardCard } from './corkboardUtils'
 import { filterOutlinerTree } from './outlinerUtils'
-import { StatusBadge, TagChips, SpanTagRollupChips, resolveStatus, resolveTags } from './StatusTagBadges'
+import { RowChips, StatusBadge, resolveStatus, resolveTags, type RowChip } from './StatusTagBadges'
 import { resolveMentionChips } from './mentionUtils'
 import DocumentBadgeEditor from './DocumentBadgeEditor'
 import TagStatusFilter from './TagStatusFilter'
@@ -28,6 +28,7 @@ interface CorkboardViewProps {
   onOpenDocument: (id: string) => void
   onEditTitle: (id: string, name: string) => void
   onEditSynopsis: (id: string, synopsis: string) => void
+  onEditNotes: (id: string, notes: string) => void
   onEditStatusId: (id: string, statusId: string | null) => void
   onEditTagIds: (id: string, tagIds: string[]) => void
   onEditWordTarget: (id: string, target: number | null) => void
@@ -60,6 +61,7 @@ function CorkboardView(props: CorkboardViewProps): JSX.Element {
     onOpenDocument,
     onEditTitle,
     onEditSynopsis,
+    onEditNotes,
     onEditStatusId,
     onEditTagIds,
     onEditWordTarget,
@@ -71,6 +73,10 @@ function CorkboardView(props: CorkboardViewProps): JSX.Element {
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null)
   const [editingTargetId, setEditingTargetId] = useState<string | null>(null)
+  /** Cards currently showing their notes rather than their synopsis. Per-view
+   *  state, deliberately not persisted: which side of a card you last looked
+   *  at is not a property of the project. */
+  const [flipped, setFlipped] = useState<Set<string>>(() => new Set())
 
   const filtered = filterOutlinerTree(tree, { statusFilter, tagFilter })
   const groups = groupDocumentsForCorkboard(filtered)
@@ -203,21 +209,76 @@ function CorkboardView(props: CorkboardViewProps): JSX.Element {
                       ) : (
                         <span className="outliner-badge-placeholder">Set status…</span>
                       )}
-                      <TagChips tags={resolveTags(tags, card.node.tagIds)} />
                     </DocumentBadgeEditor>
-                    <SpanTagRollupChips tags={resolveTags(tags, spanTagRollup[card.node.id] ?? [])} />
-                    <SpanTagRollupChips
-                      tags={resolveMentionChips(storyBibleItems, storyBibleTypes, mentionRollup[card.node.id] ?? [])}
+                    {/* Same capped list as the binder rows — one chip at most,
+                        the rest a count, all three chip kinds pooled. Tags are
+                        still edited through the status popover above. */}
+                    <RowChips
+                      chips={[
+                        ...resolveTags(tags, card.node.tagIds).map((t) => ({ ...t, filled: true }) as RowChip),
+                        ...resolveTags(tags, spanTagRollup[card.node.id] ?? []).map(
+                          (t) => ({ ...t, filled: false }) as RowChip
+                        ),
+                        ...resolveMentionChips(
+                          storyBibleItems,
+                          storyBibleTypes,
+                          mentionRollup[card.node.id] ?? []
+                        ).map((t) => ({ ...t, filled: false }) as RowChip)
+                      ]}
                     />
                   </div>
-                  <textarea
-                    className="corkboard-card-synopsis"
-                    placeholder="Synopsis…"
-                    defaultValue={card.node.synopsis}
-                    onClick={(e) => e.stopPropagation()}
+                  {/* The back of the card. An index card has two sides, and
+                      this view is built on that metaphor already — showing
+                      synopsis and notes at once would halve both for a field
+                      many projects never use, so they share the one space.
+                      The flip control is always present, not revealed only
+                      when notes exist: a feature nobody can find is not
+                      progressive disclosure. */}
+                  {flipped.has(card.node.id) ? (
+                    <textarea
+                      key={`${card.node.id}-notes`}
+                      className="corkboard-card-synopsis corkboard-card-notes"
+                      placeholder="Notes…"
+                      defaultValue={card.node.notes}
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onBlur={(e) => onEditNotes(card.node.id, e.target.value)}
+                    />
+                  ) : (
+                    <textarea
+                      key={`${card.node.id}-synopsis`}
+                      className="corkboard-card-synopsis"
+                      placeholder="Synopsis…"
+                      defaultValue={card.node.synopsis}
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onBlur={(e) => onEditSynopsis(card.node.id, e.target.value)}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    className="corkboard-card-flip"
+                    aria-pressed={flipped.has(card.node.id)}
+                    title={flipped.has(card.node.id) ? 'Show the synopsis' : 'Show the notes'}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setFlipped((current) => {
+                        const next = new Set(current)
+                        if (next.has(card.node.id)) next.delete(card.node.id)
+                        else next.add(card.node.id)
+                        return next
+                      })
+                    }}
                     onMouseDown={(e) => e.stopPropagation()}
-                    onBlur={(e) => onEditSynopsis(card.node.id, e.target.value)}
-                  />
+                  >
+                    {flipped.has(card.node.id) ? 'Synopsis' : 'Notes'}
+                    {/* A filled mark when there is something on the other
+                        side, so a glance across the board says which cards
+                        carry notes without flipping any of them. */}
+                    {!flipped.has(card.node.id) && card.node.notes.trim() !== '' && (
+                      <span className="corkboard-card-flip-mark" aria-label="has notes" />
+                    )}
+                  </button>
                   {editingTargetId === card.node.id ? (
                     <input
                       autoFocus

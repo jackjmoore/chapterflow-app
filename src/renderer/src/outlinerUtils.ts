@@ -8,6 +8,7 @@ export interface OutlinerRow {
 function nodeMatchesText(node: BinderNode, query: string): boolean {
   if (node.name.toLowerCase().includes(query)) return true
   if (node.type === 'document' && node.synopsis.toLowerCase().includes(query)) return true
+  if (node.type === 'document' && node.notes.toLowerCase().includes(query)) return true
   return false
 }
 
@@ -72,6 +73,7 @@ function sortValue(
   if (column === 'title') return node.name.toLowerCase()
   if (node.type !== 'document') return column === 'wordCount' ? 0 : ''
   if (column === 'synopsis') return node.synopsis.toLowerCase()
+  if (column === 'notes') return node.notes.toLowerCase()
   if (column === 'status') return node.statusId ? (statusesById.get(node.statusId)?.name.toLowerCase() ?? '') : ''
   return wordCounts[node.id] ?? 0
 }

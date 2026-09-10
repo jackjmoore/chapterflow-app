@@ -1,4 +1,4 @@
-import { isSceneBreakText, SCENE_BREAK_MARK } from '../../shared/export'
+import { isSceneBreakText } from '../../shared/export'
 import type { Block, Run } from './htmlToBlocks'
 
 export function escapeHtml(s: string): string {
@@ -27,10 +27,6 @@ function runToHtml(run: Run, footnoteNumber: number | null): string {
   return styles.length ? `<span style="${styles.join('; ')}">${inner}</span>` : inner
 }
 
-function alignAttr(block: Block): string {
-  return block.align ? ` style="text-align: ${block.align}"` : ''
-}
-
 export interface BlocksToHtmlOptions {
   /** Wrap list-item and blockquote content in <p>, matching how TipTap itself
    *  serializes those nodes. The PDF path doesn't need it (it prints the HTML
@@ -38,10 +34,14 @@ export interface BlocksToHtmlOptions {
    *  shape a natively-created one would have, not just equivalent after the
    *  editor re-serializes it on first save. */
   paragraphWrappedNodes?: boolean
-  /** Normalize whatever the writer typed as a scene divider (`***`, `---`) into
-   *  the single centered `#` manuscript format expects. Off for every other
-   *  preset, which leaves the divider exactly as written. */
-  manuscriptSceneBreaks?: boolean
+  /** Normalize whatever the writer typed as a scene divider (`***`, `---`) to
+   *  this one centered marker — `#` for manuscript format, the project's
+   *  scene-break setting for standard. Absent leaves dividers exactly as
+   *  written (the import path, which must not rewrite content). */
+  sceneBreakMark?: string
+  /** Drop writer-applied justification, rendering those paragraphs with the
+   *  default left alignment — standard manuscript format is never justified. */
+  stripJustify?: boolean
   /** Image id → data URI, for the PDF path. The import path passes nothing,
    *  and images without an entry here are dropped rather than rendered as a
    *  broken-image box. */
@@ -60,6 +60,10 @@ export function blocksToHtml(blocks: Block[], options: BlocksToHtmlOptions = {})
   const wrap = options.paragraphWrappedNodes ?? false
   const imageSources = options.imageSources ?? {}
   const parts: string[] = []
+  const alignAttr = (block: Block): string => {
+    const align = options.stripJustify && block.align === 'justify' ? undefined : block.align
+    return align ? ` style="text-align: ${align}"` : ''
+  }
   // Footnote numbering is global to the document and must survive the list
   // grouping below, so it's tracked across the whole walk rather than per
   // block. Same order numberFootnotes() produces, by construction.
@@ -93,8 +97,10 @@ export function blocksToHtml(blocks: Block[], options: BlocksToHtmlOptions = {})
     }
 
     if (block.kind === 'pageBreak' || block.kind === 'chapterBreak') {
-      // Both break the page; only a chapter break also gets the "new chapter
-      // opens partway down the page" treatment, and only in manuscript preset.
+      // Both break the page. In manuscript format, whatever follows a chapter
+      // break also opens the standard 2in down its page — the PDF path styles
+      // `.chf-chapter-break + *` (toPdf.ts) and the docx path inserts a
+      // spacer paragraph (toDocx.ts); both use the same 2in measurement.
       const cls = block.kind === 'chapterBreak' ? 'chf-chapter-break' : 'chf-page-break'
       parts.push(`<div class="${cls}"></div>`)
       i += 1
@@ -119,8 +125,8 @@ export function blocksToHtml(blocks: Block[], options: BlocksToHtmlOptions = {})
       continue
     }
 
-    if (options.manuscriptSceneBreaks && block.kind === 'paragraph' && isSceneBreakBlock(block)) {
-      parts.push(`<p class="chf-scene-break">${SCENE_BREAK_MARK}</p>`)
+    if (options.sceneBreakMark && block.kind === 'paragraph' && isSceneBreakBlock(block)) {
+      parts.push(`<p class="chf-scene-break">${escapeHtml(options.sceneBreakMark)}</p>`)
       i += 1
       continue
     }

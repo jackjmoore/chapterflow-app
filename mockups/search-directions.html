@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Search — three directions</title>
+<style>
+  /* ChapterFlow tokens, copied from src/renderer/src/index.css. */
+  :root {
+    --space-1: 4px; --space-2: 8px; --space-3: 12px;
+    --space-4: 16px; --space-5: 24px; --space-6: 32px;
+    --radius-sm: 4px; --radius-md: 6px;
+    --text-2xs: 10px; --text-xs: 11px; --text-sm: 12px; --text-md: 13px;
+    --text-lg: 14px; --text-xl: 20px;
+    --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-editor: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+
+    --editor-bg: #faf6ec;
+    --editor-surround: #e6e2d9;
+    --editor-page-edge: rgba(43, 38, 32, 0.09);
+    --editor-text: #2b2620;
+    --editor-match-bg: #ffe999;
+
+    --chrome-bg: #1c1a17;
+    --chrome-bg-elevated: #242119;
+    --chrome-bg-sidebar: #18160f;
+    --chrome-border: #35312a;
+    --chrome-border-strong: #4a4438;
+    --chrome-text: #e8e3d9;
+    --chrome-text-heading: #f0ece2;
+    --chrome-text-muted: #9c9585;
+    --chrome-text-dim: #6b6558;
+    --chrome-control-bg: #262319;
+    --chrome-control-hover: #322d22;
+    --chrome-control-active-bg: #3a3527;
+    --chrome-accent: #6f95b8;
+    --chrome-accent-contrast: #0d1520;
+    --chrome-row-hover: #221f18;
+    --chrome-row-selected: #2a3846;
+    --elev-1: 0 1px 2px rgb(0 0 0 / 0.22);
+    --elev-2: 0 1px 2px rgb(0 0 0 / 0.22), 0 8px 20px rgb(0 0 0 / 0.3);
+    --elev-3: 0 2px 4px rgb(0 0 0 / 0.3), 0 14px 34px rgb(0 0 0 / 0.4);
+  }
+  body.light {
+    --editor-surround: #e6e2d9;
+    --chrome-bg: #f5f1e8;
+    --chrome-bg-elevated: #ece6d8;
+    --chrome-bg-sidebar: #efe9dc;
+    --chrome-border: #ddd4c0;
+    --chrome-border-strong: #c9bea3;
+    --chrome-text: #2b2620;
+    --chrome-text-heading: #1c1812;
+    --chrome-text-muted: #6e6656;
+    --chrome-text-dim: #948c78;
+    --chrome-control-bg: #ece5d3;
+    --chrome-control-hover: #e0d8c2;
+    --chrome-control-active-bg: #d8cdb0;
+    --chrome-accent: #3d5a7a;
+    --chrome-accent-contrast: #f5f1e8;
+    --chrome-row-hover: #ece5d3;
+    --chrome-row-selected: #d7e0e8;
+    --elev-1: 0 1px 2px rgb(43 38 32 / 0.08);
+    --elev-2: 0 1px 2px rgb(43 38 32 / 0.08), 0 8px 20px rgb(43 38 32 / 0.13);
+    --elev-3: 0 2px 4px rgb(43 38 32 / 0.13), 0 14px 34px rgb(43 38 32 / 0.18);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--chrome-bg);
+    color: var(--chrome-text);
+    font-family: var(--font-ui);
+    font-size: var(--text-md);
+    line-height: 1.45;
+    overflow: hidden;
+  }
+
+  /* ── Mock chrome ─────────────────────────────────────────────────── */
+  .mockbar {
+    display: flex; align-items: center; gap: var(--space-3);
+    padding: 0 var(--space-4); height: 44px;
+    background: var(--chrome-bg-elevated);
+    border-bottom: 1px solid var(--chrome-border);
+  }
+  .mockbar-title { font-size: var(--text-sm); color: var(--chrome-text-muted); white-space: nowrap; }
+  .mockbar-tabs { display: flex; gap: var(--space-1); margin: 0 auto; }
+  .mockbar-tabs button, .mockbar-toggle {
+    font: inherit; font-size: var(--text-sm); color: var(--chrome-text-muted);
+    background: none; border: 1px solid transparent; border-radius: var(--radius-sm);
+    padding: 4px 12px; cursor: pointer;
+  }
+  .mockbar-tabs button:hover, .mockbar-toggle:hover { background: var(--chrome-control-hover); }
+  .mockbar-tabs button.is-active {
+    color: var(--chrome-text-heading); background: var(--chrome-control-bg);
+    border-color: var(--chrome-border-strong);
+  }
+  .mockbar-toggle { font-size: var(--text-xs); background: var(--chrome-control-bg); border-color: var(--chrome-border); padding: 3px 10px; }
+  .states { display: flex; border: 1px solid var(--chrome-border); border-radius: var(--radius-sm); overflow: hidden; }
+  .states button { font: inherit; font-size: var(--text-xs); color: var(--chrome-text-muted); background: none; border: none; padding: 3px 9px; cursor: pointer; }
+  .states button + button { border-left: 1px solid var(--chrome-border); }
+  .states button.is-active { background: var(--chrome-control-active-bg); color: var(--chrome-text-heading); }
+
+  .direction { display: none; height: calc(100vh - 44px); flex-direction: column; }
+  .direction.is-active { display: flex; }
+  .note {
+    flex-shrink: 0; margin: var(--space-3) var(--space-4) 0;
+    font-size: var(--text-xs); color: var(--chrome-text-dim);
+    border-left: 2px solid var(--chrome-border-strong); padding-left: var(--space-3); max-width: 980px;
+  }
+
+  /* ── The faux app: title bar, search strip, rail, panel, editor ──── */
+  .app-frame { flex: 1; min-height: 0; margin: var(--space-3) var(--space-4) var(--space-4);
+    display: flex; flex-direction: column; border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-md); overflow: hidden; background: var(--chrome-bg); }
+  .app-menubar { display: flex; align-items: center; gap: var(--space-4); height: 30px;
+    padding: 0 var(--space-3); background: var(--chrome-bg-elevated);
+    border-bottom: 1px solid var(--chrome-border); font-size: var(--text-sm); color: var(--chrome-text-muted); }
+  .app-menubar .brand { font-weight: 600; color: var(--chrome-text-heading); }
+  .app-body { flex: 1; min-height: 0; display: flex; }
+  .app-rail { width: 44px; flex-shrink: 0; background: var(--chrome-bg-sidebar); border-right: 1px solid var(--chrome-border);
+    display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding-top: var(--space-2); }
+  .app-rail i { display: block; width: 18px; height: 18px; border-radius: var(--radius-sm); background: var(--chrome-control-bg); }
+  .app-rail i.is-active { background: var(--chrome-control-active-bg); box-shadow: inset 0 0 0 1px var(--chrome-border-strong); }
+  .app-panel { width: 190px; flex-shrink: 0; background: var(--chrome-bg-sidebar); border-right: 1px solid var(--chrome-border); padding: var(--space-2); }
+  .app-panel .row { height: 18px; margin-bottom: 5px; border-radius: 3px; background: var(--chrome-control-bg); }
+  .app-panel .row:nth-child(3n) { width: 70%; }
+  .app-editor { flex: 1; min-width: 0; background: var(--editor-surround); display: flex; justify-content: center; padding: var(--space-4); overflow: hidden; }
+  .app-page { width: 460px; background: var(--editor-bg); color: var(--editor-text); border: 1px solid var(--editor-page-edge);
+    padding: 34px 40px; font-family: var(--font-editor); font-size: 13px; line-height: 1.6; }
+  .app-page mark { background: var(--editor-match-bg); color: inherit; border-radius: 2px; }
+
+  /* ── Shared search pieces ────────────────────────────────────────── */
+  .icon { width: 14px; height: 14px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.5; }
+  /* The one mark that says "this is the way in": the search glyph carries the
+     accent even at rest, in every direction. */
+  .a-field > .icon:first-child,
+  .b-field > .icon:first-child,
+  .c-trigger > .icon:first-child,
+  .c-field > .icon:first-child { color: var(--chrome-accent); }
+  .kbd {
+    display: inline-flex; align-items: center; height: 18px; padding: 0 5px;
+    font-family: var(--font-ui); font-size: var(--text-2xs); color: var(--chrome-text-dim);
+    background: var(--chrome-control-bg); border: 1px solid var(--chrome-border); border-radius: 3px;
+  }
+  .menu {
+    background: var(--chrome-bg-elevated);
+    border: 1px solid var(--chrome-border-strong);
+    border-radius: var(--radius-md);
+    box-shadow: var(--elev-3);
+    overflow: hidden;
+  }
+  .menu-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
+    padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--chrome-border); }
+  .seg { display: inline-flex; border: 1px solid var(--chrome-border); border-radius: var(--radius-sm); overflow: hidden; }
+  .seg button { font: inherit; font-size: var(--text-xs); color: var(--chrome-text-muted); background: none; border: none; padding: 3px 10px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--chrome-border); }
+  .seg button.is-active { background: var(--chrome-control-active-bg); color: var(--chrome-text-heading); }
+  .opt { display: inline-flex; gap: 2px; }
+  .opt button { font: inherit; font-size: var(--text-xs); width: 24px; height: 22px; color: var(--chrome-text-muted);
+    background: var(--chrome-control-bg); border: 1px solid var(--chrome-border); border-radius: var(--radius-sm); cursor: pointer; }
+  .opt button.is-active { background: var(--chrome-control-active-bg); color: var(--chrome-text-heading); border-color: var(--chrome-border-strong); }
+  .chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+  .chip {
+    font: inherit; font-size: var(--text-2xs); color: var(--chrome-text-muted);
+    background: none; border: 1px solid var(--chrome-border); border-radius: 9px;
+    padding: 2px 8px; cursor: pointer;
+  }
+  .chip:hover { border-color: var(--chrome-border-strong); color: var(--chrome-text); }
+  .chip.is-active { color: var(--chrome-text-heading); border-color: var(--chrome-accent); background: color-mix(in oklab, var(--chrome-accent) 14%, transparent); }
+  .menu-count { margin-left: auto; font-size: var(--text-xs); color: var(--chrome-text-dim); white-space: nowrap; }
+
+  .menu-body { max-height: 420px; overflow-y: auto; }
+  .menu-note { padding: var(--space-3); font-size: var(--text-sm); color: var(--chrome-text-muted); }
+  .group-head {
+    display: flex; align-items: center; gap: var(--space-2); width: 100%;
+    padding: var(--space-2) var(--space-3);
+    font: inherit; font-size: var(--text-xs); font-weight: 600; letter-spacing: 0.02em;
+    color: var(--chrome-text-dim); background: none; border: none; cursor: pointer; text-align: left;
+  }
+  .group-head:hover { background: var(--chrome-row-hover); }
+  .group-head .count { color: var(--chrome-text-dim); font-weight: 400; }
+  .group-head .state { margin-left: auto; font-weight: 400; color: var(--chrome-text-dim); }
+  .result {
+    display: flex; gap: var(--space-2); width: 100%;
+    padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+    background: none; border: none; cursor: pointer; text-align: left; font: inherit;
+  }
+  .result:hover, .result.is-active { background: var(--chrome-row-hover); }
+  .result.is-active { box-shadow: inset 2px 0 0 var(--chrome-accent); }
+  .result .ricon { flex-shrink: 0; width: 14px; color: var(--chrome-text-dim); margin-top: 2px; }
+  .result .rbody { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .result .rhead { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
+  .result .rname { font-size: var(--text-sm); font-weight: 500; color: var(--chrome-text-heading);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .result .rkind { font-size: var(--text-2xs); color: var(--chrome-text-dim); white-space: nowrap; }
+  .result .rdetail { font-size: var(--text-xs); color: var(--chrome-text-muted); line-height: 1.45;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .result mark { background: color-mix(in oklab, var(--chrome-accent) 30%, transparent); color: var(--chrome-text-heading); border-radius: 2px; padding: 0 1px; }
+  .history-row { display: flex; align-items: center; gap: var(--space-2); width: 100%; padding: 5px var(--space-3);
+    font: inherit; font-size: var(--text-sm); color: var(--chrome-text); background: none; border: none; cursor: pointer; text-align: left; }
+  .history-row:hover { background: var(--chrome-row-hover); }
+  .history-head { display: flex; align-items: center; padding: var(--space-2) var(--space-3) var(--space-1); }
+  .history-head .lbl { font-size: var(--text-xs); font-weight: 600; color: var(--chrome-text-dim); }
+  .history-head button { margin-left: auto; font: inherit; font-size: var(--text-xs); color: var(--chrome-text-muted);
+    background: none; border: none; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+    text-decoration-color: var(--chrome-border-strong); }
+  .menu-foot { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3);
+    border-top: 1px solid var(--chrome-border); font-size: var(--text-2xs); color: var(--chrome-text-dim); }
+  .menu-foot .spacer { flex: 1; }
+
+  /* ════════ A · The command bar ════════ */
+  /* A plain strip under a lifted pill: the field has to sit on something
+     quieter than itself to read as raised. */
+  .a-strip {
+    display: flex; align-items: center; gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: var(--chrome-bg);
+    border-bottom: 1px solid var(--chrome-border);
+  }
+  .a-search { position: relative; flex: 1; max-width: 620px; margin: 0 auto; }
+  .a-field {
+    display: flex; align-items: center; gap: var(--space-2);
+    height: 34px; padding: 0 var(--space-2) 0 var(--space-3);
+    background: var(--chrome-bg-elevated);
+    border: 1px solid var(--chrome-border-strong);
+    border-radius: 17px;
+    color: var(--chrome-text-dim); cursor: text;
+    box-shadow: var(--elev-1);
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  }
+  .a-field.is-open {
+    border-color: var(--chrome-accent);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--chrome-accent) 22%, transparent), var(--elev-1);
+  }
+  .a-field .txt { flex: 1; min-width: 0; font-size: var(--text-md); color: var(--chrome-text-heading); }
+  .a-field .txt.is-placeholder { color: var(--chrome-text-dim); }
+  .a-field .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--chrome-accent); }
+  .a-menu { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 30; }
+  .a-trail { display: flex; gap: var(--space-1); flex-shrink: 0; }
+  .a-trail button { font: inherit; font-size: var(--text-xs); color: var(--chrome-text-muted);
+    background: var(--chrome-control-bg); border: 1px solid var(--chrome-border); border-radius: var(--radius-sm); padding: 3px 10px; cursor: pointer; }
+
+  /* ════════ B · The lifted field ════════ */
+  .b-strip {
+    display: flex; align-items: center; gap: var(--space-3);
+    padding: var(--space-3);
+    background: var(--chrome-bg);
+    border-bottom: 1px solid var(--chrome-border);
+  }
+  .b-search { position: relative; flex: 1; min-width: 0; }
+  .b-field {
+    display: flex; align-items: center; gap: var(--space-2);
+    height: 38px; padding: 0 var(--space-2) 0 var(--space-3);
+    background: var(--chrome-bg-elevated);
+    border: 1px solid var(--chrome-border-strong);
+    border-left: 3px solid var(--chrome-accent);
+    border-radius: var(--radius-md);
+    box-shadow: var(--elev-1);
+    color: var(--chrome-text-dim); cursor: text;
+  }
+  .b-field.is-open { box-shadow: var(--elev-2); }
+  .b-field .txt { flex: 1; min-width: 0; font-size: var(--text-lg); color: var(--chrome-text-heading); }
+  .b-field .txt.is-placeholder { color: var(--chrome-text-muted); }
+  /* The scope lives in the field, so the bar says what it will search
+     without anything being opened. */
+  .b-scope {
+    display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 var(--space-2);
+    font-size: var(--text-xs); color: var(--chrome-text);
+    background: var(--chrome-control-bg); border: 1px solid var(--chrome-border);
+    border-radius: 12px; cursor: pointer;
+  }
+  .b-scope:hover { background: var(--chrome-control-hover); }
+  .b-menu { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 30; }
+
+  /* ════════ C · The palette ════════ */
+  .c-strip {
+    display: flex; align-items: center; gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: var(--chrome-bg-elevated);
+    border-bottom: 1px solid var(--chrome-border);
+  }
+  .c-trigger {
+    display: flex; align-items: center; gap: var(--space-2);
+    height: 28px; padding: 0 var(--space-2) 0 var(--space-3);
+    width: 340px;
+    font: inherit; font-size: var(--text-sm); color: var(--chrome-text-muted);
+    background: var(--chrome-control-bg);
+    border: 1px solid var(--chrome-accent);
+    border-radius: var(--radius-sm);
+    cursor: pointer; text-align: left;
+  }
+  .c-trigger:hover { background: var(--chrome-control-hover); color: var(--chrome-text); }
+  .c-trigger .grow { flex: 1; }
+  .c-overlay { position: absolute; inset: 0; z-index: 40; display: flex; justify-content: center;
+    padding-top: 68px; background: rgb(0 0 0 / 0.42); }
+  body.light .c-overlay { background: rgb(43 38 32 / 0.28); }
+  .c-palette { width: 660px; max-width: calc(100% - 48px); align-self: flex-start; }
+  .c-field {
+    display: flex; align-items: center; gap: var(--space-3);
+    height: 48px; padding: 0 var(--space-3);
+    background: var(--chrome-bg-elevated);
+    border-bottom: 1px solid var(--chrome-border);
+    color: var(--chrome-text-dim);
+  }
+  .c-field .txt { flex: 1; min-width: 0; font-size: var(--text-xl); color: var(--chrome-text-heading); }
+  .c-field .txt.is-placeholder { color: var(--chrome-text-dim); }
+  .c-field .icon { width: 18px; height: 18px; }
+
+  .relative { position: relative; }
+</style>
+</head>
+<body>
+
+<div class="mockbar">
+  <span class="mockbar-title">Search · fake data</span>
+  <div class="mockbar-tabs" id="tabs">
+    <button data-dir="dir-a" class="is-active">A · Command bar</button>
+    <button data-dir="dir-b">B · Lifted field</button>
+    <button data-dir="dir-c">C · Palette</button>
+  </div>
+  <div class="states" id="states">
+    <button data-state="closed">Closed</button>
+    <button data-state="recent" class="is-active">Recent</button>
+    <button data-state="results">Results</button>
+    <button data-state="empty">Nothing found</button>
+  </div>
+  <button class="mockbar-toggle" id="themeToggle">Light theme</button>
+</div>
+
+<section class="direction is-active" id="dir-a">
+  <p class="note">A is the command bar. The field keeps its place in the chrome but is given real presence:
+    taller, rounded, centred on a measure of its own, lifted off the strip, and ringed in the accent colour
+    while it is open. The keyboard shortcut sits inside it, so the way in is visible without being loud.</p>
+  <div class="app-frame relative" data-frame="a"></div>
+</section>
+
+<section class="direction" id="dir-b">
+  <p class="note">B is the lifted field. It spans the window on a strip of its own and stands out by material
+    rather than size: an elevated surface, an accent edge down its left side, larger type, and the scope
+    stated inside the field, so the bar says what it will search before anything is opened.</p>
+  <div class="app-frame relative" data-frame="b"></div>
+</section>
+
+<section class="direction" id="dir-c">
+  <p class="note">C is the palette. The chrome keeps only a small accent-outlined trigger, and searching opens
+    a centred overlay over a dimmed window: one large field with the results beneath it. Search stops being a
+    strip and becomes the thing you are doing.</p>
+  <div class="app-frame relative" data-frame="c"></div>
+</section>
+
+<script>
+/* ── Fake data ─────────────────────────────────────────────────────── */
+const QUERY = 'orchard'
+
+const HISTORY = ['orchard', 'the letters', 'Maren Voss', 'low tide']
+
+/* Grouped by the app's own ranking tiers. */
+const GROUPS = [
+  { tier: 'Exact match', matches: [
+    { icon: 'bible', name: 'The Orchard', kind: 'Story Bible location', detail: 'Sixty trees on a slope above the water, most of them past bearing.' }
+  ]},
+  { tier: 'Matching names', matches: [
+    { icon: 'bible', name: 'The Voss orchard', kind: 'Another name for The Orchard', detail: 'Also known as Home.' }
+  ]},
+  { tier: 'Documents', matches: [
+    { icon: 'doc', name: 'The Orchard', kind: 'Chapter 1, in Part I', detail: '4,812 words, last edited yesterday.' },
+    { icon: 'doc', name: 'Part I · The Orchard Year', kind: 'Folder in the Draft', detail: 'Four documents, 17,664 words.' }
+  ]},
+  { tier: 'Details & records', matches: [
+    { icon: 'bible', name: 'The Orchard belongs to Maren Voss', kind: 'Relationship', detail: 'Linked since the Prologue was written.' },
+    { icon: 'sub', name: 'Greenlake Literary', kind: 'Query sent 3 September', detail: 'Sent the orchard chapters as a sample.' }
+  ]},
+  { tier: 'Comments & footnotes', matches: [
+    { icon: 'note', name: 'Check the orchard row count', kind: 'Comment in Low Tide', detail: 'Sixty trees here, but fifty in the Prologue.' }
+  ]},
+  { tier: 'In the manuscript', matches: [
+    { icon: 'doc', name: 'Prologue', kind: '3 matches', detail: 'The <mark>orchard</mark> ran downhill toward the sea wall, and the last four rows were salt-burned.' },
+    { icon: 'doc', name: 'The Orchard', kind: '11 matches', detail: 'She counted what the frost had taken from the <mark>orchard</mark> that winter.' },
+    { icon: 'doc', name: 'The Long Field', kind: '2 matches', detail: 'Beyond the <mark>orchard</mark> wall the ground rose into gorse and nothing else.' }
+  ]}
+]
+
+const FILTERS = ['Manuscript', 'Documents', 'Story Bible', 'Lexicon', 'Notes', 'Tracking']
+const TOTAL = GROUPS.reduce((n, g) => n + g.matches.length, 0)
+
+/* ── Icons ─────────────────────────────────────────────────────────── */
+const SEARCH_ICON = '<svg class="icon" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 L14 14"/></svg>'
+const OPTIONS_ICON = '<svg class="icon" viewBox="0 0 16 16"><path d="M2 4.5h12M2 8h12M2 11.5h12"/><circle cx="6" cy="4.5" r="1.6" fill="currentColor" stroke="none"/><circle cx="10" cy="11.5" r="1.6" fill="currentColor" stroke="none"/></svg>'
+const HISTORY_ICON = '<svg class="icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 5v3.2l2 1.4"/></svg>'
+const ICONS = {
+  doc: '<svg class="icon" viewBox="0 0 16 16"><path d="M3.5 1.5h6L12.5 4.5v10h-9z"/><path d="M9.5 1.5V4.5h3"/></svg>',
+  bible: '<svg class="icon" viewBox="0 0 16 16"><path d="M3 2.5h7a1.5 1.5 0 0 1 1.5 1.5v9.5H4.5A1.5 1.5 0 0 1 3 12z"/><path d="M6 5.5h3"/></svg>',
+  note: '<svg class="icon" viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg>',
+  sub: '<svg class="icon" viewBox="0 0 16 16"><path d="M2 4h12v8H2z"/><path d="M2 4l6 4.5L14 4"/></svg>'
+}
+
+/* ── State ─────────────────────────────────────────────────────────── */
+let state = 'recent'
+
+/* ── Menu pieces, shared by all three directions ───────────────────── */
+function controlsRow() {
+  return `<div class="menu-controls">
+    <div class="seg"><button>This document</button><button class="is-active">The whole project</button></div>
+    <div class="opt">
+      <button title="Match case">Aa</button>
+      <button title="Whole word" class="is-active">ab</button>
+      <button title="Regular expression">.*</button>
+    </div>
+    <div class="chips">${FILTERS.map((f) => `<button class="chip">${f}</button>`).join('')}</div>
+    <span class="menu-count">${state === 'results' ? `${TOTAL} results` : state === 'empty' ? 'No results' : ''}</span>
+  </div>`
+}
+
+function resultsBody() {
+  if (state === 'recent') {
+    return `<div class="menu-body">
+      <div class="history-head"><span class="lbl">Recent searches</span><button>Clear</button></div>
+      ${HISTORY.map((h) => `<button class="history-row">${HISTORY_ICON}${h}</button>`).join('')}
+    </div>`
+  }
+  if (state === 'empty') {
+    return `<div class="menu-body">
+      <p class="menu-note">Nothing matched “orchid”. Check the spelling, or turn off the filters to search everything.</p>
+    </div>`
+  }
+  return `<div class="menu-body">
+    ${GROUPS.map((g, gi) => `
+      <button class="group-head">
+        <span>${g.tier}</span>
+        <span class="count">${g.matches.length}</span>
+        <span class="state">Hide</span>
+      </button>
+      ${g.matches.map((m, mi) => `
+        <button class="result ${gi === 0 && mi === 0 ? 'is-active' : ''}">
+          <span class="ricon">${ICONS[m.icon]}</span>
+          <span class="rbody">
+            <span class="rhead"><span class="rname">${m.name}</span><span class="rkind">${m.kind}</span></span>
+            <span class="rdetail">${m.detail}</span>
+          </span>
+        </button>`).join('')}
+    `).join('')}
+  </div>`
+}
+
+function menuFoot() {
+  return `<div class="menu-foot">
+    <span><span class="kbd">↑</span> <span class="kbd">↓</span> to move</span>
+    <span><span class="kbd">Enter</span> to open</span>
+    <span class="spacer"></span>
+    <span>Replace…</span>
+  </div>`
+}
+
+function menuHtml() {
+  return `<div class="menu">${controlsRow()}${resultsBody()}${menuFoot()}</div>`
+}
+
+const queryText = state === 'closed'
+  ? ''
+  : state === 'empty' ? 'orchid' : state === 'recent' ? '' : QUERY
+
+/* ── The faux window each direction sits in ────────────────────────── */
+function pageHtml() {
+  return `<div class="app-page">
+    <p>She counted what the frost had taken from the <mark>orchard</mark> that winter, and found the number
+    was worse than the one she had given Tomas at the harbour.</p>
+    <p style="margin-top:12px">The <mark>orchard</mark> ran downhill toward the sea wall, and the last four
+    rows were salt-burned past saving.</p>
+  </div>`
+}
+
+function chromeBelow() {
+  return `<div class="app-body">
+    <div class="app-rail"><i class="is-active"></i><i></i><i></i><i></i><i></i></div>
+    <div class="app-panel">${'<div class="row"></div>'.repeat(9)}</div>
+    <div class="app-editor">${pageHtml()}</div>
+  </div>`
+}
+
+function render() {
+  const q = state === 'closed' ? '' : state === 'empty' ? 'orchid' : state === 'recent' ? '' : QUERY
+  const open = state !== 'closed'
+  const showText = (placeholder) =>
+    q ? `<span class="txt">${q}</span>` : `<span class="txt is-placeholder">${placeholder}</span>`
+
+  /* A — the command bar */
+  document.querySelector('[data-frame="a"]').innerHTML = `
+    <div class="app-menubar"><span class="brand">ChapterFlow</span><span>File</span><span>Edit</span><span>View</span><span>Project</span></div>
+    <div class="a-strip">
+      <div class="a-search">
+        <div class="a-field ${open ? 'is-open' : ''}">
+          ${SEARCH_ICON}
+          ${showText('Search the whole project…')}
+          ${open ? '<span class="dot" title="Some options are not at their defaults"></span>' : ''}
+          <span class="kbd">Ctrl F</span>
+          ${OPTIONS_ICON}
+        </div>
+        ${open ? `<div class="a-menu">${menuHtml()}</div>` : ''}
+      </div>
+      <div class="a-trail"><button>Editor</button><button>Outliner</button><button>Corkboard</button></div>
+    </div>
+    ${chromeBelow()}`
+
+  /* B — the lifted field */
+  document.querySelector('[data-frame="b"]').innerHTML = `
+    <div class="app-menubar"><span class="brand">ChapterFlow</span><span>File</span><span>Edit</span><span>View</span><span>Project</span></div>
+    <div class="b-strip">
+      <div class="b-search">
+        <div class="b-field ${open ? 'is-open' : ''}">
+          ${SEARCH_ICON}
+          ${showText('Search the whole project…')}
+          <span class="b-scope">The whole project ▾</span>
+          <span class="kbd">Ctrl F</span>
+          ${OPTIONS_ICON}
+        </div>
+        ${open ? `<div class="b-menu">${menuHtml()}</div>` : ''}
+      </div>
+      <div class="a-trail"><button>Editor</button><button>Outliner</button><button>Corkboard</button></div>
+    </div>
+    ${chromeBelow()}`
+
+  /* C — the palette */
+  document.querySelector('[data-frame="c"]').innerHTML = `
+    <div class="app-menubar"><span class="brand">ChapterFlow</span><span>File</span><span>Edit</span><span>View</span><span>Project</span></div>
+    <div class="c-strip">
+      <button class="c-trigger">${SEARCH_ICON}<span class="grow">Search the whole project…</span><span class="kbd">Ctrl F</span></button>
+      <div class="a-trail" style="margin-left:auto"><button>Editor</button><button>Outliner</button><button>Corkboard</button></div>
+    </div>
+    ${chromeBelow()}
+    ${open ? `<div class="c-overlay"><div class="c-palette"><div class="menu">
+        <div class="c-field">${SEARCH_ICON}${q ? `<span class="txt">${q}</span>` : '<span class="txt is-placeholder">Search the whole project…</span>'}<span class="kbd">Esc</span></div>
+        ${controlsRow()}${resultsBody()}${menuFoot()}
+      </div></div></div>` : ''}`
+}
+
+/* ── Wiring ────────────────────────────────────────────────────────── */
+const tabs = document.getElementById('tabs')
+const states = document.getElementById('states')
+const themeBtn = document.getElementById('themeToggle')
+
+tabs.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-dir]')
+  if (!btn) return
+  tabs.querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', b === btn))
+  document.querySelectorAll('.direction').forEach((s) => s.classList.toggle('is-active', s.id === btn.dataset.dir))
+})
+states.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-state]')
+  if (!btn) return
+  state = btn.dataset.state
+  states.querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', b === btn))
+  render()
+})
+themeBtn.addEventListener('click', () => {
+  const light = document.body.classList.toggle('light')
+  themeBtn.textContent = light ? 'Dark theme' : 'Light theme'
+})
+document.addEventListener('keydown', (e) => {
+  const map = { 1: 'dir-a', 2: 'dir-b', 3: 'dir-c' }
+  if (map[e.key]) tabs.querySelector(`[data-dir="${map[e.key]}"]`).click()
+})
+
+render()
+{
+  const h = location.hash.slice(1)
+  const dir = { a: 'dir-a', b: 'dir-b', c: 'dir-c' }[h[0]]
+  if (dir) tabs.querySelector(`[data-dir="${dir}"]`).click()
+  for (const s of ['closed', 'recent', 'results', 'empty']) {
+    if (h.includes(s)) states.querySelector(`[data-state="${s}"]`).click()
+  }
+  if (h.includes('light')) themeBtn.click()
+}
+</script>
+</body>
+</html>

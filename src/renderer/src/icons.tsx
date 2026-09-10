@@ -43,6 +43,37 @@ function Svg({
   )
 }
 
+/**
+ * ChapterFlow's mark: a heron at the waterline — solitary, patient, watchful.
+ *
+ * A filled silhouette rather than the UI set's 1.4 stroke, deliberately: a
+ * brand mark reads as a shape, not a glyph, and the fill is what survives
+ * 16px. Draws in currentColor so it wears whatever ink its context does.
+ * The same path is rasterized into the OS app icon by
+ * scripts/make-app-icon.mjs — change one, regenerate the other.
+ */
+export const HERON_BODY =
+  'M2.5,12 L17,9.8 C19,9.4 23,9 25.5,9.2 L31,10.8 L26.6,12.6 ' +
+  'C28.6,15.5 28.2,18 27.4,21 C26.6,24.8 27.2,28.5 31,31.8 ' +
+  'C34,34.4 38,35.8 42,36.4 C49,37.5 54.5,40 58,44 ' +
+  'C56,45.5 54,46.2 52,46.5 C46,48.5 38,48 33,45.5 ' +
+  'C28.5,43 26,39 25.5,34 C25.2,29.5 23.8,24.5 22.4,20.4 ' +
+  'C21.6,17.8 22.8,15.4 24.6,13.8 L17.5,12.6 Z'
+export const HERON_LEG = 'M42,47.5 L43,53 L41.5,58'
+export const HERON_WATER = 'M12,58 L54,58'
+
+export function HeronMarkIcon({ size = 16 }: { size?: number }): JSX.Element {
+  return (
+    <svg className="icon" width={size} height={size} viewBox="0 0 64 64" fill="none">
+      <path d={HERON_BODY} fill="currentColor" />
+      <g stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" fill="none">
+        <path d={HERON_LEG} />
+        <path d={HERON_WATER} />
+      </g>
+    </svg>
+  )
+}
+
 export function AlignLeftIcon(): JSX.Element {
   return (
     <Svg>
@@ -362,6 +393,151 @@ export function CorkboardViewIcon(): JSX.Element {
   )
 }
 
+/* Filled variants for the nav-rail's active state — the same geometry as
+   the outline icons, rendered as solid silhouettes. Interior details are
+   stroked in the active button's own fill (--chrome-control-active-bg) so
+   they read as cutouts rather than picking up a second color. */
+
+export function ManuscriptSectionFilledIcon(): JSX.Element {
+  return (
+    <Svg>
+      <path d="M4.5 2.5 h5 l2.5 2.5 v8 a0.5 0.5 0 0 1 -0.5 0.5 h-7 a0.5 0.5 0 0 1 -0.5 -0.5 z" fill="currentColor" stroke="none" />
+      <line x1="6" y1="8" x2="10" y2="8" stroke="var(--chrome-control-active-bg)" />
+      <line x1="6" y1="10.5" x2="10" y2="10.5" stroke="var(--chrome-control-active-bg)" />
+    </Svg>
+  )
+}
+
+export function StoryBibleViewFilledIcon(): JSX.Element {
+  return (
+    <Svg>
+      <path
+        d="M2.5 3 a1 1 0 0 1 1 -1 h3.5 a1.5 1.5 0 0 1 1 0.4 a1.5 1.5 0 0 1 1 -0.4 h3.5 a1 1 0 0 1 1 1 v9.5 a1 1 0 0 1 -1 1 h-3.5 a1.5 1.5 0 0 0 -1 0.4 a1.5 1.5 0 0 0 -1 -0.4 h-3.5 a1 1 0 0 1 -1 -1 z"
+        fill="currentColor"
+        stroke="none"
+      />
+      <line x1="8" y1="2.4" x2="8" y2="13.9" stroke="var(--chrome-control-active-bg)" />
+    </Svg>
+  )
+}
+
+export function TimelineViewFilledIcon(): JSX.Element {
+  return (
+    <Svg>
+      <line x1="4" y1="2.5" x2="4" y2="13.5" />
+      <circle cx="4" cy="5" r="1.9" fill="currentColor" stroke="none" />
+      <circle cx="4" cy="11" r="1.9" fill="currentColor" stroke="none" />
+      <line x1="7" y1="5" x2="13.5" y2="5" strokeWidth="2.2" />
+      <line x1="7" y1="11" x2="12" y2="11" strokeWidth="2.2" />
+    </Svg>
+  )
+}
+
+export function SubmissionsViewFilledIcon(): JSX.Element {
+  return (
+    <Svg>
+      <path d="M2.5 3.5 a1 1 0 0 1 1 -1 h9 a1 1 0 0 1 1 1 v9 a1 1 0 0 1 -1 1 h-9 a1 1 0 0 1 -1 -1 z" fill="currentColor" stroke="none" />
+      <line x1="5" y1="6" x2="11" y2="6" stroke="var(--chrome-control-active-bg)" />
+      <line x1="5" y1="8.5" x2="11" y2="8.5" stroke="var(--chrome-control-active-bg)" />
+      <line x1="5" y1="11" x2="8.5" y2="11" stroke="var(--chrome-control-active-bg)" />
+    </Svg>
+  )
+}
+
+export function CompileViewFilledIcon(): JSX.Element {
+  return (
+    <Svg>
+      <path d="M5 3.5 v-0.5 a1 1 0 0 1 1 -1 h6 a1 1 0 0 1 1 1 v7.5 a1 1 0 0 1 -1 1 h-0.5" />
+      <path
+        d="M2.5 5.5 a1 1 0 0 1 1 -1 h6 a1 1 0 0 1 1 1 v7.5 a1 1 0 0 1 -1 1 h-6 a1 1 0 0 1 -1 -1 z"
+        fill="currentColor"
+        stroke="none"
+      />
+      <line x1="4.5" y1="8" x2="8.5" y2="8" stroke="var(--chrome-control-active-bg)" />
+      <line x1="4.5" y1="10.5" x2="7" y2="10.5" stroke="var(--chrome-control-active-bg)" />
+    </Svg>
+  )
+}
+
+export function LexiconViewFilledIcon(): JSX.Element {
+  return (
+    <Svg grid={24}>
+      {/* Same optical scale-up as the outline variant, for the same reason. */}
+      <g transform="translate(12 12) scale(1.125) translate(-12 -12)" strokeWidth={(1.4 * 24) / 16 / 1.125}>
+        <path
+          d="M12 6.5C10.5 5.2 8.6 4.6 6 4.6c-.8 0-1.5.05-2 .12v13c.5-.07 1.2-.12 2-.12 2.6 0 4.5.6 6 1.9 1.5-1.3 3.4-1.9 6-1.9.8 0 1.5.05 2 .12v-13c-.5-.07-1.2-.12-2-.12-2.6 0-4.5.6-6 1.9z"
+          fill="currentColor"
+          stroke="none"
+        />
+        <path d="M12 6.5v13" stroke="var(--chrome-control-active-bg)" />
+      </g>
+    </Svg>
+  )
+}
+
+export function StatsFilledIcon(): JSX.Element {
+  return (
+    <Svg>
+      <rect x="2" y="7.5" width="2.6" height="6" rx="1" fill="currentColor" stroke="none" />
+      <rect x="6.7" y="3.5" width="2.6" height="10" rx="1" fill="currentColor" stroke="none" />
+      <rect x="11.4" y="9.5" width="2.6" height="4" rx="1" fill="currentColor" stroke="none" />
+    </Svg>
+  )
+}
+
+export function AppearanceFilledIcon(): JSX.Element {
+  return (
+    <Svg>
+      <path
+        d="M8 2 a6 6 0 1 0 0 12 c1.2 0 1.6 -0.8 1.2 -1.7 c-0.4 -0.9 0 -1.8 1.1 -1.8 h1.6 a2.1 2.1 0 0 0 2.1 -2.3 A6 6 0 0 0 8 2 z"
+        fill="currentColor"
+        stroke="none"
+      />
+      <circle cx="5.2" cy="6.2" r="0.9" fill="var(--chrome-control-active-bg)" stroke="none" />
+      <circle cx="8.3" cy="4.8" r="0.9" fill="var(--chrome-control-active-bg)" stroke="none" />
+      <circle cx="11.2" cy="6.4" r="0.9" fill="var(--chrome-control-active-bg)" stroke="none" />
+      <circle cx="5" cy="9.6" r="0.9" fill="var(--chrome-control-active-bg)" stroke="none" />
+    </Svg>
+  )
+}
+
+export function AppearanceIcon(): JSX.Element {
+  return (
+    <Svg>
+      {/* A painter's palette: the appearance dashboard. */}
+      <path d="M8 2 a6 6 0 1 0 0 12 c1.2 0 1.6 -0.8 1.2 -1.7 c-0.4 -0.9 0 -1.8 1.1 -1.8 h1.6 a2.1 2.1 0 0 0 2.1 -2.3 A6 6 0 0 0 8 2 z" />
+      <circle cx="5.2" cy="6.2" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="8.3" cy="4.8" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="11.2" cy="6.4" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="9.6" r="0.9" fill="currentColor" stroke="none" />
+    </Svg>
+  )
+}
+
+export function DraftViewIcon(): JSX.Element {
+  return (
+    <Svg>
+      {/* A continuous scroll of text: one tall page, lines running through. */}
+      <path d="M4 1.5 h8 a1 1 0 0 1 1 1 v11 a1 1 0 0 1 -1 1 h-8 a1 1 0 0 1 -1 -1 v-11 a1 1 0 0 1 1 -1 z" />
+      <line x1="5.5" y1="4.5" x2="10.5" y2="4.5" />
+      <line x1="5.5" y1="7" x2="10.5" y2="7" />
+      <line x1="5.5" y1="9.5" x2="10.5" y2="9.5" />
+      <line x1="5.5" y1="12" x2="8.5" y2="12" />
+    </Svg>
+  )
+}
+
+export function BookViewIcon(): JSX.Element {
+  return (
+    <Svg>
+      {/* An open book: two page leaves meeting at a spine. */}
+      <path d="M8 3.5 C6.5 2.3 4.2 2 2 2.4 v10 c2.2 -0.4 4.5 -0.1 6 1.1" />
+      <path d="M8 3.5 C9.5 2.3 11.8 2 14 2.4 v10 c-2.2 -0.4 -4.5 -0.1 -6 1.1" />
+      <line x1="8" y1="3.5" x2="8" y2="14.5" />
+    </Svg>
+  )
+}
+
 export function StatsIcon(): JSX.Element {
   return (
     <Svg>
@@ -408,6 +584,20 @@ export function SubmissionsViewIcon(): JSX.Element {
       <line x1="5" y1="6" x2="11" y2="6" />
       <line x1="5" y1="8.5" x2="11" y2="8.5" />
       <line x1="5" y1="11" x2="8.5" y2="11" />
+    </Svg>
+  )
+}
+
+/** Compile: a finished page atop the stack it was assembled from. */
+export function CompileViewIcon(): JSX.Element {
+  return (
+    <Svg>
+      {/* Back sheet, peeking out behind the front one. */}
+      <path d="M5 3.5 v-0.5 a1 1 0 0 1 1 -1 h6 a1 1 0 0 1 1 1 v7.5 a1 1 0 0 1 -1 1 h-0.5" />
+      {/* Front sheet. */}
+      <path d="M2.5 5.5 a1 1 0 0 1 1 -1 h6 a1 1 0 0 1 1 1 v7.5 a1 1 0 0 1 -1 1 h-6 a1 1 0 0 1 -1 -1 z" />
+      <line x1="4.5" y1="8" x2="8.5" y2="8" />
+      <line x1="4.5" y1="10.5" x2="7" y2="10.5" />
     </Svg>
   )
 }
@@ -497,13 +687,22 @@ export function TextBlockIcon(): JSX.Element {
   )
 }
 
-/** Lexicon — an open book, distinct from the Story Bible's bookmark. */
+/** Lexicon — an open book, distinct from the Story Bible's bookmark.
+ *  Drawn on a 24 grid with proportionally wider margins than the 16-grid
+ *  set, so the inner scale-up restores optical parity with its rail
+ *  neighbours; the group stroke-width pre-divides the scale so the rendered
+ *  line stays at the set's one weight. */
+const LEXICON_SCALE = 'translate(12 12) scale(1.125) translate(-12 -12)'
+const LEXICON_STROKE = (1.4 * 24) / 16 / 1.125
+
 export function LexiconViewIcon(): JSX.Element {
   return (
     <Svg grid={24}>
-      <path d="M12 6.5C10.5 5.2 8.6 4.6 6 4.6c-.8 0-1.5.05-2 .12v13c.5-.07 1.2-.12 2-.12 2.6 0 4.5.6 6 1.9" />
-      <path d="M12 6.5c1.5-1.3 3.4-1.9 6-1.9.8 0 1.5.05 2 .12v13c-.5-.07-1.2-.12-2-.12-2.6 0-4.5.6-6 1.9" />
-      <path d="M12 6.5v13" />
+      <g transform={LEXICON_SCALE} strokeWidth={LEXICON_STROKE}>
+        <path d="M12 6.5C10.5 5.2 8.6 4.6 6 4.6c-.8 0-1.5.05-2 .12v13c.5-.07 1.2-.12 2-.12 2.6 0 4.5.6 6 1.9" />
+        <path d="M12 6.5c1.5-1.3 3.4-1.9 6-1.9.8 0 1.5.05 2 .12v13c-.5-.07-1.2-.12-2-.12-2.6 0-4.5.6-6 1.9" />
+        <path d="M12 6.5v13" />
+      </g>
     </Svg>
   )
 }

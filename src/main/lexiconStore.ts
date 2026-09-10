@@ -126,3 +126,58 @@ export async function deleteEntry(id: string): Promise<void> {
   })
   if (removed) await suppressedWordStore.removePhrase(removed.word, 'lexicon')
 }
+
+/**
+ * Adds many words at once.
+ *
+ * addEntry is the right shape for a writer typing one word: it persists the
+ * Lexicon and then registers the word with the spellchecker, two whole-file
+ * writes. Importing a personal dictionary means a couple of hundred words, so
+ * doing that per word is several hundred serialized writes — slow enough that
+ * the import visibly lags behind the dialog that started it.
+ *
+ * This writes the Lexicon once, then hands the spellchecker the complete list
+ * in a single replaceSource call. That is safe because the Lexicon is the sole
+ * owner of the 'lexicon' suppression source — replaceSource leaves every other
+ * source's claims untouched.
+ *
+ * Existing words are left exactly as they are, meanings included: an import
+ * must never overwrite something the writer wrote.
+ */
+export async function addEntries(words: string[]): Promise<{ added: number; alreadyPresent: number }> {
+  const result = await runQueued(async () => {
+    const file = await load()
+    const known = new Set(file.entries.map((e) => normalizeWord(e.word)))
+    const now = new Date().toISOString()
+    const additions: LexiconEntry[] = []
+    let alreadyPresent = 0
+
+    for (const raw of words) {
+      const word = raw.trim()
+      if (!word) continue
+      const key = normalizeWord(word)
+      if (known.has(key)) {
+        alreadyPresent++
+        continue
+      }
+      known.add(key)
+      additions.push({
+        id: randomUUID(),
+        word,
+        meaning: '',
+        pronunciation: '',
+        createdAt: now,
+        updatedAt: now
+      })
+    }
+
+    const entries = [...file.entries, ...additions]
+    if (additions.length > 0) await persist({ version: 1, entries })
+    return { added: additions.length, alreadyPresent, allWords: entries.map((e) => e.word) }
+  })
+
+  // Outside the queue, for the same reason addEntry does it: a different store
+  // with its own lock, and holding both at once is how deadlocks start.
+  if (result.added > 0) await suppressedWordStore.replaceSource(result.allWords, 'lexicon')
+  return { added: result.added, alreadyPresent: result.alreadyPresent }
+}

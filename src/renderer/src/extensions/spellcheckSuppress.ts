@@ -1,5 +1,5 @@
 import { Extension } from '@tiptap/core'
-import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { Plugin, PluginKey, type Transaction } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import type { Node as PMNode } from '@tiptap/pm/model'
 
@@ -79,10 +79,14 @@ export const SpellcheckSuppress = Extension.create({
               const words = new Set(meta.words)
               return { words, decorations: buildDecorations(tr.doc, words) }
             }
-            if (!tr.docChanged) return value
-            // Rebuilt rather than mapped: text edits change which words exist,
-            // so the previous positions are not simply displaced.
-            return { words: value.words, decorations: buildDecorations(tr.doc, value.words) }
+            if (!tr.docChanged || value.words.size === 0) return value
+            // Text edits change which words exist, so the previous positions
+            // cannot simply be displaced — but only inside the paragraphs the
+            // edit touched. Everything else is mapped, and just those
+            // paragraphs are re-scanned. Re-scanning the whole document on
+            // every keystroke was a full pass over 100,000 words per key in
+            // any project with a Story Bible.
+            return { words: value.words, decorations: rescanChangedBlocks(tr, value.decorations, value.words) }
           }
         },
 
@@ -100,25 +104,56 @@ export const SpellcheckSuppress = Extension.create({
  *  hyphens that sit inside names. Anything else is a boundary. */
 const WORD_PATTERN = /[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu
 
-function buildDecorations(doc: PMNode, words: Set<string>): DecorationSet {
-  if (words.size === 0) return DecorationSet.empty
-
+/** Suppression decorations for every occurrence between two positions. */
+function collectDecorations(doc: PMNode, from: number, to: number, words: Set<string>): Decoration[] {
   const decorations: Decoration[] = []
-  doc.descendants((node, pos) => {
+  doc.nodesBetween(from, to, (node, pos) => {
     if (!node.isText || !node.text) return
     const text = node.text
     WORD_PATTERN.lastIndex = 0
     let match: RegExpExecArray | null
     while ((match = WORD_PATTERN.exec(text)) !== null) {
       if (!words.has(match[0].toLowerCase())) continue
-      const from = pos + match.index
+      const start = pos + match.index
       decorations.push(
-        Decoration.inline(from, from + match[0].length, {
+        Decoration.inline(start, start + match[0].length, {
           spellcheck: 'false',
           class: 'chf-suppressed-word'
         })
       )
     }
   })
-  return DecorationSet.create(doc, decorations)
+  return decorations
+}
+
+function buildDecorations(doc: PMNode, words: Set<string>): DecorationSet {
+  if (words.size === 0) return DecorationSet.empty
+  return DecorationSet.create(doc, collectDecorations(doc, 0, doc.content.size, words))
+}
+
+/**
+ * Maps the existing decorations through the transaction, then re-scans only
+ * the textblocks its steps changed. Each step's changed range is carried
+ * through the steps after it into the final document, then widened to the
+ * enclosing paragraph on either side, so a text node is never scanned in
+ * part.
+ */
+function rescanChangedBlocks(tr: Transaction, previous: DecorationSet, words: Set<string>): DecorationSet {
+  let decorations = previous.map(tr.mapping, tr.doc)
+  const doc = tr.doc
+  tr.mapping.maps.forEach((stepMap, index) => {
+    const rest = tr.mapping.slice(index + 1)
+    stepMap.forEach((_oldStart, _oldEnd, newStart, newEnd) => {
+      const from = rest.map(newStart, -1)
+      const to = rest.map(newEnd, 1)
+      const $from = doc.resolve(Math.min(from, doc.content.size))
+      const $to = doc.resolve(Math.min(to, doc.content.size))
+      const start = $from.parent.isTextblock ? $from.start() : $from.pos
+      const end = $to.parent.isTextblock ? $to.end() : $to.pos
+      if (end <= start) return
+      decorations = decorations.remove(decorations.find(start, end))
+      decorations = decorations.add(doc, collectDecorations(doc, start, end, words))
+    })
+  })
+  return decorations
 }

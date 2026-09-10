@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { BinderNode, OutlinerColumn, OutlinerSort, StatusDef, TagDef } from '../../shared/binder'
 import type { StoryBibleItem, StoryBibleTypeDef } from '../../shared/storyBible'
 import { filterOutlinerTree, flattenForOutliner, sortTree } from './outlinerUtils'
-import { StatusBadge, TagChips, SpanTagRollupChips, resolveStatus, resolveTags } from './StatusTagBadges'
+import { RowChips, StatusBadge, resolveStatus, resolveTags, type RowChip } from './StatusTagBadges'
 import { resolveMentionChips } from './mentionUtils'
 import DocumentBadgeEditor from './DocumentBadgeEditor'
 import TagStatusFilter from './TagStatusFilter'
@@ -30,16 +30,21 @@ interface OutlinerViewProps {
   onOpenDocument: (id: string) => void
   onEditTitle: (id: string, name: string) => void
   onEditSynopsis: (id: string, synopsis: string) => void
+  onEditNotes: (id: string, notes: string) => void
   onEditStatusId: (id: string, statusId: string | null) => void
   onEditTagIds: (id: string, tagIds: string[]) => void
   onEditWordTarget: (id: string, target: number | null) => void
 }
 
+/** Sentence case, never all-caps — DESIGN.md, Tier 1. "Words" rather than
+ *  "Word Count" because the header wrapped to two lines at any sane column
+ *  width, and the number underneath says what it is. */
 const COLUMNS: { id: OutlinerColumn; label: string }[] = [
   { id: 'title', label: 'Title' },
   { id: 'synopsis', label: 'Synopsis' },
+  { id: 'notes', label: 'Notes' },
   { id: 'status', label: 'Status' },
-  { id: 'wordCount', label: 'Word Count' }
+  { id: 'wordCount', label: 'Words' }
 ]
 
 function OutlinerView(props: OutlinerViewProps): JSX.Element {
@@ -64,6 +69,7 @@ function OutlinerView(props: OutlinerViewProps): JSX.Element {
     onOpenDocument,
     onEditTitle,
     onEditSynopsis,
+    onEditNotes,
     onEditStatusId,
     onEditTagIds,
     onEditWordTarget
@@ -91,7 +97,7 @@ function OutlinerView(props: OutlinerViewProps): JSX.Element {
         <input
           type="text"
           className="outliner-filter-input"
-          placeholder="Filter by title or synopsis…"
+          placeholder="Filter by title, synopsis or notes…"
           value={filter}
           onChange={(e) => onFilterChange(e.target.value)}
         />
@@ -106,6 +112,21 @@ function OutlinerView(props: OutlinerViewProps): JSX.Element {
 
       <div className="outliner-table-wrap">
         <table className="outliner-table">
+          {/* Explicit widths, with table-layout: fixed in the stylesheet.
+              Without both, the column widths are decided by their content —
+              which meant a chapter carrying a dozen Story Bible mentions set
+              the width of the whole table and left the synopsis a few
+              characters wide. Percentages for the three prose columns so they
+              share whatever is left; fixed pixels for the three that hold
+              something of known size. */}
+          <colgroup>
+            <col className="outliner-col-title" />
+            <col className="outliner-col-synopsis" />
+            <col className="outliner-col-notes" />
+            <col className="outliner-col-status" />
+            <col className="outliner-col-words" />
+            <col className="outliner-col-tags" />
+          </colgroup>
           <thead>
             <tr>
               {COLUMNS.map((col) => (
@@ -124,7 +145,7 @@ function OutlinerView(props: OutlinerViewProps): JSX.Element {
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="outliner-empty">
+                <td colSpan={6} className="outliner-empty">
                   {filter || statusFilter.length > 0 || tagFilter.length > 0 ? 'No documents match your filters.' : 'No documents yet.'}
                 </td>
               </tr>
@@ -177,6 +198,18 @@ function OutlinerView(props: OutlinerViewProps): JSX.Element {
                       placeholder="—"
                       defaultValue={node.synopsis}
                       onBlur={(e) => onEditSynopsis(node.id, e.target.value)}
+                    />
+                  )}
+                </td>
+                <td>
+                  {node.type === 'document' && (
+                    <input
+                      key={`${node.id}-notes`}
+                      type="text"
+                      className="outliner-cell-input"
+                      placeholder="—"
+                      defaultValue={node.notes}
+                      onBlur={(e) => onEditNotes(node.id, e.target.value)}
                     />
                   )}
                 </td>
@@ -251,12 +284,32 @@ function OutlinerView(props: OutlinerViewProps): JSX.Element {
                       onChangeStatus={(id) => onEditStatusId(node.id, id)}
                       onChangeTags={(ids) => onEditTagIds(node.id, ids)}
                     >
-                      {node.tagIds.length > 0 ? <TagChips tags={resolveTags(tags, node.tagIds)} /> : <span className="outliner-badge-placeholder">+ Tags</span>}
+                      {(() => {
+                        // One capped row rather than three uncapped lists.
+                        // Rendering every own-tag, span tag and Story Bible
+                        // mention inline is what let a chapter with a dozen
+                        // mentions stretch this column past the window and
+                        // squeeze the synopsis down to a few characters. Same
+                        // pooled, capped treatment the binder rows and
+                        // corkboard cards already use.
+                        const chips: RowChip[] = [
+                          ...resolveTags(tags, node.tagIds).map((t) => ({ ...t, filled: true }) as RowChip),
+                          ...resolveTags(tags, spanTagRollup[node.id] ?? []).map(
+                            (t) => ({ ...t, filled: false }) as RowChip
+                          ),
+                          ...resolveMentionChips(
+                            storyBibleItems,
+                            storyBibleTypes,
+                            mentionRollup[node.id] ?? []
+                          ).map((t) => ({ ...t, filled: false }) as RowChip)
+                        ]
+                        return chips.length > 0 ? (
+                          <RowChips chips={chips} />
+                        ) : (
+                          <span className="outliner-badge-placeholder">+ Tags</span>
+                        )
+                      })()}
                     </DocumentBadgeEditor>
-                  )}
-                  {node.type === 'document' && <SpanTagRollupChips tags={resolveTags(tags, spanTagRollup[node.id] ?? [])} />}
-                  {node.type === 'document' && (
-                    <SpanTagRollupChips tags={resolveMentionChips(storyBibleItems, storyBibleTypes, mentionRollup[node.id] ?? [])} />
                   )}
                 </td>
               </tr>

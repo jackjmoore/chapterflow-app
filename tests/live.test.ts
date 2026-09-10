@@ -13,14 +13,14 @@
  * scratch project in a temp directory, and talks to it over the Chrome
  * DevTools Protocol. Never touches the user's own projects or preferences.
  */
-import { spawn, type ChildProcess } from 'child_process'
+import type { ChildProcess } from 'child_process'
 import { mkdtemp, mkdir, writeFile, rm } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { setTimeout as sleep } from 'timers/promises'
 import { assert, createReport, note, section, summarize } from './harness'
+import { spawnApp, waitForDebugPort } from './cdpPort'
 
-const PORT = 9345
 const DOC_ID = 'live-pagination-doc'
 
 interface Sample {
@@ -59,6 +59,7 @@ async function seedProject(): Promise<{ userDataDir: string; cleanup: () => Prom
           name: 'Live Pagination',
           collapsed: false,
           synopsis: '',
+    notes: '',
           statusId: null,
           tagIds: [],
           wordTarget: null,
@@ -120,11 +121,12 @@ interface Cdp {
   close: () => void
 }
 
-async function connect(child: ChildProcess): Promise<Cdp> {
+async function connect(child: ChildProcess, userDataDir: string): Promise<Cdp> {
+  const port = await waitForDebugPort(child, userDataDir)
   let target: { webSocketDebuggerUrl: string } | undefined
   for (let attempt = 0; attempt < 80 && !target; attempt += 1) {
     try {
-      const targets = (await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json()) as {
+      const targets = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()) as {
         type: string
         url: string
         webSocketDebuggerUrl: string
@@ -219,14 +221,10 @@ async function main(): Promise<void> {
   const env = { ...process.env }
   delete env.ELECTRON_RUN_AS_NODE
 
-  const child = spawn(
-    electronBinary,
-    ['.', `--remote-debugging-port=${PORT}`, `--user-data-dir=${userDataDir}`],
-    { cwd: process.cwd(), stdio: 'ignore', env }
-  )
+  const child = spawnApp(electronBinary, userDataDir, env)
 
   try {
-    const cdp = await connect(child)
+    const cdp = await connect(child, userDataDir)
 
     // Wait for the app to mount and paginate its seeded content.
     let ready = false

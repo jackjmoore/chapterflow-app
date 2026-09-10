@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Landing page — three directions</title>
+<style>
+  /* ChapterFlow tokens, copied from src/renderer/src/index.css so the mock is
+     judged in the app's own light. Dark is the default, as in the app. */
+  :root {
+    --space-1: 4px; --space-2: 8px; --space-3: 12px;
+    --space-4: 16px; --space-5: 24px; --space-6: 32px; --space-7: 44px; --space-8: 64px;
+    --radius-sm: 4px; --radius-md: 6px; --radius-lg: 10px;
+    --text-2xs: 10px; --text-xs: 11px; --text-sm: 12px; --text-md: 13px;
+    --text-lg: 14px; --text-xl: 20px; --text-2xl: 26px;
+    --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-editor: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+
+    --chrome-bg: #1c1a17;
+    --chrome-bg-elevated: #242119;
+    --chrome-border: #35312a;
+    --chrome-border-strong: #4a4438;
+    --chrome-text: #e8e3d9;
+    --chrome-text-heading: #f0ece2;
+    --chrome-text-muted: #9c9585;
+    --chrome-text-dim: #6b6558;
+    --chrome-control-bg: #262319;
+    --chrome-control-hover: #322d22;
+    --chrome-accent: #6f95b8;
+    --chrome-accent-contrast: #0d1520;
+    --chrome-accent-saved: #7a9b6e;
+    --chrome-accent-error: #c26a5a;
+
+    --motion-enter: 180ms cubic-bezier(0, 0, 0.2, 1);
+    --motion-exit: 150ms cubic-bezier(0.4, 0, 1, 1);
+  }
+  body.light {
+    --chrome-bg: #f5f1e8;
+    --chrome-bg-elevated: #ece6d8;
+    --chrome-border: #ddd4c0;
+    --chrome-border-strong: #c9bea3;
+    --chrome-text: #2b2620;
+    --chrome-text-heading: #1c1812;
+    --chrome-text-muted: #6e6656;
+    --chrome-text-dim: #948c78;
+    --chrome-control-bg: #ece5d3;
+    --chrome-control-hover: #e0d8c2;
+    --chrome-accent: #3d5a7a;
+    --chrome-accent-contrast: #f5f1e8;
+    --chrome-accent-saved: #5a7a4e;
+    --chrome-accent-error: #b0492f;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--chrome-bg);
+    color: var(--chrome-text);
+    font-family: var(--font-ui);
+    font-size: var(--text-md);
+    line-height: 1.5;
+  }
+
+  /* ── Mock chrome ───────────────────────────────────────────────── */
+  .mockbar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; gap: var(--space-4);
+    padding: 0 var(--space-4); height: 44px;
+    background: var(--chrome-bg-elevated);
+    border-bottom: 1px solid var(--chrome-border);
+  }
+  .mockbar-title { font-size: var(--text-sm); color: var(--chrome-text-muted); white-space: nowrap; }
+  .mockbar-tabs { display: flex; gap: var(--space-1); margin: 0 auto; }
+  .mockbar-tabs button, .mockbar-theme {
+    font: inherit; font-size: var(--text-sm); color: var(--chrome-text-muted);
+    background: none; border: 1px solid transparent; border-radius: var(--radius-sm);
+    padding: 4px 12px; cursor: pointer;
+  }
+  .mockbar-tabs button:hover, .mockbar-theme:hover { background: var(--chrome-control-hover); }
+  .mockbar-tabs button.is-active {
+    color: var(--chrome-text-heading);
+    background: var(--chrome-control-bg);
+    border-color: var(--chrome-border-strong);
+  }
+  .mockbar-theme {
+    font-size: var(--text-xs);
+    background: var(--chrome-control-bg); border-color: var(--chrome-border);
+    white-space: nowrap;
+  }
+
+  .direction { display: none; min-height: calc(100vh - 44px); }
+  .direction.is-active { display: flex; flex-direction: column; }
+  .note {
+    max-width: 900px; margin: var(--space-5) auto 0; padding-left: var(--space-3);
+    font-size: var(--text-xs); color: var(--chrome-text-dim);
+    border-left: 2px solid var(--chrome-border-strong);
+  }
+
+  /* ── Shared: title and splash ──────────────────────────────────── */
+  .wordmark {
+    font-family: var(--font-editor);
+    font-size: 34px; font-weight: 400; letter-spacing: 0.01em;
+    color: var(--chrome-text-heading); line-height: 1.1;
+  }
+  /* The splash line. Rotates on each visit, the way a title screen does —
+     a quiet piece of company rather than a message with information in it. */
+  .splash {
+    margin-top: var(--space-3);
+    font-family: var(--font-editor);
+    font-size: var(--text-lg); font-style: italic;
+    color: var(--chrome-text-muted);
+    max-width: 620px;
+  }
+  .splash cite { display: block; margin-top: 4px; font-style: normal; font-size: var(--text-sm); color: var(--chrome-text-dim); }
+  .splash cite::before { content: '— '; }
+
+  /* ── Shared: the ticker ────────────────────────────────────────── */
+  /* A marquee — the horizontal band that pans its contents in from the right.
+     Everything numeric on this page lives in here and nowhere else, which is
+     what keeps the landing page from becoming a second Progress Tracker.
+     Transform only, so it stays off the layout and paint paths. */
+  .ticker {
+    position: relative; overflow: hidden;
+    border-top: 1px solid var(--chrome-border);
+    border-bottom: 1px solid var(--chrome-border);
+    background: var(--chrome-bg-elevated);
+  }
+  .ticker-track {
+    display: flex; width: max-content;
+    animation: ticker-pan 64s linear infinite;
+  }
+  .ticker:hover .ticker-track { animation-play-state: paused; }
+  @keyframes ticker-pan { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .ticker-run { display: flex; flex: none; }
+  .ticker-item {
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: 9px var(--space-5);
+    font-size: var(--text-sm); color: var(--chrome-text-muted); white-space: nowrap;
+  }
+  .ticker-item b { color: var(--chrome-text-heading); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ticker-item::after {
+    content: ''; width: 3px; height: 3px; border-radius: 50%;
+    background: var(--chrome-border-strong); margin-left: var(--space-4);
+  }
+  /* Perpetual motion is a real cost on a screen people open every day, so it
+     stops entirely for anyone who has asked for less of it. */
+  @media (prefers-reduced-motion: reduce) {
+    .ticker-track { animation: none; flex-wrap: wrap; width: 100%; }
+  }
+  /* Fades at both ends so items arrive and leave rather than being clipped. */
+  .ticker::before, .ticker::after {
+    content: ''; position: absolute; top: 0; bottom: 0; width: 56px; z-index: 1; pointer-events: none;
+  }
+  .ticker::before { left: 0; background: linear-gradient(to right, var(--chrome-bg-elevated), transparent); }
+  .ticker::after { right: 0; background: linear-gradient(to left, var(--chrome-bg-elevated), transparent); }
+
+  /* ── Shared: buttons ───────────────────────────────────────────── */
+  .btn {
+    font: inherit; font-size: var(--text-md); color: var(--chrome-text);
+    background: var(--chrome-control-bg); border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-sm); padding: 7px 16px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  }
+  .btn:hover { background: var(--chrome-control-hover); }
+  .btn.primary { background: var(--chrome-accent); color: var(--chrome-accent-contrast); border-color: transparent; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.quiet { background: none; border-color: transparent; color: var(--chrome-text-muted); padding: 7px 10px; }
+  .btn.quiet:hover { color: var(--chrome-text); background: var(--chrome-control-hover); }
+
+  /* Destination chips: open a project straight into one of its areas.
+     Per-project by necessity — none of these exist without one. */
+  .dest { display: flex; gap: 6px; flex-wrap: wrap; }
+  .dest button {
+    font: inherit; font-size: var(--text-xs); color: var(--chrome-text-muted);
+    background: none; border: 1px solid var(--chrome-border); border-radius: 999px;
+    padding: 3px 10px; cursor: pointer; white-space: nowrap;
+  }
+  .dest button:hover { color: var(--chrome-text-heading); border-color: var(--chrome-border-strong); background: var(--chrome-control-hover); }
+
+  .foot {
+    display: flex; align-items: center; justify-content: center; gap: var(--space-5);
+    padding: var(--space-4); font-size: var(--text-sm); color: var(--chrome-text-dim);
+  }
+  .foot label { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
+  .foot button { font: inherit; font-size: var(--text-sm); color: inherit; background: none; border: none; cursor: pointer; }
+  .foot button:hover { color: var(--chrome-text); }
+
+  /* ══ A · The Desk ═════════════════════════════════════════════════ */
+  #dir-a .body { flex: 1; display: flex; align-items: center; justify-content: center; padding: var(--space-8) var(--space-5); }
+  #dir-a .card { width: 100%; max-width: 560px; }
+  #dir-a .head { text-align: center; margin-bottom: var(--space-7); }
+  #dir-a .splash { margin-left: auto; margin-right: auto; }
+  #dir-a .actions { display: flex; gap: var(--space-2); justify-content: center; margin-bottom: var(--space-7); }
+  #dir-a .rows { display: flex; flex-direction: column; }
+  #dir-a .row {
+    display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--space-3);
+    padding: 11px var(--space-2); border-bottom: 1px solid var(--chrome-border); cursor: pointer;
+  }
+  #dir-a .row:first-child { border-top: 1px solid var(--chrome-border); }
+  #dir-a .row:hover { background: var(--chrome-control-hover); }
+  #dir-a .row .name { display: block; color: var(--chrome-text-heading); }
+  #dir-a .row .meta { display: block; font-size: var(--text-xs); color: var(--chrome-text-dim); margin-top: 1px; }
+  /* The destinations stay out of the way until the row is hovered — they are
+     a shortcut for someone who already knows where they are going, not a menu
+     the page needs to present. */
+  #dir-a .row .dest { opacity: 0; transition: opacity var(--motion-enter); }
+  #dir-a .row:hover .dest, #dir-a .row:focus-within .dest, #dir-a .row.show-dest .dest { opacity: 1; }
+  #dir-a .rows-label { font-size: var(--text-sm); color: var(--chrome-text-muted); margin-bottom: var(--space-2); }
+
+  /* ══ B · The Shelf ════════════════════════════════════════════════ */
+  #dir-b .head { padding: var(--space-8) var(--space-6) var(--space-5); text-align: center; }
+  #dir-b .splash { margin-left: auto; margin-right: auto; }
+  #dir-b .body { flex: 1; padding: var(--space-7) var(--space-6); }
+  #dir-b .shelf { display: flex; gap: var(--space-4); flex-wrap: wrap; justify-content: center; max-width: 1100px; margin: 0 auto; }
+  #dir-b .spine {
+    width: 208px; min-height: 232px; display: flex; flex-direction: column;
+    padding: var(--space-4); cursor: pointer; text-align: left;
+    background: var(--chrome-bg-elevated);
+    border: 1px solid var(--chrome-border); border-radius: var(--radius-lg);
+    /* The cloth-spine hint: a darker band down the binding edge. */
+    border-left: 4px solid var(--chrome-border-strong);
+    transition: transform var(--motion-enter), border-color var(--motion-enter);
+  }
+  #dir-b .spine:hover { transform: translateY(-3px); border-left-color: var(--chrome-accent); }
+  #dir-b .spine.is-new {
+    border-style: dashed; border-left: 1px dashed var(--chrome-border-strong);
+    align-items: center; justify-content: center; color: var(--chrome-text-muted);
+    background: none; text-align: center; gap: var(--space-2);
+  }
+  #dir-b .spine .title { font-family: var(--font-editor); font-size: var(--text-xl); color: var(--chrome-text-heading); line-height: 1.2; }
+  #dir-b .spine .sub { font-size: var(--text-xs); color: var(--chrome-text-dim); margin-top: 6px; }
+  #dir-b .spine .grow { flex: 1; }
+  #dir-b .spine .bar { height: 3px; border-radius: 2px; background: var(--chrome-control-bg); overflow: hidden; margin: var(--space-3) 0 var(--space-2); }
+  #dir-b .spine .bar span { display: block; height: 100%; background: var(--chrome-accent); border-radius: 2px; }
+  #dir-b .spine .dest { margin-top: var(--space-2); }
+  #dir-b .actions { display: flex; gap: var(--space-2); justify-content: center; margin-top: var(--space-7); }
+
+  /* ══ C · The Workbench ════════════════════════════════════════════ */
+  #dir-c .head { padding: var(--space-7) var(--space-6) var(--space-5); }
+  #dir-c .body { flex: 1; display: grid; grid-template-columns: 1fr 380px; gap: var(--space-8); padding: var(--space-7) var(--space-6); max-width: 1160px; margin: 0 auto; width: 100%; }
+  #dir-c .col-label { font-size: var(--text-sm); color: var(--chrome-text-muted); margin-bottom: var(--space-3); }
+  #dir-c .rows { display: flex; flex-direction: column; }
+  #dir-c .row {
+    display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--space-3);
+    padding: 10px var(--space-2); border-bottom: 1px solid var(--chrome-border); cursor: pointer;
+  }
+  #dir-c .row:first-of-type { border-top: 1px solid var(--chrome-border); }
+  #dir-c .row:hover { background: var(--chrome-control-hover); }
+  #dir-c .row .name { display: block; color: var(--chrome-text-heading); }
+  #dir-c .row .meta { display: block; font-size: var(--text-xs); color: var(--chrome-text-dim); margin-top: 1px; }
+  #dir-c .actions { display: flex; gap: var(--space-2); margin-bottom: var(--space-6); }
+  /* The resume panel: the one thing this direction argues for. Not a stat —
+     a door back into the exact sentence you left. */
+  #dir-c .resume {
+    padding: var(--space-5); border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-lg); background: var(--chrome-bg-elevated);
+  }
+  #dir-c .resume .kicker { font-size: var(--text-xs); color: var(--chrome-text-dim); }
+  #dir-c .resume .proj { font-family: var(--font-editor); font-size: var(--text-xl); color: var(--chrome-text-heading); margin-top: 2px; }
+  #dir-c .resume .doc { font-size: var(--text-md); color: var(--chrome-text-muted); margin-top: var(--space-2); }
+  #dir-c .resume blockquote {
+    margin: var(--space-3) 0 var(--space-4); padding-left: var(--space-3);
+    border-left: 2px solid var(--chrome-border-strong);
+    font-family: var(--font-editor); font-size: var(--text-md); color: var(--chrome-text-dim); line-height: 1.55;
+  }
+  #dir-c .resume .btn { width: 100%; justify-content: center; }
+  #dir-c .grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); margin-top: var(--space-4);
+  }
+  #dir-c .grid button {
+    font: inherit; font-size: var(--text-sm); color: var(--chrome-text-muted); text-align: left;
+    background: none; border: 1px solid var(--chrome-border); border-radius: var(--radius-md);
+    padding: 9px var(--space-3); cursor: pointer;
+  }
+  #dir-c .grid button:hover { color: var(--chrome-text-heading); background: var(--chrome-control-hover); border-color: var(--chrome-border-strong); }
+
+  @media (max-width: 940px) {
+    #dir-c .body { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="mockbar">
+  <span class="mockbar-title">Landing page · three directions · fake data</span>
+  <div class="mockbar-tabs" id="tabs">
+    <button data-dir="dir-a" class="is-active">A · The Desk</button>
+    <button data-dir="dir-b">B · The Shelf</button>
+    <button data-dir="dir-c">C · The Workbench</button>
+  </div>
+  <button class="mockbar-theme" id="themeToggle">Light theme</button>
+</div>
+
+<!-- ══ A · The Desk ══════════════════════════════════════════════════ -->
+<section class="direction is-active" id="dir-a">
+  <p class="note">A — the desk. The quietest of the three, and the closest to
+    what is there now: one centred column, the three things you came to do, and
+    your projects underneath. Destinations appear on the row you are pointing
+    at rather than being laid out in advance. The ticker sits at the very
+    bottom, out of the way of everything.</p>
+
+  <div class="body">
+    <div class="card">
+      <div class="head">
+        <div class="wordmark">ChapterFlow</div>
+        <p class="splash" data-splash></p>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary">New project</button>
+        <button class="btn">Open project…</button>
+        <button class="btn">Import…</button>
+      </div>
+
+      <div class="rows-label">Recent projects</div>
+      <div class="rows" data-rows="a"></div>
+    </div>
+  </div>
+
+  <div class="ticker" data-ticker></div>
+  <div class="foot">
+    <button>What’s new in 0.9.4</button>
+    <label><input type="checkbox" /> Skip this and open my last project</label>
+  </div>
+</section>
+
+<!-- ══ B · The Shelf ═════════════════════════════════════════════════ -->
+<section class="direction" id="dir-b">
+  <p class="note">B — the shelf. Your projects are the page, laid out as
+    objects rather than list rows, each showing where it stands at a glance.
+    The ticker runs directly under the title so the numbers are read once, on
+    the way past. Making a project is a card in the same row, so the empty
+    state and the full one are the same layout.</p>
+
+  <div class="head">
+    <div class="wordmark">ChapterFlow</div>
+    <p class="splash" data-splash></p>
+  </div>
+
+  <div class="ticker" data-ticker></div>
+
+  <div class="body">
+    <div class="shelf" data-shelf></div>
+    <div class="actions">
+      <button class="btn quiet">Open a project from elsewhere…</button>
+      <button class="btn quiet">Import from Scrivener…</button>
+    </div>
+  </div>
+
+  <div class="foot">
+    <button>What’s new in 0.9.4</button>
+    <label><input type="checkbox" /> Skip this and open my last project</label>
+  </div>
+</section>
+
+<!-- ══ C · The Workbench ═════════════════════════════════════════════ -->
+<section class="direction" id="dir-c">
+  <p class="note">C — the workbench. Two columns: everything you might open on
+    the left, and on the right the one thing you probably came back for — the
+    document you were last in, with the sentence you stopped on. The
+    destinations are a real grid here rather than a hover reveal, because this
+    direction assumes you sometimes open the app to go to the Story Bible and
+    not to write at all.</p>
+
+  <div class="head">
+    <div class="wordmark">ChapterFlow</div>
+    <p class="splash" data-splash></p>
+  </div>
+
+  <div class="ticker" data-ticker></div>
+
+  <div class="body">
+    <div>
+      <div class="actions">
+        <button class="btn primary">New project</button>
+        <button class="btn">Open project…</button>
+        <button class="btn">Import…</button>
+      </div>
+      <div class="col-label">Recent projects</div>
+      <div class="rows" data-rows="c"></div>
+    </div>
+
+    <div>
+      <div class="resume">
+        <div class="kicker">Where you left off, 2 hours ago</div>
+        <div class="proj">The Drowned Mile</div>
+        <div class="doc">Chapter 23 · Survival is Implausible</div>
+        <blockquote>“Groslo pushed the envelope over the table. Your fate lies
+          in there. Ral took it. Nothing could be worse than starving.”</blockquote>
+        <button class="btn primary">Carry on writing</button>
+        <div class="grid">
+          <button>Story Bible</button>
+          <button>Continuity Board</button>
+          <button>Compile</button>
+          <button>Progress</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <button>What’s new in 0.9.4</button>
+    <label><input type="checkbox" /> Skip this and open my last project</label>
+  </div>
+</section>
+
+<script>
+/* ── Fake data ──────────────────────────────────────────────────── */
+const PROJECTS = [
+  { name: 'The Drowned Mile', words: 52584, target: 90000, opened: 'today', chapters: 65 },
+  { name: 'Sallow Harbour', words: 18204, target: 60000, opened: '6 days ago', chapters: 22 },
+  { name: 'Short stories', words: 9730, target: null, opened: '3 weeks ago', chapters: 11 }
+];
+
+/**
+ * Splash quotes.
+ *
+ * Only lines with solid provenance. Two famous ones are deliberately absent:
+ * "Write drunk, edit sober" is not Hemingway, and "kill your darlings" is
+ * Quiller-Couch rather than Faulkner — so the real one is quoted instead.
+ */
+const SPLASHES = [
+  ['The scariest moment is always just before you start.', 'Stephen King, On Writing'],
+  ['I love deadlines. I love the whooshing noise they make as they go by.', 'Douglas Adams'],
+  ['A word after a word after a word is power.', 'Margaret Atwood'],
+  ['Not that the story need be long, but it will take a long while to make it short.', 'Henry David Thoreau'],
+  ['If there’s a book that you want to read, but it hasn’t been written yet, then you must write it.', 'Toni Morrison'],
+  ['The road to hell is paved with adverbs.', 'Stephen King, On Writing'],
+  ['Get it down. Take chances. It may be bad, but it’s the only way you can do anything really good.', 'William Faulkner'],
+  ['You can’t wait for inspiration. You have to go after it with a club.', 'Jack London'],
+  ['Murder your darlings.', 'Arthur Quiller-Couch, On the Art of Writing'],
+  ['I write entirely to find out what I’m thinking.', 'Joan Didion'],
+  ['Start writing, no matter what. The water does not flow until the faucet is turned on.', 'Louis L’Amour'],
+  ['Sometimes it comes easily and perfectly; sometimes it’s like drilling rock and then blasting it out with charges.', 'Ernest Hemingway']
+];
+
+/**
+ * The ticker's contents.
+ *
+ * Deliberately glance-sized, and deliberately the ONLY numbers on the page.
+ * The Progress Tracker owns pace, targets, per-document counts and the
+ * calendar; repeating any of that here would be a second, worse copy of it.
+ */
+const TICKER = [
+  ['80,518', 'words across your three projects'],
+  ['61,340', 'of them typed here'],
+  ['128', 'hours of writing recorded'],
+  ['78', 'of the last 112 days written on'],
+  ['The Drowned Mile', 'last opened today'],
+  ['65', 'chapters in your longest draft'],
+  ['3', 'projects on this computer']
+];
+
+const fmt = (n) => n.toLocaleString('en-US');
+
+/* ── Splash ─────────────────────────────────────────────────────── */
+function paintSplash() {
+  const [text, who] = SPLASHES[Math.floor(Math.random() * SPLASHES.length)];
+  document.querySelectorAll('[data-splash]').forEach((el) => {
+    el.innerHTML = `“${text}”<cite>${who}</cite>`;
+  });
+}
+
+/* ── Ticker ─────────────────────────────────────────────────────── */
+// The run is rendered twice and the track panned by exactly half its width,
+// which is what makes the loop seamless rather than snapping back at the end.
+function paintTickers() {
+  const run = TICKER.map(([value, rest]) => `<span class="ticker-item"><b>${value}</b> ${rest}</span>`).join('');
+  document.querySelectorAll('[data-ticker]').forEach((el) => {
+    el.innerHTML = `<div class="ticker-track"><div class="ticker-run">${run}</div><div class="ticker-run">${run}</div></div>`;
+  });
+}
+
+/* ── Project rows and shelf ─────────────────────────────────────── */
+const DESTINATIONS = ['Story Bible', 'Continuity', 'Compile'];
+
+function destButtons() {
+  return `<span class="dest">${DESTINATIONS.map((d) => `<button type="button">${d}</button>`).join('')}</span>`;
+}
+
+function paintRows() {
+  document.querySelectorAll('[data-rows]').forEach((el) => {
+    el.innerHTML = PROJECTS.map((p) => `
+      <div class="row">
+        <span>
+          <span class="name">${p.name}</span>
+          <span class="meta">${fmt(p.words)} words · opened ${p.opened}</span>
+        </span>
+        ${destButtons()}
+      </div>`).join('');
+  });
+}
+
+function paintShelf() {
+  const el = document.querySelector('[data-shelf]');
+  if (!el) return;
+  el.innerHTML = PROJECTS.map((p) => {
+    const pct = p.target ? Math.min(100, (p.words / p.target) * 100).toFixed(1) : null;
+    return `
+      <div class="spine">
+        <div class="title">${p.name}</div>
+        <div class="sub">${p.chapters} chapters · opened ${p.opened}</div>
+        <div class="grow"></div>
+        ${pct !== null ? `<div class="bar"><span style="width:${pct}%"></span></div>` : ''}
+        <div class="sub">${fmt(p.words)}${p.target ? ' of ' + fmt(p.target) : ' words'}</div>
+        ${destButtons()}
+      </div>`;
+  }).join('') + `
+      <div class="spine is-new">
+        <div style="font-size:22px;line-height:1">+</div>
+        <div>New project</div>
+      </div>`;
+}
+
+/* ── Wiring ─────────────────────────────────────────────────────── */
+paintSplash();
+paintTickers();
+paintRows();
+paintShelf();
+
+const tabs = document.getElementById('tabs');
+function activate(dir) {
+  tabs.querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', b.dataset.dir === dir));
+  document.querySelectorAll('.direction').forEach((s) => s.classList.toggle('is-active', s.id === dir));
+  window.scrollTo(0, 0);
+}
+tabs.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-dir]');
+  if (btn) activate(btn.dataset.dir);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  const map = { 1: 'dir-a', 2: 'dir-b', 3: 'dir-c' };
+  if (map[e.key]) activate(map[e.key]);
+  // Space rerolls the splash, which is the quickest way to read several.
+  if (e.code === 'Space') { e.preventDefault(); paintSplash(); }
+});
+
+const themeBtn = document.getElementById('themeToggle');
+themeBtn.addEventListener('click', () => {
+  const light = document.body.classList.toggle('light');
+  themeBtn.textContent = light ? 'Dark theme' : 'Light theme';
+});
+
+// Deep links: #a / #b / #c, plus "-light".
+{
+  const h = location.hash.slice(1);
+  const dir = { a: 'dir-a', b: 'dir-b', c: 'dir-c' }[h[0]];
+  if (dir) activate(dir);
+  if (h.includes('light')) themeBtn.click();
+}
+</script>
+</body>
+</html>

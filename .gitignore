@@ -16,3 +16,6 @@ report.txt
 # Left over from a path-mangling bug; kept out of history pending removal.
 /UsersjackmOneDriveDocumentsChapterFlow Demo/
 /verifyDemo.mjs
+
+# Per-run results written by scripts/run-tests.mjs.
+test-results/

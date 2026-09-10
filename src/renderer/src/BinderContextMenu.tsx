@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { TRASH_FOLDER_ID, isStructuralFolderId } from '../../shared/binder'
 import type { BinderNode, StatusDef, TagDef } from '../../shared/binder'
 import type { StoryBibleItem } from '../../shared/storyBible'
+import { useFlyoutFit } from './useFlyoutFit'
 
 interface BinderContextMenuProps {
   /** The right-clicked node, or null when the right-click landed on empty
@@ -15,6 +17,13 @@ interface BinderContextMenuProps {
   onClose: () => void
   onCreateDocument: (parentId: string | null) => void
   onCreateFolder: (parentId: string | null) => void
+  /** A folder of the writer's own at the binder root, beside Draft. Offered
+   *  only on empty binder space, since that is the only place the root
+   *  itself is what was right-clicked. */
+  onCreateTopLevelFolder: () => void
+  /** Opens the confirmation for the permanent delete. Never deletes here —
+   *  emptying Trash is the one action in the app with no way back. */
+  onEmptyTrash: () => void
   onImportFiles: (parentId: string | null) => void
   onRename: (id: string) => void
   onDelete: (id: string) => void
@@ -23,6 +32,10 @@ interface BinderContextMenuProps {
   onSetTags: (id: string, tagIds: string[]) => void
   onReveal: (id: string, view: 'outliner' | 'corkboard') => void
   onSetManualMention: (documentId: string, itemId: string, present: boolean) => void
+  /** True when the node is a folder sitting directly under Draft — the only
+   *  place a Part designation means anything to the book compile preset. */
+  partEligible: boolean
+  onSetIsPart: (id: string, isPart: boolean) => void
 }
 
 /** The binder's right-click menu — every item calls the same handler its
@@ -42,6 +55,8 @@ function BinderContextMenu(props: BinderContextMenuProps): JSX.Element {
     onClose,
     onCreateDocument,
     onCreateFolder,
+    onCreateTopLevelFolder,
+    onEmptyTrash,
     onImportFiles,
     onRename,
     onDelete,
@@ -49,10 +64,13 @@ function BinderContextMenu(props: BinderContextMenuProps): JSX.Element {
     onSetStatus,
     onSetTags,
     onReveal,
-    onSetManualMention
+    onSetManualMention,
+    partEligible,
+    onSetIsPart
   } = props
   const [pos, setPos] = useState({ left: x, top: y })
   const ref = useRef<HTMLDivElement>(null)
+  useFlyoutFit(ref)
 
   useEffect(() => {
     function handlePointerDown(e: MouseEvent): void {
@@ -115,7 +133,34 @@ function BinderContextMenu(props: BinderContextMenuProps): JSX.Element {
         <span className="menubar-item-label">Import Files Here…</span>
       </button>
 
-      {node && (
+      {/* Right-clicking empty binder space is the one gesture that means the
+          root itself, so it is where a folder beside Draft is made. */}
+      {!node && (
+        <button type="button" className="menubar-item" onClick={() => act(onCreateTopLevelFolder)}>
+          <span className="menubar-item-label">New Top-Level Folder</span>
+        </button>
+      )}
+
+      {/* Trash takes documents like any other folder, and then offers the one
+          thing no other folder does. */}
+      {node?.id === TRASH_FOLDER_ID && (
+        <>
+          <div className="menubar-separator" />
+          <button
+            type="button"
+            className="menubar-item"
+            disabled={node.children.length === 0}
+            onClick={() => act(onEmptyTrash)}
+          >
+            <span className="menubar-item-label">Empty Trash…</span>
+          </button>
+        </>
+      )}
+
+      {/* Draft/Notes/Matter/Archive/Trash are fixed: they take new content
+          (the items above) but can't be renamed, duplicated, or deleted — the
+          store refuses too; the menu simply doesn't offer. */}
+      {node && !isStructuralFolderId(node.id) && (
         <>
           <div className="menubar-separator" />
 
@@ -128,6 +173,19 @@ function BinderContextMenu(props: BinderContextMenuProps): JSX.Element {
           <button type="button" className="menubar-item" onClick={() => act(() => onDelete(node.id))}>
             <span className="menubar-item-label">Delete</span>
           </button>
+
+          {/* Part designation drives the book compile preset: a Part folder's
+              children compile as chapters behind a part-title page. Only
+              offered where it means something — top-level Draft folders. */}
+          {partEligible && node.type === 'folder' && (
+            <button
+              type="button"
+              className="menubar-item"
+              onClick={() => act(() => onSetIsPart(node.id, !node.isPart))}
+            >
+              <span className="menubar-item-label">{node.isPart ? 'Unmark as Part' : 'Mark as Part'}</span>
+            </button>
+          )}
 
           {isDocument && node.type === 'document' && (
             <>
@@ -144,6 +202,10 @@ function BinderContextMenu(props: BinderContextMenuProps): JSX.Element {
                       onClick={() => act(() => onSetStatus(node.id, null))}
                     >
                       <span className="menubar-item-check">{node.statusId === null ? '✓' : ''}</span>
+                      {/* An empty swatch, so None's label lines up with the
+                          named statuses rather than sitting a swatch to
+                          their left. */}
+                      <span className="tag-status-filter-swatch tag-status-filter-swatch--none" />
                       <span className="menubar-item-label">None</span>
                     </button>
                     {statuses.map((status) => (
@@ -171,15 +233,18 @@ function BinderContextMenu(props: BinderContextMenuProps): JSX.Element {
                       <span className="tag-status-filter-empty">No tags defined yet.</span>
                     ) : (
                       tags.map((tag) => (
-                        <label key={tag.id} className="tag-status-filter-row">
-                          <input
-                            type="checkbox"
-                            checked={node.tagIds.includes(tag.id)}
-                            onChange={() => toggleTag(tag.id)}
-                          />
+                        <button
+                          key={tag.id}
+                          type="button"
+                          className="menubar-item menubar-item--checkable"
+                          onClick={() => toggleTag(tag.id)}
+                        >
+                          <span className="menubar-item-check">
+                            {node.tagIds.includes(tag.id) ? '✓' : ''}
+                          </span>
                           <span className="tag-status-filter-swatch" style={{ backgroundColor: tag.color }} />
-                          <span>{tag.name}</span>
-                        </label>
+                          <span className="menubar-item-label">{tag.name}</span>
+                        </button>
                       ))
                     )}
                   </div>
@@ -195,14 +260,17 @@ function BinderContextMenu(props: BinderContextMenuProps): JSX.Element {
                       <span className="tag-status-filter-empty">No Story Bible items yet.</span>
                     ) : (
                       storyBibleItems.map((item) => (
-                        <label key={item.id} className="tag-status-filter-row">
-                          <input
-                            type="checkbox"
-                            checked={(mentionRollup[node.id] ?? []).includes(item.id)}
-                            onChange={() => toggleMention(item.id)}
-                          />
-                          <span>{item.name}</span>
-                        </label>
+                        <button
+                          key={item.id}
+                          type="button"
+                          className="menubar-item menubar-item--checkable"
+                          onClick={() => toggleMention(item.id)}
+                        >
+                          <span className="menubar-item-check">
+                            {(mentionRollup[node.id] ?? []).includes(item.id) ? '✓' : ''}
+                          </span>
+                          <span className="menubar-item-label">{item.name}</span>
+                        </button>
                       ))
                     )}
                   </div>
