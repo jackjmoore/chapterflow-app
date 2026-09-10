@@ -73,6 +73,31 @@ need a quiet machine run locally: 1B, 3B, 4B, 5A, 5B, 6A, 7B and the flake half 
 runner needs `ELECTRON_DISABLE_SANDBOX`, the GTK, NSS, ALSA and libgbm libraries, network
 egress to GitHub and npmjs during install, and `npm install --legacy-peer-deps`.
 
+## Running in the cloud
+
+A cloud shift runs from a clean checkout of `main` on a Linux runner with no display, no
+installed app and no memory directory. These rules override anything above that assumes the
+development machine.
+
+- Install with `npm install --legacy-peer-deps`. Export `ELECTRON_DISABLE_SANDBOX=1`. Run
+  Electron-hosted suites under `xvfb-run -a` when it is available; when it is not, say so in
+  the findings file and run the Node-hosted suites only.
+- `freshness` always fails on a cloud runner because there is no installed app. Never spend
+  time on it.
+- Shift selection: take the shift `TEST-STATE.md` names. If "Which shifts can run where" lists
+  it as local, do not run it; take the earliest workbook row that is cloud-capable and not yet
+  marked done. If there is none, append a log entry under `## <date> — cloud shift, skipped`
+  naming the local shift that is blocking, commit, push, and stop.
+- When a substitute row is run, "What's in progress" in the state file keeps naming the local
+  shift, and gains one sentence saying which cloud row was done and when.
+- Commits go to `main`. Before each commit, `git pull --rebase origin main`; after each commit,
+  `git push origin HEAD:main`. That includes the shift-open commit, so a run that dies leaves
+  its evidence on the remote. If a push is rejected twice, push to `test-shift/<id>`, open a
+  pull request, and say so in the log entry. Never force-push.
+- Step 6 of the close list does not apply. Anything a later shift needs goes in a findings
+  file or the state file.
+- One shift per run. Do not start the next row.
+
 ## Write at the end, in this order
 
 1. **`FINDINGS/<date>-<topic>.md`** for any result that needs more than two sentences: a
