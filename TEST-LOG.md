@@ -65,3 +65,10 @@ which has no earlier number to compare against.
 
 The `FINDINGS/2026-09-09-headless-viability.md` file the earlier entries point at does not exist
 on disk and was never committed. Nothing in this shift depended on it.
+
+## 2026-09-10 — setup, by hand
+
+Not a shift. `TEST-SHIFT.md` written as the single entry point for an automated shift: what to
+read at the start and in what order, the rules during, what to write at the close and in what
+order, and which workbook rows can run on a cloud runner. `TESTING-PLAN.md` gained one sentence
+pointing at it. Nothing else changed.

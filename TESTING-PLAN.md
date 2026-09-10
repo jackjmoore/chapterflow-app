@@ -2,7 +2,8 @@
 
 The stable layer. Changes rarely, and changes to it are worth the same care as changes to
 the data model. Week-to-week work lives in `TEST-WORKBOOK.md`; current position lives in
-`TEST-STATE.md`; history lives in `TEST-LOG.md`.
+`TEST-STATE.md`; history lives in `TEST-LOG.md`. A shift starts from `TEST-SHIFT.md`, which
+says what to read and what to write.
 
 ## What the suite is for
 
