@@ -82,3 +82,37 @@ failing a save, the unreadable-binder guard, and the same guard on every other s
 one. A data bug found gets a failing test before anything else; renderer changes are out of
 scope. In flight: a clean `npm install --legacy-peer-deps`, then the new tests through
 `scripts/run-tests.mjs` with results in `test-results/2026-09-11-shift-2A`.
+
+## 2026-09-11 — shift 2A close
+
+Row 2A done on a cloud runner in place of 1B, which is local-only. New suite
+`tests/filesystem.test.ts`, registered in `scripts/run-tests.mjs` and `test:build` as
+`filesystem`: 24 assertions, all passing, 0.4 seconds, Electron-hosted with no window and no
+timing assertion. It covers write ordering under contention, what a failed write does to the
+queue, the observer never being able to fail a save, and the `loadFailed` guard on both
+`binder.json` and `storybible/index.json`. Per-section table, the mutation checks and the
+cloud-runner notes are in `FINDINGS/2026-09-11-filesystem-part-one.md`.
+
+The suite was checked against deliberate breakage twice rather than trusted because it was
+green. Removing the per-path queue in `atomicWrite` and the `loadFailed` return in
+`binderStore` failed five assertions; removing only the guard in both stores failed five. The
+first run also exposed a defect in the test, not the app: a missing guard made a mutation
+reject and threw out of the suite, abandoning three sections, so `pokeBinder` now swallows
+each rejection.
+
+Two things recorded rather than asserted, both decisions rather than defects. Only
+binderStore and storyBibleStore carry the guard; the other fifteen project stores read, fall
+back to an empty file when the read throws, and write the whole file back, which was
+demonstrated on `mentions.json` — two records seeded, file truncated, one mutation later the
+file held one record and no trace of the other two. And a write whose rename fails leaves its
+temp file beside the target, so the deferred `.tmp-*` sweep is about live failures too, not
+only crashes.
+
+Noticed on the way. The Electron binary failed to download on the first
+`npm install --legacy-peer-deps` with a 502 from `release-assets.githubusercontent.com` and
+needed `node node_modules/electron/install.js` run once more. `npm install` on this runner
+rewrote `package-lock.json`, dropping `libc` from thirty optional dependency entries; that was
+reverted and is not in this commit. And `compilestore` took 0.5 seconds here against 17.0 on
+2026-09-10, which bears on whether the development machine was busy during the baseline; five
+other suites were run beside it to confirm the runner change disturbed nothing, 242 assertions
+across the six, all passing.
