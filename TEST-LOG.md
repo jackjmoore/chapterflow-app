@@ -72,3 +72,13 @@ Not a shift. `TEST-SHIFT.md` written as the single entry point for an automated 
 read at the start and in what order, the rules during, what to write at the close and in what
 order, and which workbook rows can run on a cloud runner. `TESTING-PLAN.md` gained one sentence
 pointing at it. Nothing else changed.
+
+## 2026-09-11 — shift 2A open
+
+Cloud shift. `TEST-STATE.md` names 1B, which `TEST-SHIFT.md` lists as local-only, so the
+substitute rule applies and this shift takes row 2A, the earliest cloud-capable row not yet
+done: filesystem integration part one — write ordering under contention, observer failure never
+failing a save, the unreadable-binder guard, and the same guard on every other store that has
+one. A data bug found gets a failing test before anything else; renderer changes are out of
+scope. In flight: a clean `npm install --legacy-peer-deps`, then the new tests through
+`scripts/run-tests.mjs` with results in `test-results/2026-09-11-shift-2A`.
