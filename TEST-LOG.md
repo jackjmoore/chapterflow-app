@@ -116,3 +116,15 @@ reverted and is not in this commit. And `compilestore` took 0.5 seconds here aga
 2026-09-10, which bears on whether the development machine was busy during the baseline; five
 other suites were run beside it to confirm the runner change disturbed nothing, 242 assertions
 across the six, all passing.
+
+## 2026-09-12 — shift 2B open
+
+`TEST-STATE.md` still names 1B, which `TEST-SHIFT.md` lists as local-only, so the substitute
+rule applies again and this shift takes row 2B, the earliest cloud-capable row not yet done:
+binder integration part two — delete cascade leaving nothing in `documents/`, snapshots or span
+tags; duplicate yielding fresh ids with copied content; random valid moves preserving node
+count and every id; bulk insert refusing duplicates and protected ids; and four legacy binder
+shapes opening and round-tripping. A data bug found gets a failing test before anything else;
+renderer changes are reported, not made. In flight: a clean `npm install --legacy-peer-deps`
+checked with `node -e "require('electron')"`, then the new suite through
+`scripts/run-tests.mjs` with results in `test-results/2026-09-12-shift-2B`.
