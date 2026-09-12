@@ -51,6 +51,7 @@ const SUITES = [
   { name: 'compile', host: 'node', bundle: 'compile' },
   { name: 'book', host: 'node', bundle: 'book' },
   { name: 'filesystem', host: 'electron', bundle: 'filesystem' },
+  { name: 'binder', host: 'electron', bundle: 'binder' },
   { name: 'compilestore', host: 'electron', bundle: 'compileStore' },
   { name: 'bookrender', host: 'electron', bundle: 'bookRender' },
   { name: 'structure', host: 'electron', bundle: 'structure' },

@@ -128,3 +128,39 @@ shapes opening and round-tripping. A data bug found gets a failing test before a
 renderer changes are reported, not made. In flight: a clean `npm install --legacy-peer-deps`
 checked with `node -e "require('electron')"`, then the new suite through
 `scripts/run-tests.mjs` with results in `test-results/2026-09-12-shift-2B`.
+
+## 2026-09-12 — shift 2B close
+
+Row 2B done on a cloud runner in place of 1B, which is local-only and has now been deferred
+twice. New suite `tests/binder.test.ts`, registered in `scripts/run-tests.mjs` and `test:build`
+as `binder`: 68 assertions, all passing, 0.4 seconds, Electron-hosted with no window and no
+timing assertion. It covers the delete cascade into `documents/`, snapshots and span tags;
+duplicate minting fresh ids with copied content; sixty seeded moves over a 26-node tree;
+bulk insert refusing six kinds of invalid batch; and four legacy binder shapes opening and
+holding still. The per-section table, the mutation checks and the neighbour run are in
+`FINDINGS/2026-09-12-binder-part-two.md`.
+
+The suite was checked against deliberate breakage three times rather than trusted because it
+was green — the delete and duplicate paths, the insert validation and the move guards, and the
+two legacy migrations — failing 6, 7 and 5 assertions in turn. Two defects in the test came out
+of it, both fixed. The control assertion for the sixty moves compared the tree with itself,
+because `getState()` returns the live `state.tree` and a snapshot held as a reference mutates
+with it. And the third mutation reproduced 2A's finding exactly: a lost node threw and
+abandoned the sections after it, 51 assertions instead of 68, so every walk that can meet a
+missing node now returns an empty list instead.
+
+One thing traced through the source and recorded rather than asserted, because a crash cannot
+be provoked from inside a suite. `insertSubtree`'s own comment states the rule — documents
+written before the binder, so a crash leaves discoverable orphan files rather than chapters
+that exist and are empty. `duplicateNode` persists the binder before copying content, and
+`deleteNode` deletes content before persisting the binder; both land on the side that comment
+calls indistinguishable from data loss. Neither loses anything that existed before the
+operation, and reordering either is a behaviour decision, so nothing was changed.
+
+Eight neighbouring suites were run beside it to confirm the runner change disturbed nothing —
+export, compile, book, filesystem, compilestore, structure, scrivmeta, scrivrtf — 325
+assertions, all passing, 393 with the new suite. Noticed on the way: both cloud-runner problems
+of 2026-09-11 recurred in the same form, the Electron binary failing to download on install and
+`npm install` dropping `libc` from thirty lockfile entries, so both are reliable rather than
+incidental. And `structure` took 0.4 seconds here against 10.1 on the development machine on
+2026-09-10, with `compilestore` at 0.4 against 17.0.
