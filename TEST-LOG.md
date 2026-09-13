@@ -178,3 +178,49 @@ by eye. A data bug found gets a failing test before anything else; renderer chan
 reported, not made. In flight: a clean `npm install --legacy-peer-deps` checked with
 `node -e "require('electron')"`, the generator under `scripts/`, a `generator` suite through
 `scripts/run-tests.mjs`, and results in `test-results/2026-09-13-shift-3A`.
+
+## 2026-09-13 — shift 3A close
+
+Row 3A done on a cloud runner in place of 1B, which is local-only and has now been deferred
+three times. New generator `scripts/make-fixture-project.mjs` with a type declaration beside it,
+and a new suite `tests/generator.test.ts`, registered in `scripts/run-tests.mjs` and
+`test:build` as `generator`: 76 assertions, all passing, 0.7 seconds, Electron-hosted with no
+window and no timing assertion. Small is 6 documents and 1,370 words; Realistic is 58 documents
+and 123,274 words, of which exactly 120,000 are in Draft across 48 chapters in four parts, and
+takes 0.2 seconds to write 73 files. The per-section table, the mutation checks and the
+neighbour run are in `FINDINGS/2026-09-13-fixture-generator.md`.
+
+Determinism holds for both shapes: two runs of one shape and seed write the same file names,
+the same bytes and the same ground-truth file, and a different seed changes the prose and every
+id while keeping the structure. Ground truth is measured off the finished text rather than off
+the generator's bookkeeping and the two are compared before anything is written. The app's own
+`countWords`, `prepareMentionMatching` and `findMentionsInText` are what the suite checks the
+planted numbers with — 508 planted entity occurrences across 56 documents in Realistic, each
+document detecting exactly what it was given and nothing else. `binder.json` is byte-identical
+after `binderStore` loads it and writes it back, with no `.pre-structure` sidecar, so a
+generated project fires no migration and no repair.
+
+The suite was checked against deliberate breakage five times rather than trusted because it was
+green — non-deterministic ids, an extra field backfilled by `normalizeTree`, a changed snippet
+limit in `spanTagStore`, a changed `countWords`, and `prepareMentionMatching` sorting
+shortest-first — failing 6, 2, 2, 4 and 4 assertions in turn. One defect in the test came out of
+it, the same shape as the ones 2A and 2B each found: the byte-comparison loop threw ENOENT on a
+file the second run had not written and abandoned the sections after it, 5 assertions instead of
+76. A missing file now counts as a difference, and each shape's sections are wrapped so one
+cannot carry off the other.
+
+One thing confirmed directly and recorded rather than asserted. The main process extracts a
+document's text two different ways: `searchIndex.stripHtml` turns a tag into a space, and
+`mentionStore` uses `parse(html).textContent`, which turns it into nothing. A name in the first
+words after a heading is therefore glued to the heading and cannot be detected as a mention,
+while the search index finds it — demonstrated on 2026-09-13 with `Ottiline` after `<h1>Low
+Water</h1>`. Changing it would move detection counts in every existing project, so nothing was
+changed; the generator works around it by never planting a name in a document's first sentence.
+
+Nine neighbouring suites were run beside it to confirm the runner change disturbed nothing —
+export, compile, book, filesystem, binder, compilestore, structure, scrivmeta, scrivrtf — 393
+assertions, all passing, 469 with the new suite. Noticed on the way: the Electron binary
+downloaded cleanly on `npm install --legacy-peer-deps` this time, unlike 2026-09-11 and
+2026-09-12, so that problem is not reliable; `npm install` again dropped `libc` from the same
+thirty lockfile entries, which was reverted; and `structure` took 0.3 seconds here against 10.1
+on the development machine on 2026-09-10, with `compilestore` at 0.4 against 17.0.

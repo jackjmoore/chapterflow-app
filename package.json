@@ -11,7 +11,7 @@
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "node scripts/run-tests.mjs",
-    "test:build": "esbuild tests/filesystem.test.ts tests/binder.test.ts tests/export.test.ts tests/compile.test.ts tests/book.test.ts tests/bookRender.test.ts tests/compileStore.test.ts tests/structure.test.ts tests/editorfeatures.test.ts tests/pdf.test.ts tests/pagination.test.ts tests/pageview.test.ts tests/revision.test.ts tests/freshness.test.ts tests/live.test.ts tests/lexicon.test.ts tests/searchIndex.test.ts tests/searchRank.test.ts tests/searchUi.test.ts tests/uiPolish.test.ts tests/dashboard.test.ts tests/scrivenerMetadata.test.ts tests/scrivenerRtf.test.ts --bundle --platform=node --format=cjs --outdir=node_modules/.cache/chapterflow-tests --out-extension:.js=.cjs --external:electron && esbuild tests/pagination.browser.ts --bundle --format=iife --global-name=__paginationChecks --outfile=node_modules/.cache/chapterflow-tests/pagination.browser.cjs && esbuild tests/pageview.browser.ts --bundle --format=iife --global-name=__pageviewChecks --outfile=node_modules/.cache/chapterflow-tests/pageview.browser.cjs && esbuild tests/revision.browser.ts --bundle --format=iife --global-name=__revisionChecks --outfile=node_modules/.cache/chapterflow-tests/revision.browser.cjs && esbuild tests/editorfeatures.browser.ts --bundle --format=iife --global-name=__editorfeaturesChecks --outfile=node_modules/.cache/chapterflow-tests/editorfeatures.browser.cjs",
+    "test:build": "esbuild tests/filesystem.test.ts tests/binder.test.ts tests/generator.test.ts tests/export.test.ts tests/compile.test.ts tests/book.test.ts tests/bookRender.test.ts tests/compileStore.test.ts tests/structure.test.ts tests/editorfeatures.test.ts tests/pdf.test.ts tests/pagination.test.ts tests/pageview.test.ts tests/revision.test.ts tests/freshness.test.ts tests/live.test.ts tests/lexicon.test.ts tests/searchIndex.test.ts tests/searchRank.test.ts tests/searchUi.test.ts tests/uiPolish.test.ts tests/dashboard.test.ts tests/scrivenerMetadata.test.ts tests/scrivenerRtf.test.ts --bundle --platform=node --format=cjs --outdir=node_modules/.cache/chapterflow-tests --out-extension:.js=.cjs --external:electron && esbuild tests/pagination.browser.ts --bundle --format=iife --global-name=__paginationChecks --outfile=node_modules/.cache/chapterflow-tests/pagination.browser.cjs && esbuild tests/pageview.browser.ts --bundle --format=iife --global-name=__pageviewChecks --outfile=node_modules/.cache/chapterflow-tests/pageview.browser.cjs && esbuild tests/revision.browser.ts --bundle --format=iife --global-name=__revisionChecks --outfile=node_modules/.cache/chapterflow-tests/revision.browser.cjs && esbuild tests/editorfeatures.browser.ts --bundle --format=iife --global-name=__editorfeaturesChecks --outfile=node_modules/.cache/chapterflow-tests/editorfeatures.browser.cjs",
     "test:prepare": "npm run build && npm run test:build",
     "test:export": "node scripts/run-tests.mjs export",
     "test:compile": "node scripts/run-tests.mjs compile",
@@ -37,7 +37,8 @@
     "test:scrivmeta": "node scripts/run-tests.mjs scrivmeta",
     "test:scrivrtf": "node scripts/run-tests.mjs scrivrtf",
     "test:dashboard": "node scripts/run-tests.mjs dashboard",
-    "test:filesystem": "node scripts/run-tests.mjs filesystem"
+    "test:filesystem": "node scripts/run-tests.mjs filesystem",
+    "test:generator": "node scripts/run-tests.mjs generator"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",
