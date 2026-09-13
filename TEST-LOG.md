@@ -164,3 +164,17 @@ of 2026-09-11 recurred in the same form, the Electron binary failing to download
 `npm install` dropping `libc` from thirty lockfile entries, so both are reliable rather than
 incidental. And `structure` took 0.4 seconds here against 10.1 on the development machine on
 2026-09-10, with `compilestore` at 0.4 against 17.0.
+
+## 2026-09-13 — shift 3A open
+
+`TEST-STATE.md` still names 1B, which `TEST-SHIFT.md` lists as local-only and which has now
+been deferred twice, so the substitute rule applies again and this shift takes row 3A, the
+earliest cloud-capable row not yet done: a deterministic project generator for the Small and
+Realistic shapes. Fixed seed all the way down and no fresh UUIDs, so two runs of the same seed
+produce byte-identical trees; planted per-document word counts and named entity placements
+carried in a ground-truth file beside the project; and the same file shapes the stores
+themselves write, checked by opening a generated project through the binder store rather than
+by eye. A data bug found gets a failing test before anything else; renderer changes are
+reported, not made. In flight: a clean `npm install --legacy-peer-deps` checked with
+`node -e "require('electron')"`, the generator under `scripts/`, a `generator` suite through
+`scripts/run-tests.mjs`, and results in `test-results/2026-09-13-shift-3A`.
