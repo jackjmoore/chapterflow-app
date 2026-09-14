@@ -224,3 +224,16 @@ downloaded cleanly on `npm install --legacy-peer-deps` this time, unlike 2026-09
 2026-09-12, so that problem is not reliable; `npm install` again dropped `libc` from the same
 thirty lockfile entries, which was reverted; and `structure` took 0.3 seconds here against 10.1
 on the development machine on 2026-09-10, with `compilestore` at 0.4 against 17.0.
+
+## 2026-09-14 — shift 4A open
+
+`TEST-STATE.md` still names 1B, which `TEST-SHIFT.md` lists as local-only and which has now
+been deferred three times, so the substitute rule applies again and this shift takes row 4A,
+the earliest cloud-capable row not yet done: compile structure in Node for TXT, Markdown and
+DOCX. Section count against the compile scope, word parity against the generator's truth file
+with a stated tolerance, the last paragraph of the last document present in the output, an
+empty document giving an empty section rather than being dropped, and front and back matter in
+the order the binder holds them. A data or compile bug found gets a failing test before
+anything else; renderer changes are reported, not made. In flight: a clean
+`npm install --legacy-peer-deps` checked with `node -e "require('electron')"`, a `compilestruct`
+suite through `scripts/run-tests.mjs`, and results in `test-results/2026-09-14-shift-4A`.
