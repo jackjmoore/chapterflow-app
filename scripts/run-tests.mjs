@@ -49,6 +49,7 @@ const SUITES = [
   { name: 'freshness', host: 'node', bundle: 'freshness' },
   { name: 'export', host: 'node', bundle: 'export' },
   { name: 'compile', host: 'node', bundle: 'compile' },
+  { name: 'compilestruct', host: 'node', bundle: 'compileStructure' },
   { name: 'book', host: 'node', bundle: 'book' },
   { name: 'filesystem', host: 'electron', bundle: 'filesystem' },
   { name: 'binder', host: 'electron', bundle: 'binder' },

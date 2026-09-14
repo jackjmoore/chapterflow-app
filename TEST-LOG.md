@@ -237,3 +237,63 @@ the order the binder holds them. A data or compile bug found gets a failing test
 anything else; renderer changes are reported, not made. In flight: a clean
 `npm install --legacy-peer-deps` checked with `node -e "require('electron')"`, a `compilestruct`
 suite through `scripts/run-tests.mjs`, and results in `test-results/2026-09-14-shift-4A`.
+
+## 2026-09-14 — shift 4A close
+
+Row 4A done on a cloud runner in place of 1B, which is local-only and has now been deferred
+four times. New suite `tests/compileStructure.test.ts`, registered in `scripts/run-tests.mjs`
+and `test:build` as `compilestruct`: 66 assertions, all passing, 2.5 seconds, Node-hosted with
+no window and no timing assertion. It compiles the generator's Realistic shape — 4 parts, 48
+chapters, 120,000 planted Draft words, a Matter folder of three — to txt, Markdown and docx and
+reads each result back, 840,639 bytes of plain text and 3,362 docx paragraphs per full compile.
+The per-section table, the tolerances, the mutation checks and the neighbour run are in
+`FINDINGS/2026-09-14-compile-structure.md`.
+
+The five properties the row asked for all hold. One section per binder node and no more, in all
+three formats, with every heading accounted for: 52 structural plus one `<h1>` per document in
+the docx, and the title, the Contents caption, 52 sections and 48 documents in the Markdown. A
+partial scope of 26 nodes compiles 26 sections, and an excluded chapter is gone in its prose as
+well as its heading. Word parity is exact rather than tolerant where it can be — the recorded
+body count is 120,000 against 120,000 planted, and 28,554 against 28,554 for a one-part scope —
+with 2% allowed for the artifacts themselves, whose scaffolding costs +402, +451 and +150 words
+on 120,000. The last paragraph of chapter 48 is the last thing in the `.txt` file and the last
+docx paragraph with text in it. An empty document keeps its section, its heading and its
+Contents entry in all three formats and contributes no words.
+
+One compile bug found, recorded rather than fixed because it is a decision about output rather
+than a defect with an obvious fix. Front matter sits on opposite sides of the table of contents
+depending on the format: `projectToPdfHtml` and `projectToDocxBuffer` both split the leading
+matter off and emit it before the Contents — the comment at the PDF one says a title page after
+a Contents page reads backwards — while `projectToPlainText` and `projectToMarkdown` build the
+Contents first and then emit every section in order, matter included. Nothing is lost or
+duplicated; back matter is consistent in all four. Both orders are now asserted as they stand,
+the txt and md one labelled as the disagreement it is, so a change to either arrives as a
+failure. It is in "What's waiting on Jack".
+
+The suite was checked against deliberate breakage five times rather than trusted because it was
+green — a document with no blocks dropped from the walk, matter given a Markdown section
+heading, the last section lost from the plain-text render, matter allowed into the recorded
+word count, and heading text dropped from `blocksToPlainText` — failing 6, 1, 11, 1 and 3
+assertions in turn, with all 66 reached every time. The fifth is why the body count is asserted
+exactly: dropping every document's own `<h1>` loses 91 words out of 120,000, which is 0.08% and
+inside any percentage tolerance anyone would write down. No defect in the test came out of the
+mutation runs, the first time in four shifts; three came out of the first green run and were
+fixed before the recorded one, all of them the suite mismeasuring rather than the app
+misbehaving.
+
+Noticed on the way, and the reason this suite could be Node-hosted at all: nothing on the txt,
+Markdown or docx path opens a BrowserWindow, and the only thing keeping the project-level
+renderers out of a Node host was `projectRoot` computing its default from `app.getPath` at
+module load. `tests/electronForNode.ts` stands in for the `electron` module for this one suite
+through an aliased second `esbuild` step in `test:build`; every other suite still bundles with
+`--external:electron`, and `compilestore` is unchanged and still Electron-hosted.
+
+Ten neighbouring suites were run in the same invocation to confirm the runner registration and
+the `test:build` change disturbed nothing — export, compile, book, filesystem, binder,
+generator, compilestore, structure, scrivmeta, scrivrtf — 469 assertions, all passing, 535 with
+the new suite. `npm install` again dropped `libc` from the same thirty lockfile entries, which
+was reverted; `node_modules/electron` again arrived without a `dist/`, and the
+`node -e "require('electron')"` check repaired it by itself this time. `structure` took 0.4
+seconds here against 10.1 on the development machine on 2026-09-10 and `compilestore` 0.5
+against 17.0; `filesystem` took 4.9 against 0.3 on the last three cloud shifts, which is a cold
+Electron start rather than a regression.
