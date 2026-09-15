@@ -672,6 +672,19 @@ export function onDocumentDeleted(documentId: string): void {
   }).catch((error) => console.error('Search index update failed:', error))
 }
 
+/** The same, for a Story Bible sheet. Deleting an item rewrites
+ *  storybible/index.json — which atomicWrite does see, so the item's name,
+ *  aliases and summary drop out on their own — but unlinks
+ *  storybible/sheets/<id>.json, which nothing would otherwise report. Without
+ *  this the sheet's block text stays searchable for the rest of the session,
+ *  pointing at an item that is gone. */
+export function onSheetDeleted(itemId: string): void {
+  runQueued(async () => {
+    dropSource(`storybible/sheets/${itemId}.json`)
+    await persist()
+  }).catch((error) => console.error('Search index update failed:', error))
+}
+
 /**
  * Every entry matching `text`.
  *
