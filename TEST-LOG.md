@@ -297,3 +297,15 @@ was reverted; `node_modules/electron` again arrived without a `dist/`, and the
 seconds here against 10.1 on the development machine on 2026-09-10 and `compilestore` 0.5
 against 17.0; `filesystem` took 4.9 against 0.3 on the last three cloud shifts, which is a cold
 Electron start rather than a regression.
+
+## 2026-09-15 — shift 6B open
+
+`TEST-STATE.md` names shift 1B, which `TEST-SHIFT.md` lists as local-only, so the cloud
+substitute rule is taken for the fifth shift running and row 6B is run instead: reference rot at
+store level. In flight will be a new suite over three cascades — a Story Bible item delete taking
+its sheet, its images and its mentions; a document delete clearing comments, mentions and
+submission links; and timeline pruning dropping links to deleted items and nothing else — written
+against the generator's fixtures in a temporary directory, Node-hosted through
+`tests/electronForNode.ts` if the stores involved reach no `app` call at load time and
+Electron-hosted otherwise. Anything found is recorded in a findings file and gets a failing test
+before a fix; a fix only if it is store-level in `src/main`.
