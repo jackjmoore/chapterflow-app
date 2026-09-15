@@ -309,3 +309,72 @@ against the generator's fixtures in a temporary directory, Node-hosted through
 `tests/electronForNode.ts` if the stores involved reach no `app` call at load time and
 Electron-hosted otherwise. Anything found is recorded in a findings file and gets a failing test
 before a fix; a fix only if it is store-level in `src/main`.
+
+## 2026-09-15 — shift 6B close
+
+Row 6B done on a cloud runner in place of 1B, which is local-only and has now been deferred five
+times. New suite `tests/references.test.ts`, registered in `scripts/run-tests.mjs` and
+`test:build` as `references`: 102 assertions, all passing, 0.1 seconds, Node-hosted through the
+`electronForNode.ts` shim with no window and no timing assertion. The per-section table, the
+mutation checks and the neighbour run are in `FINDINGS/2026-09-15-reference-rot.md`.
+
+All three cascades the row asked for hold. A Story Bible item delete takes its sheet file, both
+images its sheet referenced, and every mention record naming it including the manual one, while
+the neighbouring item keeps its record, sheet, image and mentions byte for byte and its name
+stays claimed in the suppression list. A document delete returns both documents under a folder
+and clears their comments and mentions, and nulls `documentId` and `snapshotId` on the
+submission sent from one of them while keeping its `documentNameAtSend` tombstone, its recipient,
+its notes and its creation time; the submission sent from the surviving document is byte-identical
+afterwards, `updatedAt` included. Emptying Trash was asserted separately rather than trusted to
+be the same code. Timeline pruning removed seven dead references — five links and two
+relationships — across five entries, kept every entry and their order, restamped only the entries
+that actually lost something, and left `binder.json` and `storybible/index.json` untouched; a
+second prune returned 0 and rewrote neither file.
+
+One bug found and fixed, with the failing assertion written first. A deleted Story Bible item's
+sheet text stayed searchable for the rest of the session: the search index is maintained by an
+observer on `atomicWrite`, which never sees a delete, and `documentStore.deleteDocument` was the
+only place compensating for that. `storyBibleSheetStore.deleteSheet` unlinked
+`storybible/sheets/<id>.json` silently, so the sheet's block entries stayed in the index with no
+file behind them, returning hits that pointed at an item no longer in the Story Bible. The item's
+own name, aliases and summary dropped out on their own, because those live in
+`storybible/index.json`, which is rewritten rather than unlinked. The fix is
+`searchIndex.onSheetDeleted`, three lines mirroring `onDocumentDeleted`, called from `deleteSheet`
+— store-level in `src/main` with no renderer side. `search` (41 assertions) and `rank` (72) were
+run afterwards and both pass. The staleness was never permanent: `searchIndex.open()` drops
+sources whose files have vanished, and the suite asserts the post-reopen case separately, which
+passed before the fix as well as after.
+
+The suite was checked against six deliberate mutations rather than trusted because it was green —
+a dropped `commentStore` line in the real `binder:delete` handler, manual mentions spared by an
+item delete, only the first of a sheet's images taken, the prune removing entries left with no
+links, `documentNameAtSend` cleared with the document link, and a comment delete dropping every
+comment rather than one document's — failing 1, 3, 1, 7, 1 and 2 assertions in turn, with all 102
+reached every time. The first of those is why the suite reads the four handler bodies out of
+`src/main/index.ts` and compares the store calls in them: the suite's own cascades are
+restatements of index.ts, so a line dropped from the real handler is invisible to every other
+section. No defect in the test came out of the mutation runs, the second shift running; two came
+out of writing it and were fixed before the first recorded run, both the suite mismeasuring.
+
+Noticed on the way and recorded rather than fixed: `documentImageStore.deleteImage` is exported
+and has no caller anywhere in `src/`, so a manuscript image file outlives both the image being
+removed from the text and the document being deleted, while the Story Bible side of the same
+feature cleans up on all three paths. That is an orphan rather than a loss and belongs with the
+deferred sweep item, so it is not asserted — an assertion that the orphan survives would pin it.
+Also recorded: `binder:delete` cascades after `deleteNode` has already written `binder.json`, so a
+crash in that window leaves comment bodies naming a document the binder no longer lists, which
+compounds the write-ordering finding of 2026-09-12 rather than being a new one.
+
+Fourteen neighbouring suites were run in the same invocation — export, compile, compilestruct,
+book, filesystem, binder, generator, compilestore, structure, lexicon, search, rank, scrivmeta,
+scrivrtf — 655 assertions with one failure, 757 with the new suite. The failure is `lexicon` on
+the one spellcheck assertion `TEST-SHIFT.md` already records as a fresh-profile failure; the
+assertion that failed is that one and it was not spent time on. This is the first cloud shift to
+run `search`, `rank` and `lexicon` at all: they are marked `needsBuild`, and `npm run build` —
+never invoked by the four cloud shifts before this one — took 948 milliseconds on this runner, so
+a cloud shift touching `src/main` should run it rather than skip those suites. `npm install`
+again dropped `libc` from the same thirty lockfile entries, which was reverted;
+`node_modules/electron` again arrived without a `dist/`, and the `node -e "require('electron')"`
+check repaired it by itself. `structure` took 0.4 seconds here against 10.1 on the development
+machine on 2026-09-10 and `compilestore` 0.4 against 17.0; `filesystem` took 8.0 as the first
+Electron-hosted suite in the run, which is a cold start rather than a regression.

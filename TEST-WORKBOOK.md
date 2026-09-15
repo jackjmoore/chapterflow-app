@@ -27,7 +27,7 @@ runner's results JSON under `test-results/` plus one summary line per run in `TE
 | 5 | A | Build the smoke: open Realistic, type in A, switch to B inside the debounce, type, quit inside the max-wait, relaunch, both intact, binder byte-identical. | No |
 | 5 | B | Run it on a quiet machine. Forced-kill variant as recorded, not asserted. Flush time on Realistic against the 2.5 s quit timeout, recorded. | Quiet machine. |
 | 6 | A | Backup restore under Electron with a temporary user-data directory: pre-restore backup precedes the wipe, a failure between wipe and copy leaves that backup complete, restoring a backup lacking a document leaves no orphan. | No |
-| 6 | B | Reference rot at store level: Story Bible item delete takes sheet, images and mentions. Document delete clears comments, mentions and submission links. Timeline pruning drops links to deleted items and nothing else. | No |
+| 6 | B | Done 2026-09-15, on a cloud runner in place of 1B. New `references` suite, 102 assertions passing, Node-hosted; a deleted item's sheet text stayed searchable for the rest of the session, found with a failing test and fixed in `searchIndex`/`storyBibleSheetStore`, recorded in `FINDINGS/2026-09-15-reference-rot.md`. | No |
 | 7 | A | Wide ceiling shape in the generator. Full suite twice back to back for flake and duration. Weekly review in the log. Draft the routine definition, listing cloud-capable suites. | No |
 | 7 | B | First ceiling measurement: open, full search, entity detection, compile wall clock, peak renderer heap on Wide, recorded with no threshold. Fallback if the machine is not quiet: provoke the Windows rename retry from a second process holding a lock. | Quiet machine, or the fallback runs. |
 
