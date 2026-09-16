@@ -378,3 +378,15 @@ again dropped `libc` from the same thirty lockfile entries, which was reverted;
 check repaired it by itself. `structure` took 0.4 seconds here against 10.1 on the development
 machine on 2026-09-10 and `compilestore` 0.4 against 17.0; `filesystem` took 8.0 as the first
 Electron-hosted suite in the run, which is a cold start rather than a regression.
+
+## 2026-09-16 — shift 7A open (review half)
+
+`TEST-STATE.md` names shift 1B, which `TEST-SHIFT.md` lists as local-only, so the cloud
+substitute rule is taken for the sixth shift running. The earliest cloud-capable row not yet
+marked done is 7A, and only its review half can run here: the weekly review in this log and the
+routine definition listing the cloud-capable suites. Its other half — the Wide ceiling shape in
+the generator and the full suite twice back to back for flake and duration — needs a quiet
+machine and stays for a local shift. In flight will be one full run through
+`scripts/run-tests.mjs` into `test-results/2026-09-16-shift-7A` to put a current number against
+the 2026-09-10 baseline, with `npm run build` first so `search`, `rank` and `lexicon` are
+included, then a findings file for the week and the routine definition.
