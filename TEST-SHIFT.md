@@ -82,8 +82,15 @@ development machine.
 - Install with `npm install --legacy-peer-deps`. Export `ELECTRON_DISABLE_SANDBOX=1`. Run
   Electron-hosted suites under `xvfb-run -a` when it is available; when it is not, say so in
   the findings file and run the Node-hosted suites only.
-- `freshness` always fails on a cloud runner because there is no installed app. Never spend
-  time on it.
+- Run `npm run build` after installing. It takes about a second, and without it the suites
+  marked `needsBuild` cannot run and `freshness` fails on its first assertion.
+- `freshness` passes on a cloud runner once the build has run: its packaged-build section
+  skips itself when no installed copy exists. The AppData failure is a development-machine
+  fact and is not seen here. Demonstrated on 2026-09-16 in
+  `FINDINGS/2026-09-16-week-one-review.md`.
+- `pagination` and `live` fail on a cloud runner because Liberation Serif substitutes for Times
+  New Roman and three of their assertions are layout measurements. Do not run them here and do
+  not tune them; same file.
 - Shift selection: take the shift `TEST-STATE.md` names. If "Which shifts can run where" lists
   it as local, do not run it; take the earliest workbook row that is cloud-capable and not yet
   marked done. If there is none, append a log entry under `## <date> — cloud shift, skipped`
