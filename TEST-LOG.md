@@ -390,3 +390,98 @@ machine and stays for a local shift. In flight will be one full run through
 `scripts/run-tests.mjs` into `test-results/2026-09-16-shift-7A` to put a current number against
 the 2026-09-10 baseline, with `npm run build` first so `search`, `rank` and `lexicon` are
 included, then a findings file for the week and the routine definition.
+
+## 2026-09-16 — weekly review, week of 2026-09-10
+
+The one deliberate read of the last seven days, written by the review half of shift 7A. Numbers
+and the per-suite table are in `FINDINGS/2026-09-16-week-one-review.md`; this entry is the
+account.
+
+Six of the fourteen planned rows ran — 1A, 2A, 2B, 3A, 4A and 6B — plus this half of 7A. Five
+suites were written, all in the cloud, all still green: `filesystem` on 2026-09-11, `binder` on
+2026-09-12, `generator` on 2026-09-13, `compilestruct` on 2026-09-14 and `references` on
+2026-09-15, 336 assertions between them. The suite went from 21 suites and 867 assertions to 26
+and 1,201, a rise of 39%. One bug was found and fixed, `searchIndex.onSheetDeleted` on
+2026-09-15. Twenty-one deliberate mutations were run across the five suites and every one failed
+at least one assertion; six defects in the tests came out of writing them and none out of the
+mutation runs in the last two shifts.
+
+Against that, no B row ran except 6B, and every outstanding row — 1B, 3B, 4B, 5A, 5B, 6A, 7B and
+the flake half of 7A — is marked local. The substitute rule worked exactly as written and kept
+six shifts productive; the price is that everything needing a display or a quiet machine is
+untouched and 1B has been deferred six times. That is the week's one structural problem and it
+is not something another cloud shift can fix.
+
+A full run of all twenty-six suites was made today to put a number beside the baseline: 23 of 26
+passed, 1,197 assertions of 1,201, 4 minutes 19 seconds against just under eighteen minutes for
+twenty-one suites on 2026-09-10. Four assertions did not pass. `lexicon` failed the same
+spellcheck assertion as 2026-09-10, character for character, now on a second operating system.
+`pagination` failed one and `live` two, all three of them page counts or layout measurements, and
+all three because `fc-match "Times New Roman"` on this runner returns Liberation Serif; the
+arithmetic reproducing both pagination figures exactly from the line height is in the findings
+file. That is the font constraint in `TESTING-PLAN.md` arriving as a red suite rather than as a
+rule, and nothing was tuned to make it green.
+
+Three results bear directly on 1B and all three point away from the code. `polish` passed 114 of
+114 here against 106 of 114 on 2026-09-10, with all eight of the baseline's failing areas green,
+including the hover card's fourteen dismissal assertions and the Lexicon alphabet strip.
+`searchui` passed 96 of 96 against 93, its three baseline failures passing by their exact labels.
+And `bookrender` took 4.0 seconds against 420.3. The renderer under test is the baseline's
+renderer: `git diff --stat 3e416c5..HEAD -- src/` is two main-process files and 18 added lines,
+nothing under `src/renderer` all week. None of this proves the development machine passes — it is
+one run, on Linux, under Xvfb — but the two commits before the baseline are no longer the leading
+explanation for the eight polish failures, and a busy machine is.
+
+`freshness` passed here, 6 of 6, which `TEST-SHIFT.md` said was impossible. Its packaged-build
+section already skips itself when no installed copy exists; what failed the four cloud shifts
+before 2026-09-15 was a missing `out/`, because none of them ran `npm run build`. The same
+omission is why they skipped `search`, `rank` and `lexicon`. The rule is corrected in `9ba3ca3`.
+That also settles one of the questions standing against Jack's name without needing him.
+
+Four questions are still waiting on Jack and none has moved: `documentImageStore.deleteImage`
+with no caller, front-matter ordering in TXT and Markdown, `mentionStore` extracting text
+differently from `searchIndex`, and the fifteen stores without the `loadFailed` guard. Two are
+compounded by later findings rather than answered. Week two should not start until they are
+looked at, because three of the four are decisions that would change what a test asserts.
+
+## 2026-09-16 — shift 7A close (review half)
+
+The review half of row 7A done on a cloud runner in place of 1B, which is local-only and has now
+been deferred six times. Two deliverables, both new files: `FINDINGS/2026-09-16-week-one-review.md`
+and `TEST-ROUTINE.md`, committed in `91a081f`. The weekly review is the entry above. No test was
+written, changed or deleted this shift, and nothing in `src/` was touched.
+
+`TEST-ROUTINE.md` is row 7A's routine definition: one firing a day into a fresh session running
+one shift and stopping, the runner's six requirements, the five pre-flight steps in order, the
+suite-by-suite cloud split with its evidence, what a firing may and may not change, the prompt
+text, and three things worth settling before it is scheduled. The cloud-capable list it carries
+is 20 suites and 858 assertions, every one of which passed today, named explicitly as a runner
+invocation so a cloud run does not have to produce reds and then explain them. `lexicon`,
+`pagination` and `live` are off that list and hold all four of today's failing assertions.
+
+One full run of all twenty-six suites, results in `test-results/2026-09-16-shift-7A`: 23 of 26
+passed, 1,197 of 1,201 assertions, 4 minutes 19 seconds. It is the first cloud run of
+`pagination`, `pageview`, `revision`, `editorfeatures`, `pdf`, `bookrender`, `searchui`, `polish`,
+`dashboard` and `live`, so ten suites have a cloud number for the first time. The four failures
+and what they mean are in the review entry above and in the findings file. The flake half of this
+row — two full runs back to back — was not attempted: it is local, and one run says nothing about
+flake.
+
+`TEST-SHIFT.md` was changed in `9ba3ca3`, on its own and with the reason in the commit message,
+which is the first change to the brief since it was written on 2026-09-10. Its cloud section now
+tells a shift to run `npm run build`, states that `freshness` passes once it has, and names
+`pagination` and `live` as cloud-excluded for the font. The old rule cost four shifts three
+suites each.
+
+Noticed on the way. `npm install` again dropped `libc` from the same thirty lockfile entries, the
+sixth time in six cloud shifts, and was reverted. `node_modules/electron` again arrived without a
+`dist/` and the `node -e "require('electron')"` check repaired it, the third time in three.
+`npm run build` took 1.0 seconds and `npm run test:build` 0.6. Every Electron-hosted suite on the
+development machine sat between 10.1 and 32.8 seconds on 2026-09-10 whatever work it did, against
+0.3 to 0.9 here, which would be explained by a fixed per-suite startup cost of ten to sixteen
+seconds on that machine; that is inferred from the shape of the numbers and a local shift should
+confirm it. `bookrender` is not explained by it and stays the number to watch.
+
+There is now no cloud-capable row left in the week-one workbook. A cloud shift firing after this
+one has nothing to take and should append a skip entry naming the local row that blocks it, per
+`TEST-SHIFT.md`, until week two is planned.

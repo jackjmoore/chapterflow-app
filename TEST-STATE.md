@@ -6,47 +6,50 @@ Four sentences per section, six for What's in progress. Anything needing more te
 detail than two sentences goes in a `FINDINGS/` file and gets one plain sentence here
 pointing at it.
 
-Last updated: 2026-09-15 at the close of cloud shift 6B.
+Last updated: 2026-09-16 at the close of the review half of cloud shift 7A.
 
 ## Where it stands
 
-Twenty-six suites now, the new one being `references`: 102 assertions over the three deletes that
-leave other records pointing at nothing — a Story Bible item taking its sheet, images and
-mentions, a document taking its comments, mentions and submission links, and timeline pruning
-dropping dead references and nothing else. It runs on a cloud runner in 0.1 seconds, Node-hosted
-through the `electronForNode.ts` shim, and it is the first suite to read `src/main/index.ts` as
-source so a cascade losing a limb in the handler shows up as a failure. The last full run is
-still the baseline of 2026-09-10, 17 of 21 suites, recorded in
-`FINDINGS/2026-09-10-baseline-run.md`.
+Twenty-six suites and 1,201 assertions, of which 1,197 passed in 4 minutes 19 seconds on a cloud
+runner on 2026-09-16 — the first full run since the baseline of 2026-09-10 and the first cloud
+number for ten of the suites, with the per-suite table beside the baseline in
+`FINDINGS/2026-09-16-week-one-review.md`. Four assertions fail: `lexicon`'s spellcheck one, the
+same text on both machines for the fourth time, and one in `pagination` and two in `live`, all
+three page counts or layout measurements that fail wherever Liberation Serif substitutes for
+Times New Roman. The baseline of 2026-09-10, 17 of 21 suites and 867 assertions, is still the
+only development-machine number and is what 1B reruns against. `TEST-ROUTINE.md` is new and
+carries the cloud-capable list as a runner invocation: 20 suites and 858 assertions, every one of
+which passed on 2026-09-16.
 
 ## What happened last shift
 
-Cloud shift 6B wrote `tests/references.test.ts` and registered it in `scripts/run-tests.mjs` and
-`test:build`; all 102 assertions pass, and the mutation checks, per-section table and neighbour
-run are in `FINDINGS/2026-09-15-reference-rot.md`. One bug was found with a failing assertion and
-then fixed, because it was store-level in `src/main` with no renderer side: a deleted item's sheet
-text stayed searchable for the rest of the session, since the search index is fed by an observer
-on `atomicWrite` that never sees a delete and only `documentStore` compensated — the fix is
-`searchIndex.onSheetDeleted`, three lines mirroring `onDocumentDeleted`, called from
-`storyBibleSheetStore.deleteSheet`. The suite was checked against six deliberate breakages,
-failing 1, 3, 1, 7, 1 and 2 assertions, with no defect in the test itself coming out of them for
-the second shift running. Fourteen neighbouring suites were run beside it — 655 assertions, one
-failure, 757 with the new suite — and the one failure is the known `lexicon` spellcheck assertion
-in a fresh profile.
+The review half of row 7A ran on a cloud runner in place of 1B: the weekly review is the
+`TEST-LOG.md` entry of 2026-09-16, the numbers behind it are in
+`FINDINGS/2026-09-16-week-one-review.md`, and `TEST-ROUTINE.md` is the routine definition the row
+asked for, committed in `91a081f`. No test was written, changed or deleted and nothing in `src/`
+was touched. `polish` passed 114 of 114 and `searchui` 96 of 96 against 106 and 93 on
+2026-09-10, with `git diff 3e416c5..HEAD -- src/` showing two main-process files and nothing
+under `src/renderer`, so the eight polish failures look more like the development machine than
+like the two hover-card commits — one cloud run cannot settle it, and 1B still can.
+`TEST-SHIFT.md` was corrected on its own in `9ba3ca3`, because `freshness` passes on a cloud
+runner once `npm run build` has run, which also answers without Jack the freshness question that
+had been standing against his name.
 
 ## What's in progress
 
-Shift 1B is still next and still local: rerun polish and searchui to sort timing from
-regression, two concurrent `--no-prepare` runs to prove the dynamic port fix, correct the
-structure suite's stale header, delete the mangled-path folder in the repo root, and record a
-second bookrender duration against the 420 seconds of 2026-09-10. Cloud rows 2A, 2B, 3A, 4A and
-6B were done on 2026-09-11, 2026-09-12, 2026-09-13, 2026-09-14 and 2026-09-15 in its place,
-because 1B cannot run without a display and a quiet machine, so it has now been deferred five
-times. The timing case against the baseline has not moved: `structure` took 0.4 seconds on the
-cloud runner against 10.1 on the development machine on 2026-09-10, and `compilestore` 0.4
-against 17.0, for the fifth shift running. Row 3B is the next row in order but is local, and
-there is now no cloud-capable row left undone in this workbook apart from the review half of 7A,
-so the next cloud shift takes that or stops and says so.
+Shift 1B is still next and still local, deferred six times: rerun polish and searchui to sort
+timing from regression, two concurrent `--no-prepare` runs to prove the dynamic port fix, correct
+the structure suite's stale header, delete the mangled-path folder in the repo root, and record a
+second bookrender duration against the 420.3 seconds of 2026-09-10. It now answers three
+questions rather than one, because 2026-09-16 returned `polish` 114 of 114, `searchui` 96 of 96
+and `bookrender` at 4.0 seconds on a different machine. There is no cloud-capable row left in
+this workbook: 2A, 2B, 3A, 4A and 6B were done on 2026-09-11 through 2026-09-15 in 1B's place,
+and 7A's review half on 2026-09-16, leaving 1B, 3B, 4B, 5A, 5B, 6A, 7B and 7A's flake half, all
+local. A cloud shift firing after this one therefore has nothing to take and should append a skip
+entry naming 1B, commit, push and stop, per `TEST-SHIFT.md`. Week two is unplanned, and three of
+the four questions below would change what a test asserts, so they are worth answering before it
+is planned. The timing gap held for the sixth shift running: `structure` 0.3 seconds against
+10.1, `compilestore` 0.4 against 17.0, and now `bookrender` 4.0 against 420.3.
 
 ## What's waiting on Jack
 
@@ -65,33 +68,32 @@ cascades into comments and mentions after the binder is already written, and whe
 stores without the `loadFailed` guard should refuse to write when their file cannot be read,
 listed store by store in `FINDINGS/2026-09-11-filesystem-part-one.md`. Whether the eight polish
 failures of 2026-09-10 should be fixed if 1B confirms them, which is a renderer change and needs
-visual confirmation, and whether the freshness assertion should skip when no installed app exists.
+visual confirmation, and whether `pagination` and `live` should hold page-count and layout
+assertions at all, since three of them fail on any machine without Times New Roman and
+`TESTING-PLAN.md`'s font constraint says nothing may assert them.
 
 ## What's been ruled out
 
 Windows Task Scheduler and headless `claude -p` as the scheduling mechanism, replaced by
-Claude Code Routines. Pixel-diff comparison for compile output and any page-count or layout
-assertion outside Times New Roman on the development machine, since that is the one unbundled
-font. Committing the Scrivener corpus, which is git-ignored apart from its README, and storing
-generated fixture projects, which the generator replaces. The
+Claude Code Routines, whose definition is now `TEST-ROUTINE.md`. Pixel-diff comparison for
+compile output and any page-count or layout assertion outside Times New Roman on the development
+machine, since that is the one unbundled font; relaxing or retuning the three assertions that
+fail for that reason is ruled out with it. Committing the Scrivener corpus, which is git-ignored
+apart from its README, and storing generated fixture projects, which the generator replaces. The
 `FINDINGS/2026-09-09-headless-viability.md` file earlier entries cite was never written and is
 not being reconstructed.
 
 ## What's next
 
 Shift 4B on the development machine: PDF under Electron with the same assertions via outline
-entries, compile index written last, and the font-resolution check made able to fail. Row 4A's
-section-count, scope, last-paragraph and matter-order sections are format-agnostic and 4B needs
-only a different reader for them; the front-matter ordering question is already settled for PDF,
-which puts matter first, so 4B should assert that rather than re-open it. Shifts 1B and 3B are
-both still outstanding and both still local, and 6A, 5A, 5B and 7B are local too, so a cloud
-shift arriving next should take the review half of 7A — the weekly review and the routine
-definition, listing `references` and `compilestruct` among the Node-hosted cloud-capable suites —
-and otherwise follow `TEST-SHIFT.md`'s rule of logging a skip naming the local row that blocks it.
-Row 6A gets the most from 6B: a restore has to put back exactly the cascades `references` now
-pins, and its byte-identity comparisons are the shape to reuse. A cloud shift should still run
-`git checkout package-lock.json` before committing — `npm install` dropped `libc` from the same
-thirty entries for the fifth time on 2026-09-15 — should still run `node -e "require('electron')"`
-after installing, which on 2026-09-15 again both detected a missing `dist/` and repaired it, and
-should now also run `npm run build`, which takes under a second on a cloud runner and is what
-unlocks the `search`, `rank` and `lexicon` suites that four earlier cloud shifts skipped.
+entries, compile index written last, and the font-resolution check made able to fail — 2026-09-16
+is the demonstration that check needs, since it reported `Times New Roman` as resolved on a
+machine where `fc-match` returns `LiberationSerif-Regular.ttf`. Row 4A's section-count, scope,
+last-paragraph and matter-order sections are format-agnostic and 4B needs only a different reader
+for them; the front-matter ordering question is already settled for PDF, which puts matter first,
+so 4B should assert that rather than re-open it. Shifts 1B and 3B are both still outstanding and
+both still local, as are 5A, 5B, 6A, 7B and 7A's flake half, so a cloud shift arriving next has
+no row to take and should log the skip rather than improvise one. Any cloud shift should follow
+`TEST-ROUTINE.md`'s five pre-flight steps, of which `git checkout package-lock.json` after
+install and `node -e "require('electron')"` were both needed again on 2026-09-16, and
+`npm run build`, which takes about a second, is what unlocks `search`, `rank` and `lexicon`.
