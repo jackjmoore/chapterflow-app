@@ -485,3 +485,24 @@ confirm it. `bookrender` is not explained by it and stays the number to watch.
 There is now no cloud-capable row left in the week-one workbook. A cloud shift firing after this
 one has nothing to take and should append a skip entry naming the local row that blocks it, per
 `TEST-SHIFT.md`, until week two is planned.
+
+## 2026-09-17 — cloud shift, skipped
+
+No row was taken and no suite was run. `TEST-STATE.md` names shift 1B in "What's in progress";
+`TEST-SHIFT.md`'s "Which shifts can run where" lists 1B as local, so the substitute rule applies,
+and `TEST-WORKBOOK.md` marks all six cloud-capable rows — 2A on 2026-09-11, 2B on 2026-09-12,
+3A on 2026-09-13, 4A on 2026-09-14, 6B on 2026-09-15 and 7A's review half on 2026-09-16 — as
+done. There is no earliest cloud-capable row left to take, so this entry is the skip entry the
+cloud section calls for, naming 1B as the local row that blocks.
+
+The checkout was read only. `npm install` was not run, `npm run build` was not run, no suite ran,
+and nothing under `src/`, `tests/`, `FINDINGS/` or `test-results/` was created or changed. The
+only files this shift writes are `TEST-LOG.md` and `TEST-STATE.md`. No shift-open entry was
+written, because no shift was opened; a skip that logged an open would read as a run that died.
+
+This is the first firing to skip, and it repeats until something changes off the runner. Seven
+rows are outstanding and all seven are local: 1B, 3B, 4B, 5A, 5B, 6A, 7B and the flake half of
+7A. A firing a day that can only append a skip entry is worth pausing or repointing rather than
+leaving to run, which is a decision for Jack and is recorded in `TEST-STATE.md` under "What's
+waiting on Jack". Week two is unplanned, and the four questions standing in that section since
+2026-09-11 would change what a test asserts, so they are the work that unblocks the runner.
