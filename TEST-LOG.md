@@ -533,3 +533,32 @@ planned with cloud-capable rows in it, or the routine is paused. That is the fir
 "What's waiting on Jack" in `TEST-STATE.md` and has been since 2026-09-17; the four testing
 questions standing there since 2026-09-11 are the work that would unblock the runner, and three
 of them would change what a test asserts.
+
+## 2026-09-19 — cloud shift, skipped
+
+No row was taken and no suite was run, for the third firing running. `TEST-STATE.md` still names
+shift 1B in "What's in progress", and `TEST-SHIFT.md`'s "Which shifts can run where" still lists 1B
+as local, so the substitute rule applies. `TEST-WORKBOOK.md` was re-read rather than assumed: its
+table is unchanged since `da85a6b` on 2026-09-16, and it still marks all six cloud-capable rows —
+2A on 2026-09-11, 2B on 2026-09-12, 3A on 2026-09-13, 4A on 2026-09-14, 6B on 2026-09-15 and 7A's
+review half on 2026-09-16 — as done. There is no earliest cloud-capable row left to take, so this
+entry is the skip entry the cloud section calls for, naming 1B as the local row that blocks.
+
+The checkout was read only, as on 2026-09-17 and 2026-09-18. `npm install` was not run, `npm run
+build` was not run, no suite ran, and nothing under `src/`, `tests/`, `FINDINGS/` or
+`test-results/` was created or changed. `origin/main` was at `a983d96`, the 2026-09-18 skip commit,
+and a `git pull --rebase origin main` reported the checkout already up to date, so nothing in the
+repository has changed since that shift and no number in `TEST-STATE.md` has moved. The only files
+this shift writes are `TEST-LOG.md` and `TEST-STATE.md`. No shift-open entry was written, because
+no shift was opened.
+
+Three firings have now produced three skip entries and no test run, on 2026-09-17, 2026-09-18 and
+2026-09-19. The last shift to run a suite was 7A on 2026-09-16, three days ago; the last commit to
+touch `src/`, `tests/` or `FINDINGS/` was `da85a6b`, the same day. Seven rows are outstanding and
+all seven are local: 1B, 3B, 4B, 5A, 5B, 6A, 7B and the flake half of 7A. The routine still cannot
+recover on its own, and the three skips are evidence enough that it will not: nothing a cloud
+runner can do adds a cloud-capable row, so every firing from here repeats this entry until the
+local rows are run, week two is planned with cloud-capable rows in it, or the routine is paused.
+That is the first item under "What's waiting on Jack" in `TEST-STATE.md` and has been since
+2026-09-17; the four testing questions standing there since 2026-09-11 are the work that would
+unblock the runner, and three of them would change what a test asserts.
