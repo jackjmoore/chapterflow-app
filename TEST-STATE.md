@@ -6,7 +6,7 @@ Four sentences per section, six for What's in progress. Anything needing more te
 detail than two sentences goes in a `FINDINGS/` file and gets one plain sentence here
 pointing at it.
 
-Last updated: 2026-09-21, by the fifth cloud shift running to take no row and run no suite.
+Last updated: 2026-09-22, by the sixth cloud shift running to take no row and run no suite.
 
 ## Where it stands
 
@@ -19,44 +19,43 @@ Liberation Serif substitutes for Times New Roman. The baseline of 2026-09-10, 17
 867 assertions, is still the only development-machine number and is what 1B reruns against.
 `TEST-ROUTINE.md` carries the cloud-capable list as a runner invocation, 20 suites and 858
 assertions all passing on 2026-09-16, and nothing under `src/`, `tests/` or `FINDINGS/` has changed
-since, because none of 2026-09-17 through 2026-09-21 ran anything.
+since, because none of 2026-09-17 through 2026-09-22 ran anything.
 
 ## What happened last shift
 
-The cloud firing of 2026-09-21 took no row, the fifth firing running to skip: this file named 1B,
-which `TEST-SHIFT.md` lists as local, and `TEST-WORKBOOK.md` still marks all six cloud-capable
-rows done — 2A, 2B, 3A, 4A, 6B and 7A's review half, 2026-09-11 through 2026-09-16 — its table
-unchanged since `da85a6b`. It appended `## 2026-09-21 — cloud shift, skipped` to `TEST-LOG.md`
+The cloud firing of 2026-09-22 took no row, the sixth firing running to skip: this file named 1B,
+which `TEST-SHIFT.md` lists as local, and `TEST-WORKBOOK.md` still marks all six cloud-capable rows
+done — 2A, 2B, 3A, 4A, 6B and 7A's review half, 2026-09-11 through 2026-09-16 — its table
+unchanged since `da85a6b`. It appended `## 2026-09-22 — cloud shift, skipped` to `TEST-LOG.md`
 naming 1B as the blocking row, rewrote this file, committed and pushed, per the cloud section; the
-checkout was read only, with no install, no build and no suite run, and `origin/main` was unmoved
-at `7dd08e2` from the day before. It also sent Jack a notification saying the routine has produced
-five skips and no test run, which the firings of 2026-09-17 through 2026-09-20 did not do, and the
-five entries are the whole of the repository's history since 7A closed on 2026-09-16. No number in
-this file has moved since 2026-09-16 and none will while the firings skip.
+checkout was read only, with no install, no build and no suite run, and `origin/main` was unmoved at
+`844e6dd` from the day before. It sent Jack a second notification, after the one the 2026-09-21
+firing sent, because nothing in the repository changed in the day between them, and the six entries
+of 2026-09-17 through 2026-09-22 are the whole of the repository's history since 7A closed on
+2026-09-16. No number in this file has moved since 2026-09-16 and none will while the firings skip.
 
 ## What's in progress
 
-Shift 1B is still next and still local, deferred ten times over 2026-09-11 to 2026-09-21: rerun
-polish and searchui to sort timing from regression, two concurrent `--no-prepare` runs to prove
-the dynamic port fix, correct the structure suite's stale header, delete the mangled-path folder
-in the repo root, and record a second bookrender duration against the 420.3 seconds of 2026-09-10.
-It answers three questions rather than one, because 2026-09-16 returned `polish` 114 of 114,
-`searchui` 96 of 96 and `bookrender` at 4.0 seconds on a different machine. Nothing in this
-workbook is cloud-capable any more, and no cloud shift can change that, so 2026-09-17 through
-2026-09-21 all skipped and every firing after them skips the same way, until the local rows are
-run or week two is planned with cloud-capable rows in it. Seven rows are outstanding and all
-seven are local: 1B, 3B, 4B, 5A, 5B, 6A, 7B and the flake half of 7A. Week two is unplanned five
-days past the end of week one, and three of the four testing questions below would change what a
-test asserts, so they are worth answering before it is planned. The timing gap held for the ninth
-shift running: `structure` 0.3 seconds against 10.1, `compilestore` 0.4 against 17.0, and
-`bookrender` 4.0 against 420.3.
+Shift 1B is still next and still local, deferred eleven times over 2026-09-11 to 2026-09-22: rerun
+polish and searchui to sort timing from regression, two concurrent `--no-prepare` runs to prove the
+dynamic port fix, correct the structure suite's stale header, delete the mangled-path folder in the
+repo root, and record a second bookrender duration against the 420.3 seconds of 2026-09-10. It
+answers three questions rather than one, because 2026-09-16 returned `polish` 114 of 114, `searchui`
+96 of 96 and `bookrender` at 4.0 seconds on a different machine. Nothing in this workbook is
+cloud-capable any more, and no cloud shift can change that, so 2026-09-17 through 2026-09-22 all
+skipped and every firing after them skips the same way, until the local rows are run or week two is
+planned with cloud-capable rows in it. Seven rows are outstanding and all seven are local: 1B, 3B,
+4B, 5A, 5B, 6A, 7B and the flake half of 7A. Week two is unplanned six days past the end of week
+one, and three of the four testing questions below would change what a test asserts, so they are
+worth answering before it is planned. The timing gap held for the tenth shift running: `structure`
+0.3 seconds against 10.1, `compilestore` 0.4 against 17.0, and `bookrender` 4.0 against 420.3.
 
 ## What's waiting on Jack
 
-Whether the daily cloud routine should keep firing, now that 2026-09-17 through 2026-09-21 have
+Whether the daily cloud routine should keep firing, now that 2026-09-17 through 2026-09-22 have
 each appended a skip entry and nothing else, which is the only outcome available to it until week
-two is planned or the local rows are run; the 2026-09-21 firing sent this question as a
-notification rather than leaving it in this file a fifth time. Whether
+two is planned or the local rows are run; the 2026-09-21 and 2026-09-22 firings each sent this
+question as a notification rather than leaving it in this file alone. Whether
 `documentImageStore.deleteImage` should ever be called, since it is exported with no caller
 anywhere in `src/` and a manuscript image outlives both its removal from the text and its
 document's deletion while the Story Bible side cleans up on all three paths, traced in
@@ -90,8 +89,8 @@ not being reconstructed.
 
 A cloud shift firing next has no row to take: it should confirm from `TEST-WORKBOOK.md` that 2A,
 2B, 3A, 4A, 6B and 7A's review half are still the only cloud-capable rows and still done, append a
-skip entry naming 1B, commit, push and stop, rather than improvise a row — that is the sixth such
-firing, and the five before it are in `TEST-LOG.md` under 2026-09-17 through 2026-09-21. On the
+skip entry naming 1B, commit, push and stop, rather than improvise a row — that is the seventh such
+firing, and the six before it are in `TEST-LOG.md` under 2026-09-17 through 2026-09-22. On the
 development machine the queue is 1B first, then 3B, 4B, 5A, 5B, 6A, 7B and 7A's flake half. Row
 4B's brief is unchanged: PDF under Electron with the same assertions via outline entries, compile
 index written last, and the font-resolution check made able to fail — 2026-09-16 is the
