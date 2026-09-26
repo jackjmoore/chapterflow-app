@@ -769,3 +769,42 @@ nothing in the repository has changed since: `origin/main` moved only by the ski
 questions under "What's waiting on Jack" arrived. The condition the 2026-09-23 entry set for sending
 again — something changes, or a further week of skips passes without an answer — is not met on
 2026-09-25; three days of that week have passed, and it falls due on 2026-09-29 if the silence holds.
+
+## 2026-09-26 — cloud shift, skipped
+
+No row was taken and no suite was run, for the tenth firing running. `TEST-STATE.md` still names
+shift 1B in "What's in progress", and `TEST-SHIFT.md`'s "Which shifts can run where" still lists 1B
+as local, so the substitute rule applies. `TEST-WORKBOOK.md` was re-read rather than assumed, and
+`git diff --stat da85a6b HEAD -- TEST-WORKBOOK.md` returned empty, so its table is unchanged since
+`da85a6b` on 2026-09-16 and still marks all six cloud-capable rows — 2A on 2026-09-11, 2B on
+2026-09-12, 3A on 2026-09-13, 4A on 2026-09-14, 6B on 2026-09-15 and 7A's review half on 2026-09-16
+— as done. There is no earliest cloud-capable row left to take, so this entry is the skip entry the
+cloud section calls for, naming 1B as the local row that blocks. It is also what "What's next" in
+`TEST-STATE.md` instructed this firing to do, in place of improvising a row.
+
+The checkout was read only, as on 2026-09-17 through 2026-09-25. `npm install` was not run, `npm run
+build` was not run, no suite ran, `test-results/` was never created, and nothing under `src/`,
+`tests/` or `FINDINGS/` was created or changed. The checkout arrived on a detached HEAD at `16ab582`,
+the 2026-09-25 skip commit, which is also where `origin/main` stood; the local `main` branch was two
+commits behind at `e6b7200`, and `git checkout main` followed by `git pull --rebase origin main`
+fast-forwarded it to `16ab582`. `git diff --name-only da85a6b HEAD` lists `TEST-LOG.md` and
+`TEST-STATE.md` and nothing else, so the ten skips are the entire history since 7A closed;
+`git diff --stat da85a6b HEAD -- src tests` is empty. `FINDINGS/` still holds seven files, the newest
+dated 2026-09-16. The only files this shift writes are `TEST-LOG.md` and `TEST-STATE.md`. No
+shift-open entry was written, because no shift was opened.
+
+Ten firings have now produced ten skip entries and no test run, on 2026-09-17 through 2026-09-26,
+three days past a full week of them. The last shift to run a suite was 7A on 2026-09-16, ten days
+ago, and the week-one workbook ended that same day, so the skips now outlast the week they follow by
+three days. Seven rows are outstanding and all seven are local: 1B, 3B, 4B, 5A, 5B, 6A, 7B and the
+flake half of 7A. Nothing a cloud runner can do adds a cloud-capable row, so every firing from here
+repeats this entry until the local rows are run, week two is planned with cloud-capable rows in it,
+or the routine is paused.
+
+This firing sent Jack no notification, for the fourth day running and for the reason the 2026-09-23
+entry gives. The 2026-09-21 and 2026-09-22 firings each sent one carrying the same question, and
+nothing in the repository has changed since: `origin/main` moved only by the skip commits of
+2026-09-23 through 2026-09-25, no findings file was added, and no answer to any of the five questions
+under "What's waiting on Jack" arrived. The condition the 2026-09-23 entry set for sending again —
+something changes, or a further week of skips passes without an answer — is not met on 2026-09-26;
+four days of that week have passed, and it falls due on 2026-09-29 if the silence holds.
