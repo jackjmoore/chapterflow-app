@@ -6,7 +6,7 @@ Four sentences per section, six for What's in progress. Anything needing more te
 detail than two sentences goes in a `FINDINGS/` file and gets one plain sentence here
 pointing at it.
 
-Last updated: 2026-09-30, by the fourteenth cloud shift running to take no row and run no suite.
+Last updated: 2026-10-01, by the fifteenth cloud shift running to take no row and run no suite.
 
 ## Where it stands
 
@@ -20,65 +20,66 @@ Liberation Serif substitutes for Times New Roman. The baseline of 2026-09-10, 17
 `TEST-ROUTINE.md` carries the cloud-capable list as a runner invocation, 20 suites and 858
 assertions all passing on 2026-09-16, and nothing under `src/`, `tests/` or `FINDINGS/` has changed
 since, confirmed by an empty `git diff --stat da85a6b HEAD -- src tests`, because none of
-2026-09-17 through 2026-09-30 ran anything.
+2026-09-17 through 2026-10-01 ran anything.
 
 ## What happened last shift
 
-The cloud firing of 2026-09-30 took no row, the fourteenth firing running to skip: this file named
+The cloud firing of 2026-10-01 took no row, the fifteenth firing running to skip: this file named
 1B, which `TEST-SHIFT.md` lists as local, and `TEST-WORKBOOK.md` still marks all six cloud-capable
 rows done — 2A, 2B, 3A, 4A, 6B and 7A's review half, 2026-09-11 through 2026-09-16 — its table
 unchanged since `da85a6b`, confirmed by an empty `git diff --stat da85a6b HEAD -- TEST-WORKBOOK.md`.
-It appended `## 2026-09-30 — cloud shift, skipped` to `TEST-LOG.md` naming 1B as the blocking row,
+It appended `## 2026-10-01 — cloud shift, skipped` to `TEST-LOG.md` naming 1B as the blocking row,
 rewrote this file, committed and pushed, per the cloud section; the checkout was read only, with no
-install, no build and no suite run. It arrived on a detached HEAD at `75ee027`, where `origin/main`
-also stood once fetched, while the local `main` branch sat at `e6b7200` for the sixth firing running,
-six commits behind, which is the settled behaviour of a checkout that clones at a fixed point and
-then detaches. It sent no notification, because the condition set on 2026-09-23 and restated on
-2026-09-29 does not fall due until 2026-10-06, and it checked that all thirteen commits since
-`da85a6b` are Claude-authored skip commits, so no answer to the questions below has arrived through
-the repository.
+install, no build and no suite run. The stale-`main` shape of 2026-09-25 through 2026-09-30 did not
+recur: it arrived on branch `main` at `53d1a51`, the tip of the remote, with a clean tree and the
+`origin/main` ref already there, so `git fetch origin main` moved nothing and no `git checkout main`
+was needed. It sent no notification, because the condition set on 2026-09-23 and restated on
+2026-09-29 and 2026-09-30 does not fall due until 2026-10-06, and it checked that all fourteen
+commits since `da85a6b` are Claude-authored skip commits, so no answer to the questions below has
+arrived through the repository.
 
 ## What's in progress
 
-Shift 1B is still next and still local, deferred nineteen times over 2026-09-11 to 2026-09-30:
+Shift 1B is still next and still local, deferred twenty times over 2026-09-11 to 2026-10-01:
 rerun polish and searchui to sort timing from regression, two concurrent `--no-prepare` runs to prove
 the dynamic port fix, correct the structure suite's stale header, delete the mangled-path folder in
 the repo root, and record a second bookrender duration against the 420.3 seconds of 2026-09-10. It
 answers three questions rather than one, because 2026-09-16 returned `polish` 114 of 114,
 `searchui` 96 of 96 and `bookrender` at 4.0 seconds on a different machine. Nothing in this workbook
-is cloud-capable any more, and no cloud shift can change that, so 2026-09-17 through 2026-09-30 all
+is cloud-capable any more, and no cloud shift can change that, so 2026-09-17 through 2026-10-01 all
 skipped and every firing after them skips the same way, until the local rows are run or week two is
 planned with cloud-capable rows in it. Seven rows are outstanding and all seven are local: 1B, 3B,
-4B, 5A, 5B, 6A, 7B and the flake half of 7A. Week two is unplanned fourteen days past the end of week
-one, so the skips now outlast the week they follow by a further week, and three of the four testing
+4B, 5A, 5B, 6A, 7B and the flake half of 7A. Week two is unplanned fifteen days past the end of week
+one, so the skips now outlast the week they follow by eight days, and three of the four testing
 questions below would change what a test asserts, so they are worth answering before it is planned.
-The timing gap held for the eighteenth shift running: `structure` 0.3 seconds against 10.1,
+The timing gap held for the nineteenth shift running: `structure` 0.3 seconds against 10.1,
 `compilestore` 0.4 against 17.0, and `bookrender` 4.0 against 420.3.
 
 ## What's waiting on Jack
 
-Whether the daily cloud routine should keep firing, now that 2026-09-17 through 2026-09-30 have
+Whether the daily cloud routine should keep firing, now that 2026-09-17 through 2026-10-01 have
 each appended a skip entry and nothing else, which is the only outcome available to it until week
 two is planned or the local rows are run; three notifications have carried this question, on
 2026-09-21, 2026-09-22 and 2026-09-29, none has been answered, and the next falls due on 2026-10-06
-if nothing changes before then, which is the condition the 2026-09-23 entry set and 2026-09-29 and
-2026-09-30 both kept. Whether `documentImageStore.deleteImage` should ever be called, since it is
-exported with no caller anywhere in `src/` and a manuscript image outlives both its removal from the
-text and its document's deletion while the Story Bible side cleans up on all three paths, traced in
-`FINDINGS/2026-09-15-reference-rot.md`, and whether front matter should sit before or after the table
-of contents in compiled plain text and Markdown, since PDF and docx put it before, traced in
-`FINDINGS/2026-09-14-compile-structure.md`. Whether `mentionStore` should extract a document's text
-the way `searchIndex` does, since the difference makes a character named just after a chapter heading
-invisible to detection, demonstrated in `FINDINGS/2026-09-13-fixture-generator.md`, and whether
-`duplicateNode` and `deleteNode` should write the binder on the other side of the document content
-they copy or remove, traced in `FINDINGS/2026-09-12-binder-part-two.md` and compounded by 6B's
-finding that `binder:delete` cascades into comments and mentions after the binder is already written.
-Whether the fifteen stores without the `loadFailed` guard should refuse to write when their file
-cannot be read, listed store by store in `FINDINGS/2026-09-11-filesystem-part-one.md`, whether the
-eight polish failures of 2026-09-10 should be fixed if 1B confirms them, which is a renderer change
-and needs visual confirmation, and whether `pagination` and `live` should hold page-count and layout
-assertions at all, since three of them fail on any machine without Times New Roman and
-`TESTING-PLAN.md`'s font constraint says nothing may assert them.
+if nothing changes before then, which is the condition the 2026-09-23 entry set and 2026-09-29,
+2026-09-30 and 2026-10-01 all kept. Whether `documentImageStore.deleteImage` should ever be called,
+since it is exported with no caller anywhere in `src/` and a manuscript image outlives both its
+removal from the text and its document's deletion while the Story Bible side cleans up on all three
+paths, traced in `FINDINGS/2026-09-15-reference-rot.md`, and whether front matter should sit before
+or after the table of contents in compiled plain text and Markdown, since PDF and docx put it before,
+traced in `FINDINGS/2026-09-14-compile-structure.md`. Whether `mentionStore` should extract a
+document's text the way `searchIndex` does, since the difference makes a character named just after a
+chapter heading invisible to detection, demonstrated in `FINDINGS/2026-09-13-fixture-generator.md`,
+and whether `duplicateNode` and `deleteNode` should write the binder on the other side of the
+document content they copy or remove, traced in `FINDINGS/2026-09-12-binder-part-two.md` and
+compounded by 6B's finding that `binder:delete` cascades into comments and mentions after the binder
+is already written. Whether the fifteen stores without the `loadFailed` guard should refuse to write
+when their file cannot be read, listed store by store in
+`FINDINGS/2026-09-11-filesystem-part-one.md`, whether the eight polish failures of 2026-09-10 should
+be fixed if 1B confirms them, which is a renderer change and needs visual confirmation, and whether
+`pagination` and `live` should hold page-count and layout assertions at all, since three of them fail
+on any machine without Times New Roman and `TESTING-PLAN.md`'s font constraint says nothing may
+assert them.
 
 ## What's been ruled out
 
@@ -95,21 +96,21 @@ not being reconstructed.
 
 A cloud shift firing next has no row to take: it should confirm from `TEST-WORKBOOK.md` that 2A,
 2B, 3A, 4A, 6B and 7A's review half are still the only cloud-capable rows and still done, append a
-skip entry naming 1B, commit, push and stop, rather than improvise a row — that is the fifteenth
-such firing, and the fourteen before it are in `TEST-LOG.md` under 2026-09-17 through 2026-09-30;
-it should send a notification only if it fires on or after 2026-10-06 with nothing changed, that
-being the date the 2026-09-23 condition falls due on the silence since 2026-09-29, and none before
-then. On the development machine the queue is 1B first, then 3B, 4B, 5A, 5B, 6A, 7B and 7A's flake
-half. Row 4B's brief is unchanged: PDF under Electron with the same assertions via outline entries,
-compile index written last, and the font-resolution check made able to fail — 2026-09-16 is the
-demonstration that check needs, since it reported `Times New Roman` as resolved on a machine where
+skip entry naming 1B, commit, push and stop, rather than improvise a row — that is the sixteenth
+such firing, and the fifteen before it are in `TEST-LOG.md` under 2026-09-17 through 2026-10-01; a
+firing on or after 2026-10-06 with nothing changed should send one notification, that being the date
+the 2026-09-23 condition falls due on the silence since 2026-09-29, and a firing before then should
+send none. On the development machine the queue is 1B first, then 3B, 4B, 5A, 5B, 6A, 7B and 7A's
+flake half. Row 4B's brief is unchanged: PDF under Electron with the same assertions via outline
+entries, compile index written last, and the font-resolution check made able to fail — 2026-09-16 is
+the demonstration that check needs, since it reported `Times New Roman` as resolved on a machine where
 `fc-match` returns `LiberationSerif-Regular.ttf` — and row 4A's section-count, scope, last-paragraph
 and matter-order sections are format-agnostic, with front-matter ordering already settled for PDF,
 which puts matter first. Any cloud shift that does get a row should follow `TEST-ROUTINE.md`'s five
 pre-flight steps, of which `git checkout package-lock.json` after install and
 `node -e "require('electron')"` were both needed again on 2026-09-16, and `npm run build`, which
-takes about a second, is what unlocks `search`, `rank` and `lexicon`; it should also expect a
-detached HEAD, a local `main` six or more commits stale and a stale `origin/main` ref, as 2026-09-25
-through 2026-09-30 all found, should run `git fetch origin main` before comparing to the remote and
-`git checkout main` with `git pull --rebase origin main` before committing, and will find `xvfb-run`
-at `/usr/bin/xvfb-run`.
+takes about a second, is what unlocks `search`, `rank` and `lexicon`; it should expect either
+checkout shape — a clean branch `main` at the remote tip, as 2026-10-01 found, or a detached HEAD with
+`main` and the `origin/main` ref several commits stale, as 2026-09-25 through 2026-09-30 found — so it
+should run `git fetch origin main` before comparing to the remote and check it is on `main` before
+committing, and will find `xvfb-run` at `/usr/bin/xvfb-run`.
