@@ -6,7 +6,7 @@ Four sentences per section, six for What's in progress. Anything needing more te
 detail than two sentences goes in a `FINDINGS/` file and gets one plain sentence here
 pointing at it.
 
-Last updated: 2026-10-14, by the twenty-eighth cloud shift running to take no row and run no suite.
+Last updated: 2026-10-15, by the twenty-ninth cloud shift running to take no row and run no suite.
 
 ## Where it stands
 
@@ -20,53 +20,54 @@ Liberation Serif substitutes for Times New Roman. The baseline of 2026-09-10, 17
 `TEST-ROUTINE.md` carries the cloud-capable list as a runner invocation, 20 suites and 858
 assertions all passing on 2026-09-16, and nothing under `src/`, `tests/` or `FINDINGS/` has changed
 since, confirmed by an empty `git diff --stat da85a6b HEAD -- src tests FINDINGS`, because none of
-2026-09-17 through 2026-10-14 ran anything.
+2026-09-17 through 2026-10-15 ran anything.
 
 ## What happened last shift
 
-The cloud firing of 2026-10-14 took no row, the twenty-eighth firing running to skip: this file
+The cloud firing of 2026-10-15 took no row, the twenty-ninth firing running to skip: this file
 named 1B, which `TEST-SHIFT.md` lists as local, and `TEST-WORKBOOK.md` still marks all six
 cloud-capable rows done — 2A, 2B, 3A, 4A, 6B and 7A's review half, 2026-09-11 through 2026-09-16 —
 its table unchanged since `da85a6b`, confirmed by an empty `git diff --stat da85a6b HEAD --
-TEST-WORKBOOK.md`. It appended `## 2026-10-14 — cloud shift, skipped` to `TEST-LOG.md` naming 1B as
+TEST-WORKBOOK.md`. It appended `## 2026-10-15 — cloud shift, skipped` to `TEST-LOG.md` naming 1B as
 the blocking row, rewrote this file, committed and pushed, per the cloud section; the checkout was
-read only, with no install, no build and no suite run. The checkout arrived in the third of the three
-recorded shapes, HEAD detached from `refs/heads/main` at `87351d9`, the remote tip, with a clean tree
-and branch `main` seven commits behind at `47e35c6`, so `git checkout main` and a fast-forwarding
-`git pull --rebase origin main` were both needed before writing, the gap being seven where 2026-10-13
-found six and 2026-10-07 found none, which is what the 2026-10-13 entry predicted for this date and
-the fifth consecutive date on which that reading has been tested forward and held. It sent no
-notification, the fifth of 2026-10-13 being nine days short of the week of silence the 2026-09-23
-entry set as the condition, and it repeated the 2026-10-12 check that the repository holds zero
-issues and zero pull requests, so no answer to any of the questions below has arrived through the
-repository by any route on any of the three dates that check has been made.
+read only, with no install, no build and no suite run. The checkout arrived in the first of the
+three recorded shapes, on branch `main` at `8ec562f`, the remote tip, with a clean tree and a gap of
+zero, so neither `git checkout main` nor a pull was needed before writing: the gap of eight the
+2026-10-13 and 2026-10-14 entries predicted for this date did not appear, and the five-date reading
+that produced it ended by the one mechanism those entries named, a rebuilt runner image, which reset
+the gap to zero as it did on 2026-10-07. It sent no notification, the fifth of 2026-10-13 being five
+days short of the week of silence the 2026-09-23 entry set as the condition, and the changed
+checkout shape is a fact about the runner image rather than about the work queued, so it does not
+bring the sixth forward; it repeated the 2026-10-12 check that the repository holds zero issues and
+zero pull requests, so no answer to any of the questions below has arrived through the repository by
+any route on any of the four dates that check has been made.
 
 ## What's in progress
 
-Shift 1B is still next and still local, deferred thirty-four times over 2026-09-11 to 2026-10-14 —
-six firings that took a substitute cloud row and twenty-eight that skipped: rerun polish and searchui
+Shift 1B is still next and still local, deferred thirty-five times over 2026-09-11 to 2026-10-15 —
+six firings that took a substitute cloud row and twenty-nine that skipped: rerun polish and searchui
 to sort timing from regression, two concurrent `--no-prepare` runs to prove the dynamic port fix,
 correct the structure suite's stale header, delete the mangled-path folder in the repo root, and
 record a second bookrender duration against the 420.3 seconds of 2026-09-10. It answers three
 questions rather than one, because 2026-09-16 returned `polish` 114 of 114, `searchui` 96 of 96 and
 `bookrender` at 4.0 seconds on a different machine. Nothing in this workbook is cloud-capable any
-more, and no cloud shift can change that, so 2026-09-17 through 2026-10-14 all skipped and every
+more, and no cloud shift can change that, so 2026-09-17 through 2026-10-15 all skipped and every
 firing after them skips the same way, until the local rows are run or week two is planned with
 cloud-capable rows in it. Seven rows are outstanding and all seven are local — 1B, 3B, 4B, 5A, 5B,
-6A, 7B — along with the flake half of 7A. Week two is unplanned twenty-eight days past the end of
-week one, so the skips now outlast the week they follow by twenty-one days, and three of the four
+6A, 7B — along with the flake half of 7A. Week two is unplanned twenty-nine days past the end of
+week one, so the skips now outlast the week they follow by twenty-two days, and three of the four
 testing questions below would change what a test asserts, so they are worth answering before it is
-planned. The timing gap held for the thirty-second shift running: `structure` 0.3 seconds against
+planned. The timing gap held for the thirty-third shift running: `structure` 0.3 seconds against
 10.1, `compilestore` 0.4 against 17.0, and `bookrender` 4.0 against 420.3.
 
 ## What's waiting on Jack
 
-Whether the daily cloud routine should keep firing, now that 2026-09-17 through 2026-10-14 have
+Whether the daily cloud routine should keep firing, now that 2026-09-17 through 2026-10-15 have
 each appended a skip entry and nothing else, which is the only outcome available to it until week
 two is planned or the local rows are run; five notifications have now carried this question, on
 2026-09-21, 2026-09-22, 2026-09-29, 2026-10-06 and 2026-10-13, none was answered, no issue or pull
 request carries an answer either, and the sixth falls due on 2026-10-20, which is the condition the
-2026-09-23 entry set and 2026-09-29 through 2026-10-13 all kept.
+2026-09-23 entry set and 2026-09-29 through 2026-10-14 all kept.
 Whether `documentImageStore.deleteImage`
 should ever be called, since it is exported with no caller anywhere in `src/` and a manuscript image
 outlives both its removal from the text and its document's deletion while the Story Bible side cleans
@@ -101,8 +102,8 @@ not being reconstructed.
 
 A cloud shift firing next has no row to take: it should confirm from `TEST-WORKBOOK.md` that 2A,
 2B, 3A, 4A, 6B and 7A's review half are still the only cloud-capable rows and still done, append a
-skip entry naming 1B, commit, push and stop, rather than improvise a row — that is the twenty-ninth
-such firing, and the twenty-eight before it are in `TEST-LOG.md` under 2026-09-17 through 2026-10-14;
+skip entry naming 1B, commit, push and stop, rather than improvise a row — that is the thirtieth
+such firing, and the twenty-nine before it are in `TEST-LOG.md` under 2026-09-17 through 2026-10-15;
 a firing before 2026-10-20 with nothing changed should send no notification, that being the date a
 further week of silence after 2026-10-13 falls due on the condition the 2026-09-23 entry set, so the
 five sent so far stay five until then. On the development machine the queue is 1B first,
@@ -116,10 +117,10 @@ a row should follow `TEST-ROUTINE.md`'s five pre-flight steps, of which `git che
 package-lock.json` after install and `node -e "require('electron')"` were both needed again on
 2026-09-16, and `npm run build`, which takes about a second, is what unlocks `search`, `rank` and
 `lexicon`; it should expect any of three checkout shapes — a clean branch `main` at the remote tip,
-as 2026-10-01 and 2026-10-07 found; a detached HEAD with `main` and the `origin/main` ref several
-commits stale, as 2026-09-25 through 2026-09-30 found; or a detached HEAD at the remote tip with
-`main` one to seven commits behind it, as 2026-10-02 through 2026-10-06 and 2026-10-08 through
-2026-10-14 found, the gap having grown by one on each of the last seven firings and reached seven on
-2026-10-14 exactly as predicted, with eight predicted for 2026-10-15 unless the image is rebuilt,
-which would reset it to zero — so it should run `git fetch origin main` before comparing to the
-remote and check it is on `main` before committing, and will find `xvfb-run` at `/usr/bin/xvfb-run`.
+as 2026-10-01, 2026-10-07 and 2026-10-15 found; a detached HEAD with `main` and the `origin/main`
+ref several commits stale, as 2026-09-25 through 2026-09-30 found; or a detached HEAD at the remote
+tip with `main` one to seven commits behind it, as 2026-10-02 through 2026-10-06 and 2026-10-08
+through 2026-10-14 found, that gap having grown by one on each of eleven firings to seven and then
+reset to zero on 2026-10-15 when the image was rebuilt, which is the second such reset after
+2026-10-07 — so it should run `git fetch origin main` before comparing to the remote and check it is
+on `main` before committing, and will find `xvfb-run` at `/usr/bin/xvfb-run`.
