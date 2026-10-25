@@ -2295,3 +2295,53 @@ nothing changed, so the count stays at six. The reset of the gap to zero is not 
 sense either — it is a fact about the runner image, not about the work queued — and would not
 bring the seventh forward. The firing of 2026-10-27, if the routine is still running then, is the
 one that sends it.
+
+## 2026-10-25 — cloud shift, skipped
+
+The thirty-ninth consecutive firing to take no row. `TEST-STATE.md` named shift 1B as next, and
+`TEST-SHIFT.md` lists 1B under the shifts that run locally, so the cloud section's substitute rule
+applied: take the earliest cloud-capable workbook row not yet done. `TEST-WORKBOOK.md` still marks
+all six as done — 2A on 2026-09-11, 2B on 2026-09-12, 3A on 2026-09-13, 4A on 2026-09-14, 6B on
+2026-09-15 and 7A's review half on 2026-09-16 — and its table is still unchanged since `da85a6b`,
+confirmed by an empty `git diff --stat da85a6b HEAD -- TEST-WORKBOOK.md`. There was no substitute
+row to take, so this firing appends a skip entry and stops, as the cloud section directs. Nothing
+under `src/`, `tests/` or `FINDINGS/` has changed since `da85a6b` either, confirmed by an empty
+`git diff --stat da85a6b HEAD -- src tests FINDINGS`, and all thirty-eight commits from `da85a6b`
+to the checkout tip are skip commits authored by Claude, checked with `git log --format='%an'
+da85a6b..HEAD | sort | uniq -c`, which returns the single line `38 Claude`; `git diff --name-only
+da85a6b HEAD` returns only `TEST-LOG.md` and `TEST-STATE.md`. This firing repeated the two
+repository-channel checks 2026-10-12 introduced: the repository has zero issues, open or closed,
+and zero pull requests, open, closed or merged. So no answer to the five questions under "What's
+waiting on Jack" has arrived through the repository by any route, on any of the fourteen dates
+that check has been made. The only files this shift writes are `TEST-LOG.md` and `TEST-STATE.md`.
+No shift-open entry was written, because no shift was opened.
+
+The checkout arrived in the third of the three recorded shapes, after one firing in the first: a
+detached HEAD at `671dce0`, the 2026-10-24 skip commit and the tip of the remote, with branch
+`main` one commit behind it at `b7adfb4` and a clean working tree, so the gap is one and both `git
+checkout main` and a fast-forward were needed before committing. `git fetch origin main` moved the
+`origin/main` ref from `b7adfb4` to `671dce0`, which is where the detached HEAD already stood. The
+one commit of the gap is the 2026-10-24 firing's own skip commit, so this is growth of one per
+firing from the zero of 2026-10-24, the fourth such run of growth and the fourth time it has begun
+from a reset. The reading the 2026-10-20 entry settled on and 2026-10-24 confirmed a third time
+therefore holds for a fourth firing: the gap grows by one per firing while the runner image stands,
+and a rebuild returns it to zero on a date no firing has been able to predict. A later cloud shift
+should still expect any of the three shapes, fetch before it compares, and check it is on `main`
+before committing, rather than rely on an extrapolated gap — one here does not mean two tomorrow.
+`xvfb-run` is present at `/usr/bin/xvfb-run` on this runner. No install, no build and no suite was
+run; the checkout was read only apart from the two files above.
+
+Thirty-nine firings have now produced thirty-nine skip entries and no test run, on 2026-09-17
+through 2026-10-25. The last shift to run a suite was 7A on 2026-09-16, thirty-nine days ago, and
+the week-one workbook ended that same day, so the skips now outlast the week they follow by
+thirty-two days. Seven rows are outstanding and all seven are local — 1B, 3B, 4B, 5A, 5B, 6A, 7B —
+along with the flake half of 7A. Nothing a cloud runner can do adds a cloud-capable row, so every
+firing from here repeats this entry until the local rows are run, week two is planned with
+cloud-capable rows in it, or the routine is paused.
+
+This firing sent no notification, which is what the condition the 2026-09-23 entry set and the
+2026-09-29 through 2026-10-24 entries restated calls for: the sixth went on 2026-10-20, a week of
+silence after it falls due on 2026-10-27, and this firing is two days before that date with
+nothing changed, so the count stays at six. The growth of the gap back to one is not a change in
+that sense either — it is a fact about the runner image, not about the work queued. The firing of
+2026-10-27, if the routine is still running then, is the one that sends the seventh.
