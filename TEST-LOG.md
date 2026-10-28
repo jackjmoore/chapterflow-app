@@ -2452,3 +2452,56 @@ again: plan week two with cloud-capable rows in it, or run 1B locally. The count
 2026-09-21, 2026-09-22, 2026-09-29, 2026-10-06, 2026-10-13, 2026-10-20 and 2026-10-27. Under the
 same condition the eighth falls due on 2026-11-03, a week of silence after this one, and a firing
 before that date sends nothing.
+
+## 2026-10-28 — cloud shift, skipped
+
+The forty-second consecutive firing to take no row. `TEST-STATE.md` named shift 1B as next, and
+`TEST-SHIFT.md` lists 1B under the shifts that run locally, so the cloud section's substitute rule
+applied: take the earliest cloud-capable workbook row not yet done. `TEST-WORKBOOK.md` still marks
+all six as done — 2A on 2026-09-11, 2B on 2026-09-12, 3A on 2026-09-13, 4A on 2026-09-14, 6B on
+2026-09-15 and 7A's review half on 2026-09-16 — and its table is still unchanged since `da85a6b`,
+confirmed by an empty `git diff --stat da85a6b HEAD -- TEST-WORKBOOK.md`. There was no substitute
+row to take, so this firing appends a skip entry and stops, as the cloud section directs. Nothing
+under `src/`, `tests/` or `FINDINGS/` has changed since `da85a6b` either, confirmed by an empty
+`git diff --stat da85a6b HEAD -- src tests FINDINGS`, and all forty-one commits from `da85a6b` to
+the checkout tip are skip commits authored by Claude, checked with `git log --format='%an'
+da85a6b..HEAD | sort | uniq -c`, which returns the single line `41 Claude`; `git diff --name-only
+da85a6b HEAD` returns only `TEST-LOG.md` and `TEST-STATE.md`. This firing repeated the two
+repository-channel checks 2026-10-12 introduced: the repository has zero issues, open or closed,
+and zero pull requests, open, closed or merged. So no answer to the five questions under "What's
+waiting on Jack" has arrived through the repository by any route, on any of the seventeen dates
+that check has been made. `FINDINGS/` holds the same seven files it held on 2026-09-16. The only
+files this shift writes are `TEST-LOG.md` and `TEST-STATE.md`. No shift-open entry was written,
+because no shift was opened.
+
+The checkout arrived in the first of the three recorded shapes for the second firing running: a
+clean working tree on branch `main` at `fa1d32b`, the 2026-10-27 skip commit and the tip of the
+remote, so the gap is zero and neither a checkout nor a fast-forward was needed before committing.
+`git fetch origin main` left the `origin/main` ref at `fa1d32b`, where `HEAD` and `main` already
+stood, all three reported by one `git rev-parse HEAD origin/main main`. The gap was zero on
+2026-10-27 and growth of one per firing would have put it at one here, so the runner image was
+rebuilt between the two firings and this is the fifth reset to zero — on 2026-10-15 from seven, on
+2026-10-20 from four, on 2026-10-24 from two, on 2026-10-27 from three and here from the one it
+would have been. Two consecutive firings have now found a gap of zero, which had not happened
+before, and the rebuilds have landed on 2026-10-15, 2026-10-20, 2026-10-24, 2026-10-27 and
+2026-10-28, the last two on consecutive dates, so the runs of growth have gone seven, four, two,
+one and now zero; a later cloud shift should still expect any of the three shapes, fetch before it
+compares, and check it is on `main` before committing, rather than carry a gap forward from the
+entry above it or read the shortening runs as a trend. `xvfb-run` is present at `/usr/bin/xvfb-run`
+on this runner. No install, no build and no suite was run; the checkout was read only apart from
+the two files above.
+
+Forty-two firings have now produced forty-two skip entries and no test run, on 2026-09-17 through
+2026-10-28. The last shift to run a suite was 7A on 2026-09-16, forty-two days ago, and the
+week-one workbook ended that same day, so the skips now outlast the week they follow by thirty-five
+days. Seven rows are outstanding and all seven are local — 1B, 3B, 4B, 5A, 5B, 6A, 7B — along with
+the flake half of 7A. Nothing a cloud runner can do adds a cloud-capable row, so every firing from
+here repeats this entry until the local rows are run, week two is planned with cloud-capable rows
+in it, or the routine is paused.
+
+This firing sent no notification, which is what the condition the 2026-09-23 entry set calls for:
+the seventh went on 2026-10-27, the eighth falls due on 2026-11-03 after a week of silence, and a
+firing before that date sends nothing. The count stays at seven, on 2026-09-21, 2026-09-22,
+2026-09-29, 2026-10-06, 2026-10-13, 2026-10-20 and 2026-10-27. This firing found nothing the
+seventh notification did not already carry: the same question, one further skip, and no answer
+through the repository.
