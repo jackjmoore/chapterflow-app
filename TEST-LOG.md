@@ -2867,3 +2867,49 @@ stays at eight, on 2026-09-21, 2026-09-22, 2026-09-29, 2026-10-06, 2026-10-13, 2
 2026-10-27 and 2026-11-03, all eight unanswered. Under the same weekly condition the firings of
 2026-11-05 through 2026-11-09 send nothing either, unless something in the repository changes, and
 the firing of 2026-11-10 sends the ninth.
+
+## 2026-11-05 — cloud shift, skipped
+
+The fiftieth consecutive firing to take no row. `TEST-STATE.md` named shift 1B as next, and
+`TEST-SHIFT.md` lists 1B under the shifts that run locally, so the cloud section's substitute rule
+applied: take the earliest cloud-capable workbook row not yet done. `TEST-WORKBOOK.md` was re-read
+rather than assumed, and it still marks all six cloud-capable rows done — 2A on 2026-09-11, 2B on
+2026-09-12, 3A on 2026-09-13, 4A on 2026-09-14, 6B on 2026-09-15 and 7A's review half on
+2026-09-16 — its table unchanged since `da85a6b`, confirmed by an empty `git diff --stat da85a6b
+HEAD -- TEST-WORKBOOK.md`. Reading the table's own non-done rows gives 1B, 3B, 4B, 5A, 5B, 6A, 7B
+and 7A's remaining half, which are the eight the "Which shifts can run where" list puts on the
+development machine, so there was no substitute row to take and this entry is the skip entry the
+cloud section calls for, naming 1B as the local row that blocks. Nothing under `src/`, `tests/` or
+`FINDINGS/` has changed since `da85a6b` either, confirmed by an empty `git diff --stat da85a6b HEAD
+-- src tests FINDINGS`, and `FINDINGS/` holds the same seven files it held on 2026-09-16. The
+repository-channel check of 2026-10-12 was repeated: zero issues, open or closed, and zero pull
+requests, open, closed or merged, so no answer to anything under "What's waiting on Jack" has
+arrived through the repository on any of the twenty-five dates that check has been made. No install,
+no build and no suite was run; the only files written are `TEST-LOG.md` and `TEST-STATE.md`, and no
+shift-open entry was written because no shift was opened.
+
+The checkout arrived in the third of the three recorded shapes, as 2026-11-01 through 2026-11-04
+did: a clean tree on a detached `HEAD` at `e9f50c9`, the remote tip, with branch `main` and the
+`origin/main` ref both at `7c00bc6`, five commits behind, so `git fetch origin main` moved a stale
+ref and a checkout and a fast-forward were both needed before committing. The gap was four on
+2026-11-04, so it grew by one and the runner image was not rebuilt between the two firings. The
+arithmetic beyond that is not worth recording: six resets to zero have each landed on a date no
+firing predicted, and the conclusion a later firing needs is only to run `git fetch origin main`
+before comparing to the remote and to check it is on `main` before committing. `xvfb-run` is
+present at `/usr/bin/xvfb-run` on this runner.
+
+Fifty firings have now produced fifty skip entries and no test run, on 2026-09-17 through
+2026-11-05. The last shift to run a suite was 7A on 2026-09-16, fifty days ago, and the week-one
+workbook ended that same day, so the skips now outlast the week they follow by forty-three days.
+Shift 1B has been deferred fifty-six times, six firings taking a substitute cloud row and fifty
+skipping. Nothing a cloud runner can do adds a cloud-capable row, so every firing from here repeats
+this entry until the local rows are run, week two is planned with cloud-capable rows in it, or the
+routine is paused.
+
+This firing sent no notification, which is what the condition the 2026-09-23 entry set calls for:
+the eighth went on 2026-11-03, the ninth falls due on 2026-11-10, and nothing in the repository
+changed in between — the workbook table, `src/`, `tests/` and `FINDINGS/` all unchanged since
+`da85a6b`, and the issue and pull request counts both still zero. The count stays at eight, on
+2026-09-21, 2026-09-22, 2026-09-29, 2026-10-06, 2026-10-13, 2026-10-20, 2026-10-27 and 2026-11-03,
+all eight unanswered. The firings of 2026-11-06 through 2026-11-09 send nothing either unless
+something in the repository changes, and the firing of 2026-11-10 sends the ninth.
