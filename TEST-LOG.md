@@ -2913,3 +2913,73 @@ changed in between — the workbook table, `src/`, `tests/` and `FINDINGS/` all 
 2026-09-21, 2026-09-22, 2026-09-29, 2026-10-06, 2026-10-13, 2026-10-20, 2026-10-27 and 2026-11-03,
 all eight unanswered. The firings of 2026-11-06 through 2026-11-09 send nothing either unless
 something in the repository changes, and the firing of 2026-11-10 sends the ninth.
+
+## 2026-11-06 — cloud shift, skipped
+
+The fifty-first consecutive firing to take no row. `TEST-STATE.md` named shift 1B as next, and
+`TEST-SHIFT.md` lists 1B under the shifts that run locally, so the cloud section's substitute rule
+applied. `TEST-WORKBOOK.md` was re-read rather than assumed, and it still marks all six
+cloud-capable rows done — 2A on 2026-09-11, 2B on 2026-09-12, 3A on 2026-09-13, 4A on 2026-09-14,
+6B on 2026-09-15 and 7A's review half on 2026-09-16 — its table unchanged since `da85a6b`,
+confirmed by an empty `git diff --stat da85a6b HEAD -- TEST-WORKBOOK.md`. Reading the table's own
+non-done rows gives 1B, 3B, 4B, 5A, 5B, 6A, 7B and 7A's remaining half, which are the eight the
+"Which shifts can run where" list puts on the development machine, so there was no substitute row
+to take and this entry is the skip entry the cloud section calls for, naming 1B as the local row
+that blocks. Nothing under `src/`, `tests/` or `FINDINGS/` had changed since `da85a6b` on arrival,
+confirmed by an empty `git diff --stat da85a6b HEAD -- src tests FINDINGS`, and `FINDINGS/` held
+the same seven files it held on 2026-09-16. No install, no build and no suite was run:
+`node_modules/`, `out/` and `test-results/` were all absent on arrival and were left so, and the
+runner has Node v22.23.4 and `xvfb-run` at `/usr/bin/xvfb-run`. No shift-open entry was written
+because no shift was opened.
+
+Unlike the fifty firings before it, this one wrote a findings file:
+`FINDINGS/2026-11-06-mangled-path-folder.md`, which takes the eighth file into `FINDINGS/` and
+answers one of the four parts of 1B's brief, "find what wrote the mangled-path folder in the repo
+root". The occasion was noticing that the folder is named outright in `.gitignore`, in three lines
+carried since `59d296e` on 2026-09-17, the first skip commit, and that the string `mangled` appears
+nowhere in the 234 KB of this log before this entry, so no firing had written the mechanism down in
+the fifty days the name sat there. The ignored name
+`/UsersjackmOneDriveDocumentsChapterFlow Demo/` is `C:\Users\jackm\OneDrive\Documents\ChapterFlow
+Demo` with the drive letter and every backslash removed and the one space kept, which points at a
+shell eating `\` as an escape rather than at `node:path`, and `scripts/make-demo-project.mjs` takes
+its target raw from `process.argv[2]` on line 21 and calls `mkdir` with `recursive: true` on line
+489, so a relative target is created under the working directory without complaint. The guard on
+line 27 does not catch it, because it refuses only an existing `binder.json` and a mangled target
+names a folder that does not exist yet. This is hedged on purpose: no Windows shell was driven here
+and `/verifyDemo.mjs`, ignored under the same comment and untracked, could not be read, so the
+caller is unverified. Two of 1B's four parts — delete the folder, quote the target — need no
+investigation on the development machine now, and the folder itself cannot be deleted from a cloud
+runner, because `git log --all --diff-filter=A --name-only` over the whole history shows no path
+with a backslash, colon or quote was ever tracked and a clean checkout does not contain it.
+
+The checkout arrived in the third of the three recorded shapes, as 2026-11-01 through 2026-11-05
+did: a clean tree on a detached `HEAD` at `91c56a2`, the remote tip, with branch `main` and the
+`origin/main` ref both at `7c00bc6`, six commits behind, so `git fetch origin main` moved a stale
+ref and a checkout and a fast-forward were both needed before committing. The gap was five on
+2026-11-05, so it grew by one and the runner image was not rebuilt between the two firings. The
+arithmetic beyond that is not worth recording, for the reason 2026-11-05 gave: six resets to zero
+have each landed on a date no firing predicted, and the conclusion a later firing needs is only to
+run `git fetch origin main` before comparing to the remote and to check it is on `main` before
+committing.
+
+The repository-channel check of 2026-10-12 was repeated: zero issues, open or closed, and zero pull
+requests, open, closed or merged, so no answer to anything under "What's waiting on Jack" has
+arrived through the repository on any of the twenty-six dates that check has been made. Fifty-one
+firings have now produced fifty-one skip entries and no test run, on 2026-09-17 through 2026-11-06.
+The last shift to run a suite was 7A on 2026-09-16, fifty-one days ago, and the week-one workbook
+ended that same day, so the skips now outlast the week they follow by forty-four days. Shift 1B has
+been deferred fifty-seven times, six firings taking a substitute cloud row and fifty-one skipping.
+Nothing a cloud runner can do adds a cloud-capable row, so every firing from here repeats this
+entry until the local rows are run, week two is planned with cloud-capable rows in it, or the
+routine is paused.
+
+This firing sent no notification, which is what the condition the 2026-09-23 entry set calls for:
+the eighth went on 2026-11-03, the ninth falls due on 2026-11-10, and nothing on Jack's side of the
+repository changed in between — the workbook table, `src/` and `tests/` all unchanged since
+`da85a6b`, and the issue and pull request counts both still zero. The findings file this firing
+wrote is its own output, not a change arriving from outside, so it does not meet that condition; it
+needs no decision, blocks nothing, and spending a notification on it four days early would dilute
+the ninth, which carries the question that does need answering. The count stays at eight, on
+2026-09-21, 2026-09-22, 2026-09-29, 2026-10-06, 2026-10-13, 2026-10-20, 2026-10-27 and 2026-11-03,
+all eight unanswered. The firings of 2026-11-07 through 2026-11-09 send nothing either unless
+something changes in the repository, and the firing of 2026-11-10 sends the ninth.
