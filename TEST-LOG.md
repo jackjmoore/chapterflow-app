@@ -2983,3 +2983,92 @@ the ninth, which carries the question that does need answering. The count stays 
 2026-09-21, 2026-09-22, 2026-09-29, 2026-10-06, 2026-10-13, 2026-10-20, 2026-10-27 and 2026-11-03,
 all eight unanswered. The firings of 2026-11-07 through 2026-11-09 send nothing either unless
 something changes in the repository, and the firing of 2026-11-10 sends the ninth.
+
+## 2026-11-07 — cloud shift, skipped
+
+The fifty-second consecutive firing to take no row. `TEST-STATE.md` named shift 1B as next, and
+`TEST-SHIFT.md` lists 1B under the shifts that run locally, so the cloud section's substitute rule
+applied. `TEST-WORKBOOK.md` was re-read rather than assumed, and it still marks all six
+cloud-capable rows done — 2A on 2026-09-11, 2B on 2026-09-12, 3A on 2026-09-13, 4A on 2026-09-14,
+6B on 2026-09-15 and 7A's review half on 2026-09-16 — its table unchanged, confirmed by an empty
+`git diff --stat da85a6b HEAD -- TEST-WORKBOOK.md`. The table's own non-done rows are 1B, 3B, 4B,
+5A, 5B, 6A, 7B and 7A's remaining half, which are the eight the "Which shifts can run where" list
+puts on the development machine, so there was no substitute row to take and this entry is the skip
+entry the cloud section calls for, naming 1B as the local row that blocks. No install, no build and
+no suite was run: `node_modules/`, `out/` and `test-results/` were all absent on arrival and were
+left so, and the runner has Node v22.23.4 and `xvfb-run` at `/usr/bin/xvfb-run`. No shift-open
+entry was written because no shift was opened.
+
+This firing wrote two findings files, the second and third written by a skipping firing after
+fifty-one wrote none and 2026-11-06 wrote one. Both come out of tracked files alone and neither
+runs or changes anything.
+
+`FINDINGS/2026-11-07-unreachable-baseline.md` records that `da85a6b`, the commit fifty-two state
+rewrites have told each firing to diff against, is not an ancestor of `HEAD`:
+`git merge-base --is-ancestor da85a6b HEAD` exits 1. The repository's root commit is `a983d96` of
+2026-09-18 02:04:38, the second skip commit, which adds every tracked path in one import; there are
+50 commits in total, 49 after the root, all 50 authored by `Claude`, so the pushed history begins
+the day after the first skip and contains none of the week-one shift commits. Those are present as
+unreachable objects instead — `git fsck --unreachable` finds seven commits dated 2026-09-15 to
+2026-09-17 inside the one packfile the clone arrived with, three of them authored by Jack Moore and
+including both halves of 7A, with no branch, tag or remote ref reaching any of them. `59d296e`, the
+commit `FINDINGS/2026-11-06-mangled-path-folder.md` named yesterday as the origin of the
+`.gitignore` lines, is one of the seven. No content is lost: `git diff --stat da85a6b a983d96 -- src
+tests` is empty and the two commits differ across the whole tree only in `TEST-LOG.md` and
+`TEST-STATE.md`, by 108 insertions and 58 deletions, which is the 2026-09-17 entry folded into the
+import. What is lost is the commit sequence of those three days, and whether it survives in a clone
+on the development machine was not established here.
+
+The consequence is operational, and is why that file was worth writing rather than noting in a
+sentence. The `da85a6b` diff is load-bearing in `TEST-STATE.md` and resolves today only because
+those unreachable objects happen to be packed in this image's clone; a checkout arriving without
+them, after a remote GC, gets a bad-object error instead of an empty diff, and a firing could read
+that as a change under `src/` or stall on it. This state rewrite therefore diffs against the root
+commit `a983d96`, which is reachable from `main` and byte-identical to `da85a6b` for `src` and
+`tests`, and keeps `da85a6b` named only as the week-one baseline for the 2026-09-10 numbers, which
+is what it is. Both forms were run this firing and both are empty. `a983d96` is not a substitute
+for the two documents that do differ.
+
+`FINDINGS/2026-11-07-structure-header.md` answers part 3 of 1B's brief, "correct the structure
+suite's stale header", which no file had described. `tests/structure.test.ts` is 618 lines and
+calls `section()` thirteen times; its header comment describes ten of the thirteen and never
+mentions the sections at lines 231, 478 and 562 — notes as metadata, `insertSubtree` in one
+persist, and `importSnapshot` keeping its given timestamp. Nothing in the header is wrong: all ten
+of its claims were checked against the section list and hold, including "45+ documents", where
+`buildLegacyTree()` on line 67 builds 47. So the defect is incompleteness by three sections, not
+error, and the edit is three clauses in the header's second paragraph with no assertion and no
+behaviour change. Two of the three unmentioned sections are importer paths, which fits the importer
+landing after the header was written, but no commit shows it: the file has one commit in the
+history, the root import, for the reason the other findings file gives.
+
+The checkout arrived in the third of the three recorded shapes, as 2026-11-01 through 2026-11-06
+did: a clean tree on a detached `HEAD` at `6dcdd75`, the remote tip, with branch `main` and the
+`origin/main` ref both at `7c00bc6`, seven commits behind, so `git fetch origin main` moved a stale
+ref and a checkout and a fast-forward were both needed before committing. The gap was six on
+2026-11-06, so it grew by one and the runner image was not rebuilt between the two firings; the
+packfile is dated 2026-10-31, which is consistent with that and is the same image that carries the
+unreachable objects. The arithmetic beyond that is not worth recording, for the reason 2026-11-05
+gave.
+
+The repository-channel check of 2026-10-12 was repeated: zero issues, open or closed, and zero pull
+requests, open, closed or merged, so no answer to anything under "What's waiting on Jack" has
+arrived through the repository on any of the twenty-seven dates that check has been made. All 50
+commits since the root are the routine's own, so nothing has reached this repository from outside
+it since 2026-09-18. Fifty-two firings have now produced fifty-two skip entries and no test run, on
+2026-09-17 through 2026-11-07. The last shift to run a suite was 7A on 2026-09-16, fifty-two days
+ago. Shift 1B has been deferred fifty-eight times, six firings taking a substitute cloud row and
+fifty-two skipping, and its brief is now three parts of work for the machine: parts 3 and 5 are
+both reduced to known edits by findings files, leaving the two reruns, the concurrent-run proof and
+the `bookrender` duration.
+
+This firing sent no notification, which is what the condition the 2026-09-23 entry set calls for:
+the eighth went on 2026-11-03, the ninth falls due on 2026-11-10, and nothing on Jack's side of the
+repository changed in between — the workbook table, `src/` and `tests/` all unchanged, and the issue
+and pull request counts both still zero. The two findings files are this firing's own output, not a
+change arriving from outside, so they do not meet that condition; the question of how the history
+came to start on 2026-09-18 is Jack's to answer but blocks nothing, loses no content, and is fully
+recorded with its fix applied, so it travels with the ninth rather than four days ahead of it. The
+count stays at eight, on 2026-09-21, 2026-09-22, 2026-09-29, 2026-10-06, 2026-10-13, 2026-10-20,
+2026-10-27 and 2026-11-03, all eight unanswered. The firings of 2026-11-08 and 2026-11-09 send
+nothing either unless something changes in the repository, and the firing of 2026-11-10 sends the
+ninth, which should carry the unreachable-history question beside the routine question.
