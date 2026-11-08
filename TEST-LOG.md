@@ -3072,3 +3072,79 @@ count stays at eight, on 2026-09-21, 2026-09-22, 2026-09-29, 2026-10-06, 2026-10
 2026-10-27 and 2026-11-03, all eight unanswered. The firings of 2026-11-08 and 2026-11-09 send
 nothing either unless something changes in the repository, and the firing of 2026-11-10 sends the
 ninth, which should carry the unreachable-history question beside the routine question.
+
+## 2026-11-08 — cloud shift, skipped
+
+The fifty-third consecutive firing to take no row. `TEST-STATE.md` named shift 1B as next, and
+`TEST-SHIFT.md` lists 1B under the shifts that run locally, so the cloud section's substitute rule
+applied. `TEST-WORKBOOK.md` was re-read rather than assumed, and it still marks all six
+cloud-capable rows done — 2A on 2026-09-11, 2B on 2026-09-12, 3A on 2026-09-13, 4A on 2026-09-14,
+6B on 2026-09-15 and 7A's review half on 2026-09-16 — its table unchanged, confirmed by an empty
+`git diff --stat da85a6b HEAD -- TEST-WORKBOOK.md`. Its non-done rows are 1B, 3B, 4B, 5A, 5B, 6A,
+7B and 7A's remaining half, which are the eight the "Which shifts can run where" list puts on the
+development machine, so there was no substitute row to take and this entry is the skip entry the
+cloud section calls for, naming 1B as the local row that blocks. No install, no build and no suite
+was run: `node_modules/`, `out/` and `test-results/` were all absent on arrival and were left so,
+and the runner has Node v22.23.4 and `xvfb-run` at `/usr/bin/xvfb-run`. No shift-open entry was
+written because no shift was opened.
+
+This firing wrote one findings file, `FINDINGS/2026-11-08-shallow-clone-history.md`, and it
+corrects yesterday's. The checkout arrives as a shallow clone of fixed depth 50:
+`git rev-parse --is-shallow-repository` returns true and `.git/shallow` holds
+`4ad60b30630bf91e516646dee5c518a8c3f4e6e2`. That is what `FINDINGS/2026-11-07-unreachable-baseline.md`
+read as a root commit. The arithmetic settles it on both dates — `git rev-list --count
+a983d96^..6dcdd75` is 50 for yesterday's HEAD and `git rev-list --count 4ad60b3^..57dcd3f` is 50
+for today's — so the boundary advances one commit per firing, and yesterday's seven unreachable
+commits are the seven immediately preceding its boundary, left reachable from nothing by the
+shallow graft rather than by anything the remote did. `git fetch --unshallow origin main`, which
+changes nothing on the remote, gives 86 commits from the root `9d1ccdc` of 2026-08-20, 59 authored
+by `Claude` and 27 by `Jack Moore`, with `3e416c5`, `da85a6b` and `a983d96` all present and all
+ancestors of `HEAD` — `git merge-base --is-ancestor da85a6b HEAD` exits 0. Nothing is lost, both
+halves of 7A are in the reachable history, and the fourteen commits of 2026-08-20 to 2026-08-22
+that precede the 2026-09-10 baseline are there too and have never been mentioned in a state
+rewrite.
+
+The operational consequence is the opposite of yesterday's. Substituting `a983d96` for `da85a6b`
+does not survive a shallow checkout and did not survive this one: `git diff --stat a983d96 HEAD --
+src tests` failed with `fatal: bad revision 'a983d96'`, because the boundary had already moved one
+commit past it. Any commit older than fifty back is absent, so no choice of commit fixes this and
+the check has to undo the shallowness first. Run after `--unshallow`, both forms are empty and
+`src/` and `tests/` are unchanged since `da85a6b` — the claim fifty-two rewrites have made, checked
+for the first time against a commit that is in the history. Against `3e416c5` the week-one work
+shows as 8 files and 3,112 insertions, the two store fixes and the six test files, which is
+independent evidence that week one is reachable and not only packed. `TEST-SHIFT.md`'s cloud
+section says nothing about the shallow clone; it is Jack's document and was not edited, so the
+check is recorded in `TEST-STATE.md` instead.
+
+The checkout arrived in the first of the three recorded shapes, not the third: a clean tree on
+branch `main` at `57dcd3f`, the remote tip, with `origin/main` at the same commit, so no fetch,
+checkout or fast-forward was needed before committing. The seven-commit gap of 2026-11-07 is gone
+and the pack is dated with the clone rather than 2026-10-31, so the runner image was rebuilt
+between the two firings — the seventh rebuild to reset the gap to zero, and the first on a date a
+firing had predicted no better than the six before it. The arithmetic beyond that is not worth
+recording, for the reason 2026-11-05 gave.
+
+The repository-channel check of 2026-10-12 was repeated: zero issues, open or closed, and zero pull
+requests, open, closed or merged, so no answer to anything under "What's waiting on Jack" has
+arrived through the repository on any of the twenty-eight dates that check has been made. All 71
+commits since the 2026-09-10 baseline are accounted for, the last by Jack Moore is `da85a6b` of
+2026-09-16, and the 52 after it are the routine's own, so nothing has reached this repository from
+outside it in fifty-three days. Fifty-three firings have now produced fifty-three skip entries and
+no test run, on 2026-09-17 through 2026-11-08. The last shift to run a suite was 7A on 2026-09-16,
+fifty-three days ago. Shift 1B has been deferred fifty-nine times, six firings taking a substitute
+cloud row and fifty-three skipping, and its brief is unchanged at three parts of work for the
+machine.
+
+This firing sent no notification, which is what the condition the 2026-09-23 entry set calls for:
+the eighth went on 2026-11-03, the ninth falls due on 2026-11-10, and nothing on Jack's side of the
+repository changed in between — the workbook table, `src/` and `tests/` all unchanged, and the issue
+and pull request counts both still zero. The findings file is this firing's own output, not a change
+arriving from outside, so it does not meet that condition, which is the reasoning 2026-11-06 and
+2026-11-07 both recorded and which holds the more plainly here: the file retires a question rather
+than raising one, nothing is broken, nothing is lost, and nothing is asked of Jack today that was
+not already asked eight times. What it changes is the wording the ninth should carry. The
+2026-11-07 entry queued the unreachable-history question for 2026-11-10; it should not go, because
+it has an answer, and the ninth carries the routine question alone. The count stays at eight, on
+2026-09-21, 2026-09-22, 2026-09-29, 2026-10-06, 2026-10-13, 2026-10-20, 2026-10-27 and 2026-11-03,
+all eight unanswered. The firing of 2026-11-09 sends nothing either unless something changes in the
+repository.
