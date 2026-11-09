@@ -3148,3 +3148,63 @@ it has an answer, and the ninth carries the routine question alone. The count st
 2026-09-21, 2026-09-22, 2026-09-29, 2026-10-06, 2026-10-13, 2026-10-20, 2026-10-27 and 2026-11-03,
 all eight unanswered. The firing of 2026-11-09 sends nothing either unless something changes in the
 repository.
+
+## 2026-11-09 — cloud shift, skipped
+
+The fifty-fourth firing in a row to take no row. `TEST-STATE.md` named shift 1B,
+`TEST-SHIFT.md`'s "Which shifts can run where" lists 1B as local, and `TEST-WORKBOOK.md` still
+marks all six cloud-capable rows done — 2A, 2B, 3A, 4A, 6B and 7A's review half, 2026-09-11
+through 2026-09-16. `git diff --stat da85a6b HEAD -- TEST-WORKBOOK.md` is empty, so the table has
+not changed since Jack last touched it on 2026-09-16, and the cloud section's substitution rule
+has nothing to substitute. Per that section this firing appended this entry, rewrote
+`TEST-STATE.md`, committed and pushed, and stopped. No install, no build, no suite.
+
+`git diff --stat da85a6b HEAD -- src tests` is empty: `src/` and `tests/` are unchanged since
+`da85a6b` of 2026-09-16, now for the fifty-fourth rewrite running. The check was made in the form
+`FINDINGS/2026-11-08-shallow-clone-history.md` prescribes — `git rev-parse
+--is-shallow-repository` returned true, then `git fetch --unshallow origin main`, after which the
+history is 87 commits from the root `9d1ccdc` of 2026-08-20, one more than yesterday's 86, the one
+more being yesterday's own skip commit `aaf88c6`. Of the 72 commits since the `3e416c5` baseline,
+60 are by `Claude` and 12 by `Jack Moore`, and the last by Jack Moore is still `da85a6b` of
+2026-09-16, fifty-four days ago.
+
+The checkout arrived in a shape none of the fifty-three firings before it saw, and it is written up
+in `FINDINGS/2026-11-09-inherited-checkout.md`. `HEAD` was detached at `aaf88c6`, yesterday's own
+close commit and the current remote tip; the local branch `main` still pointed at `57dcd3f`, the
+tip as of 2026-11-07; `origin/main` pointed there too until fetched; and the tree was clean. The
+reflog shows `main` created from `refs/remotes/origin/main` at 2026-11-08 02:08:30 and not since,
+`.git/shallow` held two depth-50 boundaries rather than one — `4ad60b3` measured from `57dcd3f` and
+`7dd08e2` measured from `aaf88c6`, both exactly 50 commits back — and the pack, `logs/` and `refs/`
+are dated 2026-11-08 while `config` and `HEAD` are dated 2026-11-09. The reading those support is
+that this container inherited yesterday's `.git` and fetched the tip into it, rather than cloning
+fresh. The operational point is that `git checkout main` alone leaves the tree a commit behind,
+with yesterday's log entry and state rewrite reverted and
+`FINDINGS/2026-11-08-shallow-clone-history.md` absent, so a firing that appended from there would
+have committed a log with 2026-11-08 missing and a findings file deleted. The brief's own
+`git pull --rebase origin main` prevents that if it runs after the checkout; this firing used
+`git fetch origin main`, `git checkout main`, `git merge --ff-only origin/main`, which reported
+the expected one-commit fast-forward and a clean tree.
+
+The repository-channel check of 2026-10-12 was repeated: zero issues, open or closed, and zero
+pull requests, open, closed or merged. That is the twenty-ninth date it has been made, and no
+answer to anything under "What's waiting on Jack" has arrived through the repository on any of
+them. Nothing has reached this repository from outside the routine in fifty-four days. Fifty-four
+firings have now produced fifty-four skip entries and no test run, on 2026-09-17 through
+2026-11-09, and the last shift to run a suite was 7A on 2026-09-16. Shift 1B has been deferred
+sixty times, six firings taking a substitute cloud row and fifty-four skipping, and its brief is
+unchanged at three parts of work for the machine.
+
+The runner facts are as 2026-11-08 left them: `xvfb-run` at `/usr/bin/xvfb-run`, Node v22.23.4,
+and `node_modules/` and `out/` both absent, so any firing that does get a row still installs and
+builds from nothing.
+
+This firing sent no notification. The condition the 2026-09-23 entry set is weekly unless
+something on Jack's side of the repository changes, the eighth went on 2026-11-03 and the ninth
+falls due on 2026-11-10; the workbook table, `src/` and `tests/` are all unchanged and the issue
+and pull request counts are both still zero, so nothing arrived from outside. The checkout shape
+is a runner fact this firing observed and wrote up itself, which is its own output and not a
+change from outside, the same reasoning 2026-11-06, 2026-11-07 and 2026-11-08 recorded for their
+own findings files; it also cost nothing and lost nothing, the fast-forward having put the tree
+where it belonged. The ninth notification still falls due on 2026-11-10 and still carries the
+routine question alone — whether the daily cloud routine should keep firing — with the
+checkout-shape finding worth one clause at most, as a pointer to the findings file.
