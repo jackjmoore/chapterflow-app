@@ -3302,6 +3302,15 @@ a fixed snapshot predicts and what an inherited-from-yesterday `.git` does not. 
 commits on 2026-11-12. No findings file was written for this: it confirms an existing file rather
 than correcting it, and the handling is unchanged.
 
+The cloud section's "Before each commit, `git pull --rebase origin main`" cannot run in that order
+as written, which no entry in fifty-six firings has recorded. With the shift's own writes to
+`TEST-LOG.md` and `TEST-STATE.md` still unstaged it refuses with `cannot pull with rebase: You have
+unstaged changes`, so the order that works is `git add`, `git commit`, then
+`git pull --rebase origin main`, then `git push origin HEAD:main`. Run that way today the rebase
+reported `Current branch main is up to date` and the push took `e02a08c..d89e579` on the first
+attempt. The refusal is the expected response to a dirty tree and not a sign that anything is
+wrong; a firing that meets it should stage and commit first rather than investigate.
+
 The repository-channel check of 2026-10-12 was repeated: zero issues, open or closed, and zero
 pull requests, open, closed or merged. That is the thirty-first date it has been made, and no
 answer to anything under "What's waiting on Jack" has arrived through the repository on any of

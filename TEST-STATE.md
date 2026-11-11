@@ -128,7 +128,9 @@ the remote tip and the local `main` four commits behind, one more than on 2026-1
 sequence is `git fetch origin main`, `git checkout main`, `git merge --ff-only origin/main`, because
 `git checkout main` alone silently reverts every firing's log entry, state rewrite and findings file
 since 2026-11-07 and `merge --ff-only` takes a gap of any size, per
-`FINDINGS/2026-11-10-frozen-git-snapshot.md`; and before any comparison to a commit older than
+`FINDINGS/2026-11-10-frozen-git-snapshot.md`, and it should expect the cloud section's
+`git pull --rebase origin main` to refuse while its own writes are unstaged, the working order being
+add, commit, rebase, push, as the 2026-11-11 log entry records; and before any comparison to a commit older than
 fifty back, `da85a6b` and `3e416c5` included, it should run `git rev-parse --is-shallow-repository`
 and, if true, `git fetch --unshallow origin main`, which touches nothing on the remote and is the
 only thing that makes those commits resolvable, per
