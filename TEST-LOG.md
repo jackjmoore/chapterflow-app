@@ -3331,3 +3331,57 @@ on Jack's side of the repository changes; the ninth went on 2026-11-10 and the t
 `tests/` are all unchanged and the issue and pull request counts are both still zero — and a
 confirmation the routine produced about its own container is its own output and does not meet the
 condition, which is the same reasoning 2026-11-06 through 2026-11-10 recorded.
+
+## 2026-11-12 — cloud shift, skipped
+
+The fifty-seventh firing running took no row. `TEST-STATE.md` named shift 1B, which
+`TEST-SHIFT.md`'s "Which shifts can run where" lists as local, and `TEST-WORKBOOK.md` still marks
+all six cloud-capable rows done — 2A, 2B, 3A, 4A, 6B and 7A's review half, 2026-09-11 through
+2026-09-16 — its table unchanged, confirmed by an empty `git diff --stat da85a6b HEAD --
+TEST-WORKBOOK.md`. The seven outstanding rows are 1B, 3B, 4B, 5A, 5B, 6A and 7B, plus 7A's flake
+half, and every one of them is local. The checkout was read only: no install, no build, no suite
+run. `src/` and `tests/` are unchanged since `da85a6b` of 2026-09-16, confirmed by an empty
+`git diff --stat da85a6b HEAD -- src tests` after `git fetch --unshallow origin main`, which was
+needed again because the clone arrived shallow at depth 50 and `da85a6b` is 76 commits back.
+
+The arrival gap was 5 commits, not the 4 that `FINDINGS/2026-11-10-frozen-git-snapshot.md` and this
+file's 2026-11-11 entry both predicted. The cause is that the gap counts commits pushed since
+`57dcd3f`, not days elapsed, and the 2026-11-11 firing pushed two — `d89e579`, its skip close, and
+`2e455ad`, its addendum on the `git pull --rebase` ordering. The predictions had been made by adding
+one per day, which also explains why 2026-11-11 arrived at 3 against a predicted 2. Traced, with the
+rule to use instead, in `FINDINGS/2026-11-12-commit-gap-rule.md`; the handling is unchanged, since
+`git merge --ff-only origin/main` takes a fast-forward of any size and it took this one without
+complaint. That file is the fourteenth in `FINDINGS/` and the first since 2026-11-10.
+
+The frozen-snapshot reading is now confirmed three times. On arrival
+`.git/logs/refs/remotes/origin/main` held exactly one event, the 2026-11-08 02:08:30 bootstrap fetch
+ending at `57dcd3f`, with no entry for 2026-11-09, 2026-11-10 or 2026-11-11, each of which ran a
+fetch, a checkout and a merge against this same `.git`, and the one pre-existing pack was still
+`pack-7be55801c5032cc9fb75a501b038622adea3b6f3.pack` at 20,535,568 bytes dated 2026-11-08 02:08,
+unchanged in name, size and date. Three days of writes are now missing rather than two. `HEAD`
+arrived detached at `2e455ad`, the remote tip, with a clean tree, so the merge restored nothing that
+was not already in the working files; `git checkout main` alone would have reverted four firings'
+log entries, state rewrites and six findings files.
+
+The repository-channel check of 2026-10-12 was repeated: zero issues, open or closed, and zero pull
+requests, open, closed or merged. That is the thirty-second date it has been made, and no answer to
+anything under "What's waiting on Jack" has arrived through the repository on any of them. Of the 76
+commits since `3e416c5`, 64 are routine firings' and 12 carry Jack's git identity, the most recent
+of those being `da85a6b` of 2026-09-16, itself a shift close rather than work from outside. Nothing
+has reached this repository from outside the routine in fifty-seven days, and the last shift to run
+a suite was 7A on 2026-09-16. Shift 1B has now been deferred sixty-three times, six firings taking a
+substitute cloud row and fifty-seven skipping, and its brief is unchanged at three parts of work for
+the machine.
+
+The runner facts are as 2026-11-11 left them: `xvfb-run` at `/usr/bin/xvfb-run`, Node v22.23.4, and
+`node_modules/`, `out/` and `test-results/` all absent, so any firing that does get a row still
+installs and builds from nothing. The working order recorded on 2026-11-11 was used again and held:
+`git add`, `git commit`, `git pull --rebase origin main`, `git push origin HEAD:main`.
+
+This firing sent no notification. The condition the 2026-09-23 entry set is weekly unless something
+on Jack's side of the repository changes; the ninth went on 2026-11-10 and the tenth falls due on
+2026-11-17. Nothing arrived from outside to bring it forward — the workbook table, `src/` and
+`tests/` are all unchanged and the issue and pull request counts are both still zero — and a
+correction the routine makes to its own earlier prediction about its own container is its own
+output, which does not meet the condition, the same reasoning 2026-11-06 through 2026-11-11
+recorded.

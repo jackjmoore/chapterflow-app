@@ -6,7 +6,7 @@ Four sentences per section, six for What's in progress. Anything needing more te
 detail than two sentences goes in a `FINDINGS/` file and gets one plain sentence here
 pointing at it.
 
-Last updated: 2026-11-11, by the fifty-sixth cloud shift running to take no row and run no suite.
+Last updated: 2026-11-12, by the fifty-seventh cloud shift running to take no row and run no suite.
 
 ## Where it stands
 
@@ -17,37 +17,36 @@ spellcheck assertion and three page-count or layout assertions, one in `paginati
 `live`, which fail wherever Liberation Serif substitutes for Times New Roman, and the baseline of
 2026-09-10, 17 of 21 suites and 867 assertions, is still the only development-machine number and is
 what 1B reruns against. Nothing under `src/` or `tests/` has changed since `da85a6b` of 2026-09-16,
-confirmed on 2026-11-11 by an empty `git diff --stat da85a6b HEAD -- src tests` run after
+confirmed on 2026-11-12 by an empty `git diff --stat da85a6b HEAD -- src tests` run after
 `git fetch --unshallow origin main`, which is the form every later firing should use for the reason
-in `FINDINGS/2026-11-08-shallow-clone-history.md`. `FINDINGS/` still holds thirteen files: the seven
+in `FINDINGS/2026-11-08-shallow-clone-history.md`. `FINDINGS/` now holds fourteen files: the seven
 of 2026-09-10 to 2026-09-16, one of 2026-11-06, two of 2026-11-07, and one each of 2026-11-08,
-2026-11-09 and 2026-11-10.
+2026-11-09, 2026-11-10 and 2026-11-12.
 
 ## What happened last shift
 
-The cloud firing of 2026-11-11 took no row, the fifty-sixth firing running to skip: this file named
-1B, which `TEST-SHIFT.md` lists as local, and `TEST-WORKBOOK.md` still marks all six cloud-capable
-rows done — 2A, 2B, 3A, 4A, 6B and 7A's review half, 2026-09-11 through 2026-09-16 — its table
-unchanged, confirmed by an empty `git diff --stat da85a6b HEAD -- TEST-WORKBOOK.md`. It appended
-`## 2026-11-11 — cloud shift, skipped` to `TEST-LOG.md` naming 1B as the blocking row, rewrote this
-file, committed and pushed, per the cloud section; the checkout was otherwise read only, with no
-install, no build and no suite run. It wrote no findings file, because the checkout arrived in
-exactly the shape `FINDINGS/2026-11-10-frozen-git-snapshot.md` predicted, with the local branch
-`main` three commits behind as that file said it would be, and the three-command sequence took the
-three-commit fast-forward unchanged. That file's reading is now confirmed twice rather than inferred
-once: the inherited `.git` still carries only the 2026-11-08 02:08:30 bootstrap fetch in
+The cloud firing of 2026-11-12 took no row, the fifty-seventh firing running to skip: this file
+named 1B, which `TEST-SHIFT.md` lists as local, and `TEST-WORKBOOK.md` still marks all six
+cloud-capable rows done — 2A, 2B, 3A, 4A, 6B and 7A's review half, 2026-09-11 through 2026-09-16 —
+its table unchanged, confirmed by an empty `git diff --stat da85a6b HEAD -- TEST-WORKBOOK.md`. It
+appended `## 2026-11-12 — cloud shift, skipped` to `TEST-LOG.md` naming 1B as the blocking row,
+rewrote this file, committed and pushed, per the cloud section; the checkout was otherwise read
+only, with no install, no build and no suite run. It wrote one findings file,
+`FINDINGS/2026-11-12-commit-gap-rule.md`, because the arrival gap was 5 commits rather than the
+predicted 4: the gap counts commits pushed since `57dcd3f`, not days elapsed, and the 2026-11-11
+firing pushed two rather than one. The frozen-snapshot reading is now confirmed three times rather
+than twice: the inherited `.git` still carried only the 2026-11-08 02:08:30 bootstrap fetch in
 `.git/logs/refs/remotes/origin/main` and the same 20,535,568-byte pack of that date, with no trace
-of the fetch, checkout and merge that 2026-11-09 and 2026-11-10 each ran against it, so two days of
-writes are now missing rather than one and the gap should be 4 commits on 2026-11-12. It sent no
-notification, the ninth having gone on 2026-11-10 and the tenth falling due on 2026-11-17, and it
-repeated the 2026-10-12 check that the repository holds zero issues and zero pull requests, the
-thirty-first date that check has been made and still no answer arriving through the repository by
-any route.
+of the fetches, checkouts and merges that 2026-11-09, 2026-11-10 and 2026-11-11 each ran against it,
+so three days of writes are now missing. It sent no notification, the ninth having gone on
+2026-11-10 and the tenth falling due on 2026-11-17, and it repeated the 2026-10-12 check that the
+repository holds zero issues and zero pull requests, the thirty-second date that check has been made
+and still no answer arriving through the repository by any route.
 
 ## What's in progress
 
-Shift 1B is still next and still local, deferred sixty-two times over 2026-09-11 to 2026-11-11 —
-six firings that took a substitute cloud row and fifty-six that skipped. Its brief is three parts
+Shift 1B is still next and still local, deferred sixty-three times over 2026-09-11 to 2026-11-12 —
+six firings that took a substitute cloud row and fifty-seven that skipped. Its brief is three parts
 of work for the machine: rerun `polish` and `searchui` to sort timing from regression, two
 concurrent `--no-prepare` runs to prove the dynamic port fix, and record a second `bookrender`
 duration against the 420.3 seconds of 2026-09-10 — part 3, the structure suite's stale header,
@@ -57,16 +56,16 @@ mangled-path folder, to deleting the folder and quoting the target per
 2026-09-16 returned `polish` 114 of 114, `searchui` 96 of 96 and `bookrender` at 4.0 seconds on a
 different machine. Seven rows are outstanding and all seven are local — 1B, 3B, 4B, 5A, 5B, 6A, 7B
 — along with the flake half of 7A, so nothing in this workbook is cloud-capable any more and every
-firing after 2026-11-11 skips the same way until the local rows are run or week two is planned with
-cloud-capable rows in it. Week two is unplanned fifty-six days past the end of week one, and three
+firing after 2026-11-12 skips the same way until the local rows are run or week two is planned with
+cloud-capable rows in it. Week two is unplanned fifty-seven days past the end of week one, and three
 of the four groups of questions below would change what a test asserts, so they are worth answering
-before it is planned. The timing gap held for the sixtieth shift running: `structure` 0.3
+before it is planned. The timing gap held for the sixty-first shift running: `structure` 0.3
 seconds against 10.1, `compilestore` 0.4 against 17.0, and `bookrender` 4.0 against 420.3.
 
 ## What's waiting on Jack
 
-Whether the daily cloud routine should keep firing, now that 2026-09-17 through 2026-11-11 have
-each appended a skip entry and, on five dates out of fifty-six, six findings files, which is the
+Whether the daily cloud routine should keep firing, now that 2026-09-17 through 2026-11-12 have
+each appended a skip entry and, on six dates out of fifty-seven, seven findings files, which is the
 only outcome available to it until week two is planned or the local rows are run; nine
 notifications have carried this question, on 2026-09-21, 2026-09-22, 2026-09-29, 2026-10-06,
 2026-10-13, 2026-10-20, 2026-10-27, 2026-11-03 and 2026-11-10, all nine went unanswered, no
@@ -90,9 +89,9 @@ layout assertions at all, since three of them fail on any machine without Times 
 `TESTING-PLAN.md`'s font constraint says nothing may assert them, and whether
 `scripts/make-demo-project.mjs` should reject a relative target outright, a one-line main-process
 change that could carry a test beside it, raised in `FINDINGS/2026-11-06-mangled-path-folder.md`.
-Nothing new was added to this list on 2026-11-11, which is the sixth date running that nothing was:
-the only thing the firing learned was that the frozen-snapshot prediction held, and the sequence
-that handles it is the same three commands a firing runs for itself.
+Nothing new was added to this list on 2026-11-12, which is the seventh date running that nothing
+was: the only thing the firing learned was why its own gap prediction was one short, and the
+sequence that handles the gap is the same three commands a firing runs for itself.
 
 ## What's been ruled out
 
@@ -105,35 +104,37 @@ apart from its README, and storing generated fixture projects, which the generat
 substituting any older commit for `da85a6b` in the `src`/`tests` diff, since the shallow boundary
 advances past every such commit in turn and the fix is `git fetch --unshallow origin main` instead.
 Expecting anything a firing writes inside `.git` to reach the next one, since the inherited `.git`
-is a fixed 2026-11-08 snapshot whose reflog and pack were unchanged again on 2026-11-11 after two
-further firings had written to it; the commit gap is now the one predictable thing about the
-checkout, 3 on 2026-11-11 and 4 expected on 2026-11-12, but `git rev-parse --abbrev-ref HEAD` and
-`git status --short` on arrival are still what confirms it, per
-`FINDINGS/2026-11-10-frozen-git-snapshot.md`. The `FINDINGS/2026-09-09-headless-viability.md` file
+is a fixed 2026-11-08 snapshot whose reflog and pack were unchanged again on 2026-11-12 after three
+further firings had written to it; predicting the commit gap by adding one per day is ruled out with
+it, the gap being the count of commits pushed since `57dcd3f` and `git rev-list --count
+main..origin/main` after a fetch being the number itself, per
+`FINDINGS/2026-11-12-commit-gap-rule.md`. The `FINDINGS/2026-09-09-headless-viability.md` file
 earlier entries cite was never written and is not being reconstructed.
 
 ## What's next
 
 A cloud shift firing next has no row to take: it should confirm from `TEST-WORKBOOK.md` that 2A, 2B,
 3A, 4A, 6B and 7A's review half are still the only cloud-capable rows and still done, append a skip
-entry naming 1B, commit, push and stop, rather than improvise a row — that is the fifty-seventh such
-firing, and the fifty-six before it are in `TEST-LOG.md` under 2026-09-17 through 2026-11-11. The
+entry naming 1B, commit, push and stop, rather than improvise a row — that is the fifty-eighth such
+firing, and the fifty-seven before it are in `TEST-LOG.md` under 2026-09-17 through 2026-11-12. The
 tenth notification falls due on 2026-11-17 under the weekly condition the 2026-09-23 entry set, and
 it carries the routine question alone; a firing on any other date sends nothing unless something
 changes in the repository from outside the routine, and a findings file or a confirmation the firing
 produces itself is its own output and does not meet that condition, which is the reasoning
-2026-11-06 through 2026-11-11 all recorded. On arrival it should run `git rev-parse --abbrev-ref
+2026-11-06 through 2026-11-12 all recorded. On arrival it should run `git rev-parse --abbrev-ref
 HEAD` and `git status --short` before anything else and expect a clean tree with `HEAD` detached at
-the remote tip and the local `main` four commits behind, one more than on 2026-11-11, for which the
-sequence is `git fetch origin main`, `git checkout main`, `git merge --ff-only origin/main`, because
+the remote tip and the local `main` behind by the number of commits pushed since `57dcd3f`, which is
+6 if 2026-11-12 pushed one and is read directly with `git rev-list --count main..origin/main` after
+a fetch rather than predicted, per `FINDINGS/2026-11-12-commit-gap-rule.md`; the sequence is
+`git fetch origin main`, `git checkout main`, `git merge --ff-only origin/main`, because
 `git checkout main` alone silently reverts every firing's log entry, state rewrite and findings file
 since 2026-11-07 and `merge --ff-only` takes a gap of any size, per
 `FINDINGS/2026-11-10-frozen-git-snapshot.md`, and it should expect the cloud section's
 `git pull --rebase origin main` to refuse while its own writes are unstaged, the working order being
-add, commit, rebase, push, as the 2026-11-11 log entry records; and before any comparison to a commit older than
-fifty back, `da85a6b` and `3e416c5` included, it should run `git rev-parse --is-shallow-repository`
-and, if true, `git fetch --unshallow origin main`, which touches nothing on the remote and is the
-only thing that makes those commits resolvable, per
+add, commit, rebase, push, as the 2026-11-11 and 2026-11-12 log entries both record; and before any
+comparison to a commit older than fifty back, `da85a6b` and `3e416c5` included, it should run
+`git rev-parse --is-shallow-repository` and, if true, `git fetch --unshallow origin main`, which
+touches nothing on the remote and is the only thing that makes those commits resolvable, per
 `FINDINGS/2026-11-08-shallow-clone-history.md`. On the development machine the queue is 1B first,
 then 3B, 4B, 5A, 5B, 6A, 7B and 7A's flake half, and row 4B's brief is unchanged — PDF under
 Electron with the same assertions via outline entries, compile index written last, and the
@@ -143,4 +144,4 @@ while any cloud shift that does get a row should follow `TEST-ROUTINE.md`'s five
 of which `git checkout package-lock.json` after install and `node -e "require('electron')"` were
 both needed again on 2026-09-16, and `npm run build`, which takes about a second, is what unlocks
 `search`, `rank` and `lexicon`; it will find `xvfb-run` at `/usr/bin/xvfb-run`, Node v22.23.4, and
-`node_modules/`, `out/` and `test-results/` all absent, as on 2026-11-11.
+`node_modules/`, `out/` and `test-results/` all absent, as on 2026-11-12.
