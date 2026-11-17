@@ -3615,3 +3615,68 @@ on Jack's side of the repository changes; the ninth went on 2026-11-10 and the t
 `tests/` are all unchanged and the issue and pull request counts are both still zero — and a reading
 of this container that the routine took itself is its own output rather than Jack's, which does not
 meet the condition. That is the same reasoning 2026-11-06 through 2026-11-15 recorded.
+
+## 2026-11-17 — cloud shift, skipped
+
+The sixty-second firing running took no row. `TEST-STATE.md` named shift 1B, which `TEST-SHIFT.md`'s
+"Which shifts can run where" lists as local, and `TEST-WORKBOOK.md` still marks all six
+cloud-capable rows done — 2A, 2B, 3A, 4A, 6B and 7A's review half, 2026-09-11 through 2026-09-16 —
+its table unchanged, confirmed by an empty `git diff --stat da85a6b HEAD -- TEST-WORKBOOK.md`. The
+seven outstanding rows are 1B, 3B, 4B, 5A, 5B, 6A and 7B, plus 7A's flake half, and every one of
+them is local. The checkout was read only: no install, no build, no suite run. `src/` and `tests/`
+are unchanged since `da85a6b` of 2026-09-16, confirmed by an empty `git diff --stat da85a6b HEAD --
+src tests` after `git fetch --unshallow origin main`, which was needed again because the clone
+arrived shallow at depth 50; after unshallowing the history is 96 commits from the root, with
+`da85a6b` 62 commits back and `3e416c5` 81.
+
+The container image has now held for a fifth firing, and this one earned an eighteenth `FINDINGS/`
+file at `FINDINGS/2026-11-17-image-fifth-firing.md` rather than a log paragraph, because it corrects
+two things rather than only extending one. `.git` arrived with the same `pack-4235e996…` at
+20,557,875 bytes dated 2026-11-13 02:08:25, identical to the four previous readings down to the byte
+and the second, with `refs/heads/main` and `refs/remotes/origin/main` both at `4245f99`, `HEAD`
+detached at the tip `cbb59ae` and the tree clean. Provisioning wrote 22 loose objects at 2026-11-17
+02:08:15, and a `diff` against `git rev-list --objects 4245f99..cbb59ae` shows them to be its exact
+closure with nothing on either side: 4 commits, 7 trees and 11 blobs. That is 22 where the
+"six per commit" wording of `FINDINGS/2026-11-15-image-held.md` predicts 24, because `cbb59ae` wrote
+no findings file and so cost one commit, one tree and two blobs rather than six; the rule is the
+closure of the commits pushed since the image was taken, and a commit's share is whatever it
+touched. The top-up mechanism of `FINDINGS/2026-11-14-provisioning-top-up.md` now holds at one, two,
+three and four commits.
+
+The second correction is to the count of reflogs. There are three files under `.git/logs`, not two:
+`.git/logs/refs/remotes/origin/main` and `.git/logs/refs/heads/main` each held one bootstrap event
+at 1794535705, which is 2026-11-13 02:08:25, while `.git/logs/HEAD` held three — those same two
+image-build entries and one unlabelled top-up entry at 1794881295, which is 2026-11-17 02:08:15,
+moving `HEAD` from `4245f99` to `cbb59ae`. A later firing counting lines in `.git/logs/HEAD` should
+expect three. What the earlier claim was for is unchanged: no entry in any of the three was written
+by a previous firing's container, so expecting a firing's own `.git` writes to reach the next one
+stays ruled out on every date from 2026-11-08 to 2026-11-17.
+
+The arrival sequence was a rescue again rather than a no-op. `main` was `4245f99` while the tree was
+at `cbb59ae`, so the warning in `FINDINGS/2026-11-10-frozen-git-snapshot.md` applied: the fetch
+moved `origin/main` to the tip, `git checkout main` reverted the tree as warned, and `git merge
+--ff-only origin/main` put it back. The gap read with `git rev-list --count main..origin/main` after
+the fetch was 4, being the four commits pushed since the image was taken; predicting it stays ruled
+out, and that 4 is one more than the 3 of 2026-11-16 follows from one firing having pushed once in
+between rather than from a rule.
+
+The repository-channel check of 2026-10-12 was repeated: zero issues, open or closed, and zero pull
+requests, open, closed or merged. That is the thirty-seventh date it has been made, and no answer to
+anything under "What's waiting on Jack" has arrived through the repository on any of them. Of the 81
+commits since `3e416c5`, 69 are routine firings' and 12 carry Jack's git identity, the most recent
+of those still `da85a6b` of 2026-09-16, itself a shift close rather than work from outside. Nothing
+has reached this repository from outside the routine in sixty-two days, the last shift to run a
+suite was 7A on 2026-09-16, and shift 1B has now been deferred sixty-eight times — six firings
+taking a substitute cloud row and sixty-two skipping.
+
+The runner facts are as 2026-11-16 left them: `xvfb-run` at `/usr/bin/xvfb-run`, Node v22.23.4, and
+`node_modules/`, `out/` and `test-results/` all absent, so any firing that does get a row still
+installs and builds from nothing.
+
+This firing sent the tenth notification. The condition the 2026-09-23 entry set is weekly unless
+something on Jack's side of the repository changes, the ninth went on 2026-11-10, and 2026-11-17 is
+the date this file's predecessor named as due. It carries the routine question alone — whether the
+daily cloud routine should keep firing, given that sixty-two consecutive dates have had no
+cloud-capable row to take — since nothing else has changed: the workbook table, `src/` and `tests/`
+are all unchanged and the issue and pull request counts are both still zero. The eleventh falls due
+on 2026-11-24.

@@ -6,7 +6,7 @@ Four sentences per section, six for What's in progress. Anything needing more te
 detail than two sentences goes in a `FINDINGS/` file and gets one plain sentence here
 pointing at it.
 
-Last updated: 2026-11-16, by the sixty-first cloud shift running to take no row and run no suite.
+Last updated: 2026-11-17, by the sixty-second cloud shift running to take no row and run no suite.
 
 ## Where it stands
 
@@ -17,39 +17,42 @@ spellcheck assertion and three page-count or layout assertions, one in `paginati
 `live`, which fail wherever Liberation Serif substitutes for Times New Roman, and the baseline of
 2026-09-10, 17 of 21 suites and 867 assertions, is still the only development-machine number and is
 what 1B reruns against. Nothing under `src/` or `tests/` has changed since `da85a6b` of 2026-09-16,
-confirmed on 2026-11-16 by an empty `git diff --stat da85a6b HEAD -- src tests` run after
+confirmed on 2026-11-17 by an empty `git diff --stat da85a6b HEAD -- src tests` run after
 `git fetch --unshallow origin main`, which is still the form every later firing should use for the
-reason in `FINDINGS/2026-11-08-shallow-clone-history.md`; after unshallowing the history is 95
-commits from the root, with `da85a6b` 61 back and `3e416c5` 80. `FINDINGS/` still holds seventeen
-files, none added on 2026-11-16: the seven of 2026-09-10 to 2026-09-16, one of 2026-11-06, two of
-2026-11-07, and one each of 2026-11-08, 2026-11-09, 2026-11-10, 2026-11-12, 2026-11-13, 2026-11-14
-and 2026-11-15.
+reason in `FINDINGS/2026-11-08-shallow-clone-history.md`; after unshallowing the history is 96
+commits from the root, with `da85a6b` 62 back and `3e416c5` 81. `FINDINGS/` now holds eighteen
+files, one added on 2026-11-17: the seven of 2026-09-10 to 2026-09-16, one of 2026-11-06, two of
+2026-11-07, and one each of 2026-11-08, 2026-11-09, 2026-11-10, 2026-11-12, 2026-11-13, 2026-11-14,
+2026-11-15 and 2026-11-17.
 
 ## What happened last shift
 
-The cloud firing of 2026-11-16 took no row, the sixty-first firing running to skip: this file named
+The cloud firing of 2026-11-17 took no row, the sixty-second firing running to skip: this file named
 1B, which `TEST-SHIFT.md` lists as local, and `TEST-WORKBOOK.md` still marks all six cloud-capable
 rows done — 2A, 2B, 3A, 4A, 6B and 7A's review half, 2026-09-11 through 2026-09-16 — its table
 unchanged, confirmed by an empty `git diff --stat da85a6b HEAD -- TEST-WORKBOOK.md`. It appended
-`## 2026-11-16 — cloud shift, skipped` to `TEST-LOG.md` naming 1B as the blocking row, rewrote this
+`## 2026-11-17 — cloud shift, skipped` to `TEST-LOG.md` naming 1B as the blocking row, rewrote this
 file, committed and pushed, per the cloud section; the checkout was otherwise read only, with no
-install, no build and no suite run. It wrote no findings file, the first firing since 2026-11-12 not
-to: the container image held for a fourth firing at the same `pack-4235e996…`, 20,557,875 bytes
-dated 2026-11-13 02:08:25, identical to the three previous readings down to the byte and the second,
-and provisioning's 18 loose objects written at 2026-11-16 02:09:07 were the exact closure of
-`e4d58ec`, `eaad6a7` and `1d60683` against the packed `4245f99` — 3 commits, 6 trees and 9 blobs,
-six per commit — which extends `FINDINGS/2026-11-14-provisioning-top-up.md` from two commits to
-three in two sentences and so earned a log paragraph rather than an eighteenth file. The gap read
-with `git rev-list --count main..origin/main` after the fetch was 3, the three commits pushed since
-the image was taken, and predicting it stays ruled out. It sent no notification, the ninth having
-gone on 2026-11-10 and the tenth falling due on 2026-11-17, and it repeated the 2026-10-12 check
-that the repository holds zero issues and zero pull requests, the thirty-sixth date that check has
-been made and still no answer arriving through the repository by any route.
+install, no build and no suite run. It wrote an eighteenth findings file,
+`FINDINGS/2026-11-17-image-fifth-firing.md`, because the container reading corrected two earlier
+statements rather than only extending one: the image held for a fifth firing at the same
+`pack-4235e996…`, 20,557,875 bytes dated 2026-11-13 02:08:25, identical to the four previous
+readings down to the byte and the second, but provisioning's 22 loose objects written at 2026-11-17
+02:08:15 are 22 where the "six per commit" wording of `FINDINGS/2026-11-15-image-held.md` predicts
+24, `cbb59ae` having written no findings file and so cost four objects rather than six. That file
+also separates the three reflogs under `.git/logs` from the two that earlier entries counted:
+`.git/logs/HEAD` holds three entries on arrival, not one, which is the image's two plus the top-up's
+unlabelled one, and the conclusion the earlier count served is unchanged. The gap read with `git
+rev-list --count main..origin/main` after the fetch was 4, the four commits pushed since the image
+was taken, and predicting it stays ruled out. It sent the tenth notification, carrying the routine
+question alone, and it repeated the 2026-10-12 check that the repository holds zero issues and zero
+pull requests, the thirty-seventh date that check has been made and still no answer arriving through
+the repository by any route.
 
 ## What's in progress
 
-Shift 1B is still next and still local, deferred sixty-seven times over 2026-09-11 to 2026-11-16 —
-six firings that took a substitute cloud row and sixty-one that skipped. Its brief is three parts of
+Shift 1B is still next and still local, deferred sixty-eight times over 2026-09-11 to 2026-11-17 —
+six firings that took a substitute cloud row and sixty-two that skipped. Its brief is three parts of
 work for the machine: rerun `polish` and `searchui` to sort timing from regression, two concurrent
 `--no-prepare` runs to prove the dynamic port fix, and record a second `bookrender` duration
 against the 420.3 seconds of 2026-09-10 — part 3, the structure suite's stale header, reduces to
@@ -59,23 +62,23 @@ folder, to deleting the folder and quoting the target per
 2026-09-16 returned `polish` 114 of 114, `searchui` 96 of 96 and `bookrender` at 4.0 seconds on a
 different machine. Seven rows are outstanding and all seven are local — 1B, 3B, 4B, 5A, 5B, 6A, 7B
 — along with the flake half of 7A, so nothing in this workbook is cloud-capable any more and every
-firing after 2026-11-16 skips the same way until the local rows are run or week two is planned with
-cloud-capable rows in it. Week two is unplanned sixty-one days past the end of week one, and three
+firing after 2026-11-17 skips the same way until the local rows are run or week two is planned with
+cloud-capable rows in it. Week two is unplanned sixty-two days past the end of week one, and three
 of the four groups of questions below would change what a test asserts, so they are worth answering
-before it is planned. The timing gap held for the sixty-fifth shift running: `structure` 0.3
+before it is planned. The timing gap held for the sixty-sixth shift running: `structure` 0.3
 seconds against 10.1, `compilestore` 0.4 against 17.0, and `bookrender` 4.0 against 420.3.
 
 ## What's waiting on Jack
 
-Whether the daily cloud routine should keep firing, now that 2026-09-17 through 2026-11-16 have
-each appended a skip entry and, on nine dates out of sixty-one, ten findings files, which is the
-only outcome available to it until week two is planned or the local rows are run; nine
+Whether the daily cloud routine should keep firing, now that 2026-09-17 through 2026-11-17 have
+each appended a skip entry and, on ten dates out of sixty-two, eleven findings files, which is the
+only outcome available to it until week two is planned or the local rows are run; ten
 notifications have carried this question, on 2026-09-21, 2026-09-22, 2026-09-29, 2026-10-06,
-2026-10-13, 2026-10-20, 2026-10-27, 2026-11-03 and 2026-11-10, all nine went unanswered, no issue
-or pull request carries an answer either, and the tenth falls due on 2026-11-17. Whether
-`documentImageStore.deleteImage` should ever be called, since it is exported with no caller anywhere
-in `src/` and a manuscript image outlives both its removal from the text and its document's deletion
-while the Story Bible side cleans up on all three paths, traced in
+2026-10-13, 2026-10-20, 2026-10-27, 2026-11-03, 2026-11-10 and 2026-11-17, the first nine went
+unanswered, no issue or pull request carries an answer either, and the eleventh falls due on
+2026-11-24. Whether `documentImageStore.deleteImage` should ever be called, since it is exported
+with no caller anywhere in `src/` and a manuscript image outlives both its removal from the text and
+its document's deletion while the Story Bible side cleans up on all three paths, traced in
 `FINDINGS/2026-09-15-reference-rot.md`; whether front matter should sit before or after the table of
 contents in compiled plain text and Markdown, since PDF and docx put it before, traced in
 `FINDINGS/2026-09-14-compile-structure.md`; whether `mentionStore` should extract a document's text
@@ -92,9 +95,10 @@ layout assertions at all, since three of them fail on any machine without Times 
 `TESTING-PLAN.md`'s font constraint says nothing may assert them, and whether
 `scripts/make-demo-project.mjs` should reject a relative target outright, a one-line main-process
 change that could carry a test beside it, raised in `FINDINGS/2026-11-06-mangled-path-folder.md`.
-Nothing new was added to this list on 2026-11-16, which is the eleventh date running that nothing
-was: the only thing the firing learned was that the container image it is provisioned from had not
-moved since 2026-11-13, which changes no test and needs no decision.
+Nothing new was added to this list on 2026-11-17, which is the twelfth date running that nothing
+was: the only things the firing learned were that the container image it is provisioned from had not
+moved since 2026-11-13 and that two sentences in earlier findings files were wrong about how
+provisioning's objects and reflogs count, neither of which changes a test or needs a decision.
 
 ## What's been ruled out
 
@@ -110,42 +114,47 @@ instead; and reconstructing `FINDINGS/2026-09-09-headless-viability.md`, which e
 cite but which was never written. Predicting the arrival gap at all, whether by adding one per day,
 by adding the previous firing's push count or by counting from the previous firing at all, since
 the gap is the commits pushed since the container image was taken and the image's date moves
-without notice — it was 0 on 2026-11-13, 1 on 2026-11-14, 2 on 2026-11-15 and 3 on 2026-11-16,
-read each time with `git rev-list --count main..origin/main` after a fetch, and that the last three
-rose by one apiece follows from one firing having pushed once in between each time rather than from
-a rule, per `FINDINGS/2026-11-15-image-held.md`; and expecting a firing's own writes inside `.git`
-to reach the next one stays ruled out, both reflogs inside `.git` having held one bootstrap event
-each on every date from 2026-11-08 to 2026-11-16.
+without notice — it was 0 on 2026-11-13, 1 on 2026-11-14, 2 on 2026-11-15, 3 on 2026-11-16 and 4 on
+2026-11-17, read each time with `git rev-list --count main..origin/main` after a fetch, and that the
+last four rose by one apiece follows from one firing having pushed once in between each time rather
+than from a rule, per `FINDINGS/2026-11-15-image-held.md`; and expecting a firing's own writes
+inside `.git` to reach the next one stays ruled out, every entry in all three files under
+`.git/logs` on every date from 2026-11-08 to 2026-11-17 having come from either the image's build or
+that firing's own provisioning, per `FINDINGS/2026-11-17-image-fifth-firing.md`. Also ruled out is
+reading six objects per commit as the top-up rule: it is the closure of the commits pushed since the
+image was taken, and a commit's share is whatever that commit touched, which is four for a commit
+that writes no findings file, demonstrated in that same file.
 
 ## What's next
 
 A cloud shift firing next has no row to take: it should confirm from `TEST-WORKBOOK.md` that 2A, 2B,
 3A, 4A, 6B and 7A's review half are still the only cloud-capable rows and still done, append a skip
-entry naming 1B, commit, push and stop, rather than improvise a row — that is the sixty-second such
-firing, and the sixty-one before it are in `TEST-LOG.md` under 2026-09-17 through 2026-11-16. The
-tenth notification falls due on 2026-11-17 under the weekly condition the 2026-09-23 entry set, and
-it carries the routine question alone; a firing on any other date sends nothing unless something
+entry naming 1B, commit, push and stop, rather than improvise a row — that is the sixty-third such
+firing, and the sixty-two before it are in `TEST-LOG.md` under 2026-09-17 through 2026-11-17. The
+eleventh notification falls due on 2026-11-24 under the weekly condition the 2026-09-23 entry set,
+and it carries the routine question alone; a firing on any other date sends nothing unless something
 changes in the repository from outside the routine, and a findings file, a confirmation or a reading
 of its own container that the firing takes itself is its own output and does not meet that
-condition, which is the reasoning 2026-11-06 through 2026-11-16 all recorded. On arrival it should
+condition, which is the reasoning 2026-11-06 through 2026-11-17 all recorded. On arrival it should
 run `git rev-parse --abbrev-ref HEAD` and `git status --short` before anything else and expect a
 clean tree, but it should read the arrival shape rather than assume one: three shapes have been seen
-and one mechanism explains them all, now tested at two commits and at three — provisioning tops the
-working tree up to the remote tip and leaves the branch refs at the image's commit, so `HEAD`
-arrives detached at the tip with `main` stale when the image is behind, as on 2026-11-08 through
-2026-11-12 at `57dcd3f` and on 2026-11-14 through 2026-11-16 at `4245f99`, and attached with a gap
-of 0 when the image is already current, as on 2026-11-13. The sequence `git fetch origin main`, `git
-checkout main`, `git merge --ff-only origin/main` is correct under all three and was a rescue again
-on 2026-11-16, the fetch first being what makes the checkout's revert harmless; the gap is read with
-`git rev-list --count main..origin/main` after the fetch rather than predicted; and whether the image
-has moved is read from the pack's name, byte count and date together, the current image's signature
-being `pack-4235e996…` at 20,557,875 bytes dated 2026-11-13 02:08:25, unchanged across four
-firings, per `FINDINGS/2026-11-15-image-held.md`. It should still expect the cloud section's `git
-pull --rebase origin main` to refuse while its own writes are unstaged, the working order being add,
-commit, rebase, push, as the 2026-11-11 through 2026-11-16 log entries all record, and before any
+and one mechanism explains them all, now tested at one, two, three and four commits — provisioning
+tops the working tree up to the remote tip and leaves the branch refs at the image's commit, so
+`HEAD` arrives detached at the tip with `main` stale when the image is behind, as on 2026-11-08
+through 2026-11-12 at `57dcd3f` and on 2026-11-14 through 2026-11-17 at `4245f99`, and attached with
+a gap of 0 when the image is already current, as on 2026-11-13. The sequence `git fetch origin main`,
+`git checkout main`, `git merge --ff-only origin/main` is correct under all three and was a rescue
+again on 2026-11-17, the fetch first being what makes the checkout's revert harmless; the gap is
+read with `git rev-list --count main..origin/main` after the fetch rather than predicted; whether the
+image has moved is read from the pack's name, byte count and date together, the current image's
+signature being `pack-4235e996…` at 20,557,875 bytes dated 2026-11-13 02:08:25, unchanged across
+five firings; and `.git/logs/HEAD` holds three entries on arrival rather than one, per
+`FINDINGS/2026-11-17-image-fifth-firing.md`. It should still expect the cloud section's `git pull
+--rebase origin main` to refuse while its own writes are unstaged, the working order being add,
+commit, rebase, push, as the 2026-11-11 through 2026-11-17 log entries all record, and before any
 comparison to a commit older than fifty back, `da85a6b` and `3e416c5` included, it should run `git
 rev-parse --is-shallow-repository` and, if true, `git fetch --unshallow origin main`, which touches
-nothing on the remote and was needed again on 2026-11-16. On the development machine the queue is 1B
+nothing on the remote and was needed again on 2026-11-17. On the development machine the queue is 1B
 first, then 3B, 4B, 5A, 5B, 6A, 7B and 7A's flake half, and row 4B's brief is unchanged — PDF under
 Electron with the same assertions via outline entries, compile index written last, and the
 font-resolution check made able to fail, for which 2026-09-16 is the demonstration, having reported
@@ -154,4 +163,4 @@ while any cloud shift that does get a row should follow `TEST-ROUTINE.md`'s five
 of which `git checkout package-lock.json` after install and `node -e "require('electron')"` were
 both needed again on 2026-09-16, and `npm run build`, which takes about a second, is what unlocks
 `search`, `rank` and `lexicon`; it will find `xvfb-run` at `/usr/bin/xvfb-run`, Node v22.23.4, and
-`node_modules/`, `out/` and `test-results/` all absent, as on 2026-11-16.
+`node_modules/`, `out/` and `test-results/` all absent, as on 2026-11-17.
