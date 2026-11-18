@@ -3680,3 +3680,57 @@ daily cloud routine should keep firing, given that sixty-two consecutive dates h
 cloud-capable row to take — since nothing else has changed: the workbook table, `src/` and `tests/`
 are all unchanged and the issue and pull request counts are both still zero. The eleventh falls due
 on 2026-11-24.
+
+## 2026-11-18 — cloud shift, skipped
+
+No row was taken, which makes this the sixty-third consecutive firing to run and skip. `TEST-STATE.md`
+named shift 1B, `TEST-SHIFT.md`'s "Which shifts can run where" lists 1B as local, and
+`TEST-WORKBOOK.md` still marks all six cloud-capable rows done — 2A, 2B, 3A, 4A, 6B and 7A's review
+half, 2026-09-11 through 2026-09-16 — its table unchanged, confirmed by an empty `git diff --stat
+da85a6b HEAD -- TEST-WORKBOOK.md`. The seven outstanding rows are 1B, 3B, 4B, 5A, 5B, 6A and 7B,
+plus 7A's flake half, and every one of them is local. The checkout was read only: no install, no
+build, no suite run. `src/` and `tests/` are unchanged since `da85a6b` of 2026-09-16, confirmed by
+an empty `git diff --stat da85a6b HEAD -- src tests` after `git fetch --unshallow origin main`,
+which was needed again because the clone arrived shallow at depth 50; after unshallowing the history
+is 97 commits from the root, with `da85a6b` 63 commits back and `3e416c5` 82.
+
+The container image moved. It had held for the five firings of 2026-11-13 through 2026-11-17 at
+`pack-4235e996…`, 20,557,875 bytes dated 2026-11-13 02:08:25; this firing arrived with
+`pack-ad60b3ff…`, 20,573,546 bytes dated 2026-11-18 02:09:07, which is 15,671 bytes larger. That
+earned a nineteenth `FINDINGS/` file at `FINDINGS/2026-11-18-image-moved.md`, because it ends the
+five-firing run the previous two files were built on and sets out the lineage of all three images
+seen so far. The three image dates are 2026-11-08, 2026-11-13 and 2026-11-18, five days apart
+apiece, and the first two each served exactly five firings; two intervals is not a schedule, and no
+prediction of the next rebuild is made.
+
+The arrival shape was the gap-0 one, for the second time ever and the first since the top-up
+mechanism was understood. Because the image was taken at 2026-11-18 02:09:07 and the remote tip was
+still `e920de8` from the 2026-11-17 push, provisioning had nothing to top up: `HEAD` arrived
+attached to `main` at the tip, `git rev-list --count main..origin/main` after the fetch read 0,
+`.git/objects` held zero loose objects, and `.git/logs/HEAD` held two lines rather than three. The
+arrival sequence `git fetch origin main`, `git checkout main`, `git merge --ff-only origin/main` was
+a no-op rather than a rescue, as on 2026-11-13. Two things that the previous two findings files
+asserted came out as they predict: zero loose objects is the closure of no commits, which is the
+fifth value the top-up mechanism has been read at after 1, 2, 3 and 4; and the three
+`.git/logs/HEAD` entries of 2026-11-17 decompose into the image's two plus the top-up's one, since
+with no top-up there are two. Every entry in all three files under `.git/logs` shares the timestamp
+1794967747, the same second as the pack, so expecting a firing's own `.git` writes to reach the next
+one stays ruled out on every date from 2026-11-08 to 2026-11-18.
+
+One number in `TEST-STATE.md` was wrong and is corrected: Node is v22.23.5 on this image, not the
+v22.23.4 the file has carried since 2026-11-16. `xvfb-run` is still at `/usr/bin/xvfb-run`, and
+`node_modules/`, `out/` and `test-results/` are still all absent.
+
+The repository-channel check of 2026-10-12 was repeated: zero issues, open or closed, and zero pull
+requests, open, closed or merged. That is the thirty-eighth date it has been made, and no answer to
+anything under "What's waiting on Jack" has arrived through the repository on any of them. Nothing
+has reached this repository from outside the routine in sixty-three days, the last shift to run a
+suite was 7A on 2026-09-16, and shift 1B has now been deferred sixty-nine times — six firings taking
+a substitute cloud row and sixty-three skipping.
+
+No notification was sent. The condition the 2026-09-23 entry set is weekly unless something on
+Jack's side of the repository changes, the tenth went on 2026-11-17, and the eleventh falls due on
+2026-11-24. Nothing on his side changed: the workbook table, `src/` and `tests/` are all unchanged
+and the issue and pull request counts are both still zero. The image move and the findings file are
+this firing's own output and its own reading of its own container, which the 2026-11-06 entry
+established does not meet the condition.
