@@ -3734,3 +3734,67 @@ Jack's side of the repository changes, the tenth went on 2026-11-17, and the ele
 and the issue and pull request counts are both still zero. The image move and the findings file are
 this firing's own output and its own reading of its own container, which the 2026-11-06 entry
 established does not meet the condition.
+
+## 2026-11-19 — cloud shift, skipped
+
+No row was taken, which makes this the sixty-fourth consecutive firing to run and skip.
+`TEST-STATE.md` named shift 1B, `TEST-SHIFT.md`'s "Which shifts can run where" lists 1B as local,
+and `TEST-WORKBOOK.md` still marks all six cloud-capable rows done — 2A, 2B, 3A, 4A, 6B and 7A's
+review half, 2026-09-11 through 2026-09-16 — its table unchanged, confirmed by an empty `git diff
+--stat da85a6b HEAD -- TEST-WORKBOOK.md`. The seven outstanding rows are 1B, 3B, 4B, 5A, 5B, 6A and
+7B, plus 7A's flake half, and every one of them is local. The checkout was read only: no install, no
+build, no suite run. `src/` and `tests/` are unchanged since `da85a6b` of 2026-09-16, confirmed by
+an empty `git diff --stat da85a6b HEAD -- src tests` after `git fetch --unshallow origin main`,
+which was needed again because the clone arrived shallow at depth 50; after unshallowing the history
+is 98 commits from the root, with `da85a6b` 64 commits back and `3e416c5` 83.
+
+The container image moved again, one day after the last move. The third image held for one firing
+only, 2026-11-18, at `pack-ad60b3ff…`, 20,573,546 bytes dated 2026-11-18 02:09:07; this firing
+arrived with `pack-d8aeb08a…`, 20,576,948 bytes dated 2026-11-19 02:08:22, which is 3,402 bytes
+larger. That earned a twentieth `FINDINGS/` file at
+`FINDINGS/2026-11-19-image-moved-after-one-firing.md`, because the four image dates are now
+2026-11-08, 2026-11-13, 2026-11-18 and 2026-11-19 — intervals of five days, five days and one day —
+which settles that the two five-day gaps the 2026-11-18 file described were not a cadence. That file
+declined to predict the next rebuild and the decline was right; predicting it stays ruled out. The
+same file also notes, hedged, that the three byte deltas between consecutive images are 22,307,
+15,671 and 3,402 against five, five and one of the routine's commits pushed inside those intervals,
+which is consistent with the pack growing by what was pushed rather than by elapsed time.
+
+The arrival shape was the gap-0 one for the third time, after 2026-11-13 and 2026-11-18. The image
+was taken at 2026-11-19 02:08:22 and the remote tip was still `a2f1d46` from the 2026-11-18 push, so
+provisioning had nothing to top up: `HEAD` arrived attached to `main` at the tip, `git rev-list
+--count main..origin/main` after the fetch read 0, `.git/objects` held zero loose objects, and
+`.git/logs/HEAD` held two lines. That is the sixth reading of the top-up mechanism of
+`FINDINGS/2026-11-14-provisioning-top-up.md` and the third at 0, after 1, 2, 3 and 4. The arrival
+sequence `git fetch origin main`, `git checkout main`, `git merge --ff-only origin/main` was a no-op
+rather than a rescue. Every entry in all three files under `.git/logs` carries 1795054102 or
+1795054103, which are 2026-11-19 02:08:22 and 02:08:23, the pack's second and the one after it, so
+expecting a firing's own `.git` writes to reach the next one stays ruled out on every date from
+2026-11-08 to 2026-11-19.
+
+One limit of the pack reading was noticed on the way and is recorded in the findings file. Today's
+pack is dated within a minute of the firing, and a same-minute pack cannot by itself distinguish an
+image rebuilt that morning from a clone taken fresh at provisioning. What rules the second
+explanation out for this container is the four firings of 2026-11-14 through 2026-11-17, which each
+arrived with a pack dated 2026-11-13. A later firing should record the signature and compare it to
+the previous one, and not read a build time out of a same-minute date.
+
+Nothing in `TEST-STATE.md` needed correcting this time. Node is v22.23.5, as the file has said since
+2026-11-18, `xvfb-run` is at `/usr/bin/xvfb-run`, and `node_modules/`, `out/` and `test-results/`
+are all absent.
+
+The repository-channel check of 2026-10-12 was repeated: zero issues, open or closed, and zero pull
+requests, open, closed or merged. That is the thirty-ninth date it has been made, and no answer to
+anything under "What's waiting on Jack" has arrived through the repository on any of them. Nothing
+has reached this repository from outside the routine in sixty-four days, the last shift to run a
+suite was 7A on 2026-09-16, and shift 1B has now been deferred seventy times — six firings taking a
+substitute cloud row and sixty-four skipping. The timing gap is untouched and held for the
+sixty-eighth shift running: `structure` 0.3 seconds against 10.1, `compilestore` 0.4 against 17.0,
+and `bookrender` 4.0 against 420.3.
+
+No notification was sent. The condition the 2026-09-23 entry set is weekly unless something on
+Jack's side of the repository changes, the tenth went on 2026-11-17, and the eleventh falls due on
+2026-11-24. Nothing on his side changed: the workbook table, `src/` and `tests/` are all unchanged
+and the issue and pull request counts are both still zero. The image move and the findings file are
+this firing's own output and its own reading of its own container, which the 2026-11-06 entry
+established does not meet the condition.
