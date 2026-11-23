@@ -4033,10 +4033,15 @@ come out that way, the other three being the gap-0 shape — and the gap was 4, 
 2026-11-17. The working tree arrived at the remote tip `9d4e624`, `git rev-parse --abbrev-ref HEAD`
 read `HEAD`, `main` and `origin/main` were both stale at the image's `a2f1d46`, `git status --short`
 was clean, and `git rev-list --count main..origin/main` read 4 after the fetch and 0 after the merge.
-One detail is worth a later firing's notice: with the refs stale, `git rev-parse --short HEAD main
-origin/main` in one invocation failed with `fatal: Needed a single revision` before printing anything,
-because `HEAD` is detached from `refs/heads/main` and git resolves the three-argument form as one
-revision expression; the refs were read with `git show-ref` and `git branch -a` instead. The sequence
+One detail is worth a later firing's notice: `git rev-parse --short HEAD main origin/main` in one
+invocation failed with `fatal: Needed a single revision` before printing anything, and the refs were
+read with `git show-ref` and `git branch -a` instead. The cause is not the detached shape, which is
+what this entry first said: `git rev-parse --short` takes exactly one revision and fails on two or
+more whatever their values, tested on git 2.43.0 after the push with `main` and `origin/main` both at
+`39948f5`, where `git rev-parse --short HEAD main` and `git rev-parse --short=7 HEAD main` both failed
+the same way while `git rev-parse HEAD main origin/main` printed three full ids and two separate
+`--short` calls printed `39948f5` twice. A firing wanting several short ids should make one call per
+revision, or drop `--short` and shorten the output itself. The sequence
 `git fetch origin main`, `git checkout main`, `git merge --ff-only origin/main` was a rescue and not a
 no-op: the checkout reverted the working tree to `a2f1d46` and the merge fast-forwarded it back to
 `9d4e624`, which is what the fetch-first ordering is for. That is the tenth reading of the top-up
@@ -4081,3 +4086,9 @@ Jack's side of the repository changes, the tenth went on 2026-11-17, and the ele
 `tests/` are all unchanged and the issue and pull request counts are both still zero. The image
 holding and the twenty-object reading are this firing's own reading of its own container, which the
 2026-11-06 entry established does not meet the condition.
+
+Correction, same shift, after the close commit `39948f5` was pushed: the paragraph above on
+`git rev-parse --short` first attributed the failure to `HEAD` being detached from `refs/heads/main`.
+That was wrong, and it was the mechanism this file and `TEST-STATE.md` were about to hand the next
+firing. It was retested on the reattached checkout and corrected in place in this entry and in
+`TEST-STATE.md`'s "What's next" by the follow-up commit; no earlier entry was touched.

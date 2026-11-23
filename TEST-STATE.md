@@ -161,10 +161,11 @@ working tree up to the remote tip and leaves the branch refs at the image's comm
 detached at the tip with `main` stale when the image is behind, as on 2026-11-08 through 2026-11-12
 at `57dcd3f`, on 2026-11-14 through 2026-11-17 at `4245f99` and on 2026-11-20 through 2026-11-23 at
 `a2f1d46`, and attached with a gap of 0, zero loose objects and two lines in `.git/logs/HEAD` when the
-image is already current, as on 2026-11-13, 2026-11-18 and 2026-11-19; under the detached shape it
-should read the refs with `git show-ref` rather than pass `HEAD main origin/main` to one
-`git rev-parse`, which fails with `fatal: Needed a single revision` and prints nothing, as on
-2026-11-23. The sequence `git fetch origin main`, `git checkout main`, `git merge --ff-only
+image is already current, as on 2026-11-13, 2026-11-18 and 2026-11-19; it should read several refs
+with `git show-ref`, or one `git rev-parse` call per revision, rather than pass `HEAD main
+origin/main` to a single `git rev-parse --short`, which takes exactly one revision and fails with
+`fatal: Needed a single revision` while printing nothing, on git 2.43.0 and regardless of whether
+`HEAD` is detached, tested both ways on 2026-11-23. The sequence `git fetch origin main`, `git checkout main`, `git merge --ff-only
 origin/main` is correct under both and was a rescue on 2026-11-20 through 2026-11-23 where it had
 been a no-op on 2026-11-18 and 2026-11-19, the fetch first being what makes the checkout's revert to
 the image's commit harmless; the gap is read with `git rev-list --count main..origin/main` after the
