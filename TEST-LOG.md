@@ -4092,3 +4092,80 @@ Correction, same shift, after the close commit `39948f5` was pushed: the paragra
 That was wrong, and it was the mechanism this file and `TEST-STATE.md` were about to hand the next
 firing. It was retested on the reattached checkout and corrected in place in this entry and in
 `TEST-STATE.md`'s "What's next" by the follow-up commit; no earlier entry was touched.
+
+## 2026-11-24 — cloud shift, skipped
+
+This firing took no row, the sixty-ninth running to skip. `TEST-STATE.md` named shift 1B, which
+`TEST-SHIFT.md`'s "Which shifts can run where" lists as local, so the cloud section's selection rule
+sent the firing to the earliest cloud-capable row not yet done, and there is none: `TEST-WORKBOOK.md`
+still marks all six — 2A, 2B, 3A, 4A, 6B and 7A's review half, done 2026-09-11 through 2026-09-16 —
+as done, and its table is unchanged, confirmed by an empty `git diff --stat da85a6b HEAD --
+TEST-WORKBOOK.md`. The checkout was read only apart from this entry, `TEST-STATE.md`, one findings
+file and the commit: no install, no build, no suite run. `src/` and `tests/` are also unchanged since
+`da85a6b` of 2026-09-16, confirmed by an empty `git diff --stat da85a6b HEAD -- src tests` run after
+`git fetch --unshallow origin main`; after unshallowing the history is 104 commits from the root,
+with `da85a6b` 70 back and `3e416c5` 89 back.
+
+The container image moved, after the fourth served five firings. The pack read before unshallowing is
+`pack-2f686ef4…` at 20,592,486 bytes dated 2026-11-24 02:08:58, against the `pack-d8aeb08a…` at
+20,576,948 bytes dated 2026-11-19 02:08:22 that 2026-11-19 through 2026-11-23 all recorded. That is a
+fifth signature, and the five image dates are 2026-11-08, 2026-11-13, 2026-11-18, 2026-11-19 and
+2026-11-24 — intervals of five days, five days, one day and five days, which fit no schedule, so
+predicting the next rebuild stays ruled out. The fourth image's five firings equal the first image's
+five and the second image's five, and the third's one remains the short run. The byte delta is 15,538
+over the six commits pushed since the fourth image was taken, which is fewer bytes for more commits
+than the second interval gave, so the per-commit reading offered as consistent-but-unestablished on
+2026-11-19 is not carried forward; the four deltas are tabulated in
+`FINDINGS/2026-11-24-fifth-image.md` with the reason a per-commit figure was always weak. The
+unshallow again wrote a pack of its own, `pack-870c5d69…` at 807,905 bytes dated 2026-11-24 02:09:55,
+which is why the image's pack is read before unshallowing and not after.
+
+The arrival shape was the gap-0 one, the fourth such reading in seventeen since 2026-11-08 and the
+first since 2026-11-19, the other thirteen being detached. `git rev-parse --abbrev-ref HEAD` read
+`main`, `main` and `origin/main` were both at the remote tip `31b7095`, `git status --short` was
+clean, `.git/objects` held zero loose objects, `.git/logs/HEAD` held two lines, and one pack was
+present. `git rev-list --count main..origin/main` read 0 after the fetch, so the image was already
+current and provisioning had nothing to top the working tree up with; the sequence `git fetch origin
+main`, `git checkout main`, `git merge --ff-only origin/main` was a no-op, as on the three earlier
+gap-0 dates. Zero loose objects is what the share rule of
+`FINDINGS/2026-11-17-image-fifth-firing.md` gives at a gap of 0, and the count was read before the
+gap was known, so it is an accounting and not a prediction. The refs were read with `git show-ref`
+and one `git rev-parse` call per revision, per the correction the 2026-11-23 entry carries.
+
+One new reading is worth a later firing's attention. `.git/logs/refs/remotes/origin/main` held one
+line whose message is the command that wrote the pack, `fetch --no-progress --depth 50 origin main:
+storing head`, stamped 1795486138 for 2026-11-24 02:08:58 — the same second as the pack — with
+`.git/logs/refs/heads/main` holding one line stamped 1795486139 reading `branch: Created from
+refs/remotes/origin/main`. No earlier reading quoted the reflog message, only its timestamp. This
+does not settle the limit the 2026-11-19 file set, that a pack dated within a minute of the firing
+cannot on its own tell a rebuild from a provisioning-time clone, and today's pack is again
+same-minute. What it gives is a check that would settle it: the next firing to arrive with a pack
+dated days before itself should `cat .git/logs/refs/remotes/origin/main` and see whether that same
+depth-50 fetch line is stamped at the pack's second, which would put the clone inside the image
+build, or at its own, which would make every pack date a clone time rather than a build time. The
+reasoning and both outcomes are in `FINDINGS/2026-11-24-fifth-image.md`. Nothing the 2026-11-23
+firing wrote inside `.git` survived into this one, all three files under `.git/logs` carrying only
+entries stamped 1795486138 and 1795486139, so that expectation stays ruled out on every date from
+2026-11-08 to 2026-11-24.
+
+Nothing in `TEST-STATE.md` needed correcting. `FINDINGS/` now holds twenty-three files, the
+twenty-third being this firing's. Node is v22.23.5, `xvfb-run` is at `/usr/bin/xvfb-run`, and
+`node_modules/`, `out/` and `test-results/` are all absent.
+
+The repository-channel check of 2026-10-12 was repeated: zero issues, open or closed, and zero pull
+requests, open, closed or merged. That is the forty-fourth date it has been made, and no answer to
+anything under "What's waiting on Jack" has arrived through the repository on any of them. Nothing
+has reached this repository from outside the routine in sixty-nine days, the last shift to run a
+suite was 7A on 2026-09-16, and shift 1B has now been deferred seventy-five times — six firings
+taking a substitute cloud row and sixty-nine skipping. The timing gap is untouched and held for the
+seventy-third shift running: `structure` 0.3 seconds against 10.1, `compilestore` 0.4 against 17.0,
+and `bookrender` 4.0 against 420.3.
+
+The eleventh notification was sent, carrying the routine question alone: whether the daily cloud
+routine should keep firing when a skip entry is the only outcome available to it. It fell due today
+under the weekly condition the 2026-09-23 entry set, the tenth having gone on 2026-11-17, and the
+twelfth falls due on 2026-12-01. The ten before it, on 2026-09-21, 2026-09-22, 2026-09-29,
+2026-10-06, 2026-10-13, 2026-10-20, 2026-10-27, 2026-11-03, 2026-11-10 and 2026-11-17, are all
+unanswered. The image move and the reflog reading are this firing's own reading of its own container,
+which the 2026-11-06 entry established does not meet the condition on its own; they are mentioned in
+the notification only because it was going out regardless.
