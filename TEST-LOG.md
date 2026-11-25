@@ -4169,3 +4169,73 @@ twelfth falls due on 2026-12-01. The ten before it, on 2026-09-21, 2026-09-22, 2
 unanswered. The image move and the reflog reading are this firing's own reading of its own container,
 which the 2026-11-06 entry established does not meet the condition on its own; they are mentioned in
 the notification only because it was going out regardless.
+
+## 2026-11-25 — cloud shift, skipped
+
+This firing took no row, the seventieth running to skip. `TEST-STATE.md` named shift 1B, which
+`TEST-SHIFT.md`'s "Which shifts can run where" lists as local, so the cloud section's selection rule
+sent the firing to the earliest cloud-capable row not yet done, and there is none: `TEST-WORKBOOK.md`
+still marks all six — 2A, 2B, 3A, 4A, 6B and 7A's review half, done 2026-09-11 through 2026-09-16 —
+as done, and its table is unchanged, confirmed by an empty `git diff --stat da85a6b HEAD --
+TEST-WORKBOOK.md`. The checkout was read only apart from this entry, `TEST-STATE.md`, one findings
+file and the commit: no install, no build, no suite run. `src/` and `tests/` are also unchanged since
+`da85a6b` of 2026-09-16, confirmed by an empty `git diff --stat da85a6b HEAD -- src tests` run after
+`git fetch --unshallow origin main`; after unshallowing the history is 105 commits from the root,
+with `da85a6b` 71 back and `3e416c5` 90 back.
+
+The question the 2026-11-24 entry left for a later firing is answered, and this firing is the one it
+named. The container image held rather than moving, the pack read before unshallowing being the
+fifth image's `pack-2f686ef4…` at 20,592,486 bytes unchanged in name and byte count, but its date of
+2026-11-24 02:08:57 is now a day old rather than same-minute, which is the condition the check
+needed. `.git/logs/refs/remotes/origin/main` holds one line, `fetch --no-progress --depth 50 origin
+main: storing head`, stamped 1795486137 — the pack's own second, read as 1795486137 by `stat -c %Y`
+as well — and the only `.git` write this firing's provisioning made is the third line of
+`.git/logs/HEAD`, stamped 1795572490 for 2026-11-25 02:08:10, moving `HEAD` from `31b7095` to
+`deedd80`. The two are 86,353 seconds apart. So the depth-50 clone ran inside the image build and
+provisioning does not clone, which settles the limit `FINDINGS/2026-11-19-image-moved-after-one-firing.md`
+set: a pack dated in a firing's own minute means the image was built in that minute, and pack date is
+build time. The reasoning is in `FINDINGS/2026-11-25-pack-predates-firing.md`. Predicting when the
+image next moves stays ruled out — the fifth signature has now served two firings and the four
+intervals are still five, five, one and five days.
+
+That file also carries a one-second correction. The 2026-11-24 entry records the `origin/main`
+reflog line at 1795486138 and the `heads/main` line at 1795486139; read directly today from the same
+image, by pack name and byte count byte-identical, they are 1795486137 and 1795486138. One reading is
+off by one second and today's is the direct one, agreeing with the pack's own mtime. The conclusion
+holds under both, since both pair the fetch line with the pack's second. Earlier entries are not
+edited, so the correction lives there and here.
+
+The arrival shape was the image-behind one, the fourteenth such reading in eighteen since 2026-11-08
+against four gap-0 ones, and the first detached arrival since 2026-11-23. `git rev-parse
+--abbrev-ref HEAD` read `HEAD`, `git show-ref` put `main` and `origin/main` both at `31b7095` while
+`HEAD` stood at the remote tip `deedd80`, `git status --short` was clean, `.git/objects` held six
+loose objects, `.git/logs/HEAD` held three lines, and one pack was present. `git rev-list --count
+main..origin/main` read 1 after the fetch, and the sequence `git fetch origin main`, `git checkout
+main`, `git merge --ff-only origin/main` was a rescue rather than a no-op, the fetch first being what
+made the checkout's revert to `31b7095` harmless. The six loose objects were counted at arrival,
+before the gap was read, and the share rule of `FINDINGS/2026-11-17-image-fifth-firing.md` accounts
+for all six against the single commit `deedd80`: that commit, its root tree `4150051`, the `FINDINGS`
+tree `20faeec`, and three blobs for `FINDINGS/2026-11-24-fifth-image.md`, `TEST-LOG.md` and
+`TEST-STATE.md`. Six is what the rule gives for one commit writing a findings file. Nothing the
+2026-11-24 firing wrote inside `.git` survived into this one, the two reflog lines from the clone
+both being the image's, so that expectation stays ruled out on every date from 2026-11-08 to
+2026-11-25. The unshallow again wrote a pack of its own, `pack-8df88d40…` at 807,904 bytes dated
+2026-11-25 02:09:08, which is why the image's pack is read before unshallowing and not after.
+
+Nothing in `TEST-STATE.md` needed correcting. `FINDINGS/` now holds twenty-four files, the
+twenty-fourth being this firing's. Node is v22.23.5, `xvfb-run` is at `/usr/bin/xvfb-run`, and
+`node_modules/`, `out/` and `test-results/` are all absent.
+
+The repository-channel check of 2026-10-12 was repeated: zero issues, open or closed, and zero pull
+requests, open, closed or merged. That is the forty-fifth date it has been made, and no answer to
+anything under "What's waiting on Jack" has arrived through the repository on any of them. Nothing
+has reached this repository from outside the routine in seventy days, the last shift to run a suite
+was 7A on 2026-09-16, and shift 1B has now been deferred seventy-six times — six firings taking a
+substitute cloud row and seventy skipping. The timing gap is untouched and held for the
+seventy-fourth shift running: `structure` 0.3 seconds against 10.1, `compilestore` 0.4 against 17.0,
+and `bookrender` 4.0 against 420.3.
+
+No notification was sent. The eleventh went on 2026-11-24 and the twelfth falls due on 2026-12-01
+under the weekly condition the 2026-09-23 entry set, and the one thing this firing learned is a
+reading of its own container, which the 2026-11-06 entry established does not meet the
+send-anyway condition on its own. Nothing reached the repository from outside the routine.
