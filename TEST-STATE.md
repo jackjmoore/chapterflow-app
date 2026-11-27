@@ -6,7 +6,7 @@ Four sentences per section, six for What's in progress. Anything needing more te
 detail than two sentences goes in a `FINDINGS/` file and gets one plain sentence here
 pointing at it.
 
-Last updated: 2026-11-26, by the seventy-first cloud shift running to take no row and run no suite.
+Last updated: 2026-11-27, by the seventy-second cloud shift running to take no row and run no suite.
 
 ## Where it stands
 
@@ -17,51 +17,52 @@ spellcheck assertion and three page-count or layout assertions, one in `paginati
 `live`, which fail wherever Liberation Serif substitutes for Times New Roman, and the baseline of
 2026-09-10, 17 of 21 suites and 867 assertions, is still the only development-machine number and is
 what 1B reruns against. Nothing under `src/` or `tests/` has changed since `da85a6b` of 2026-09-16,
-confirmed on 2026-11-26 by an empty `git diff --stat da85a6b HEAD -- src tests` run after
+confirmed on 2026-11-27 by an empty `git diff --stat da85a6b HEAD -- src tests` run after
 `git fetch --unshallow origin main`, which is still the form every later firing should use for the
-reason in `FINDINGS/2026-11-08-shallow-clone-history.md`; after unshallowing the history is 106
-commits from the root, with `da85a6b` 72 back and `3e416c5` 91. `FINDINGS/` now holds twenty-five
-files, one added on 2026-11-26: the seven of 2026-09-10 to 2026-09-16, one of 2026-11-06, two of
+reason in `FINDINGS/2026-11-08-shallow-clone-history.md`; after unshallowing the history is 107
+commits from the root, with `da85a6b` 73 back and `3e416c5` 92. `FINDINGS/` now holds twenty-six
+files, one added on 2026-11-27: the seven of 2026-09-10 to 2026-09-16, one of 2026-11-06, two of
 2026-11-07, and one each of 2026-11-08, 2026-11-09, 2026-11-10, 2026-11-12, 2026-11-13, 2026-11-14,
-2026-11-15, 2026-11-17, 2026-11-18, 2026-11-19, 2026-11-22, 2026-11-23, 2026-11-24, 2026-11-25 and
-2026-11-26.
+2026-11-15, 2026-11-17, 2026-11-18, 2026-11-19, 2026-11-22, 2026-11-23, 2026-11-24, 2026-11-25,
+2026-11-26 and 2026-11-27.
 
 ## What happened last shift
 
-The cloud firing of 2026-11-26 took no row, the seventy-first firing running to skip: this file named
+The cloud firing of 2026-11-27 took no row, the seventy-second firing running to skip: this file named
 1B, which `TEST-SHIFT.md` lists as local, and `TEST-WORKBOOK.md` still marks all six cloud-capable
 rows done — 2A, 2B, 3A, 4A, 6B and 7A's review half, 2026-09-11 through 2026-09-16 — its table
 unchanged, confirmed by an empty `git diff --stat da85a6b HEAD -- TEST-WORKBOOK.md`. It appended
-`## 2026-11-26 — cloud shift, skipped` to `TEST-LOG.md` naming 1B as the blocking row, wrote one
+`## 2026-11-27 — cloud shift, skipped` to `TEST-LOG.md` naming 1B as the blocking row, wrote one
 findings file, rewrote this file, committed and pushed, per the cloud section; the checkout was
 otherwise read only, with no install, no build and no suite run. It wrote
-`FINDINGS/2026-11-26-gap-two-twelve-objects.md`, which records the second loose-object count ever
-read at a gap of 2 and the fact that it differs from the first: twelve objects today against ten on
-2026-11-21, both following from the share rule, because today's two commits `deedd80` and `afc4df7`
-each added a file under `FINDINGS/` and modified `TEST-LOG.md` and `TEST-STATE.md` for six objects
-each, while 2026-11-21's pair differed in shape and gave six plus four. All twelve names on disk were
-matched to the two sets of six with no overlap and nothing over, the fourth verification of the rule
-by name rather than by total, and the reading is also the first in which the share rule and the
-discarded six-per-commit rule agree, so it confirms the rule rather than separating the two — the
-separating readings remain 2026-11-21, 2026-11-22 and 2026-11-23. The image held for a third firing,
-the pack read before unshallowing being `pack-2f686ef4…` at 20,592,486 bytes dated 2026-11-24
-02:08:57, two days old and therefore settled by name and byte count alone under
-`FINDINGS/2026-11-25-pack-predates-firing.md`; the only provisioning write inside `.git` was the
-third line of `.git/logs/HEAD` at 1795658943 for 2026-11-26 02:09:03, 172,806 seconds after the
-image's own clone, and the unshallow again wrote a pack of its own, `pack-a4e78262…` at 809,498
-bytes. The arrival shape was the image-behind one for the fifteenth time in nineteen readings since
-2026-11-08 and the second detached arrival running — `HEAD` at the remote tip `afc4df7` with `main`
-and `origin/main` both stale at `31b7095`, clean `git status --short`, twelve loose objects, three
-lines in `.git/logs/HEAD`, one pack, gap 2 — so the fetch, checkout and `--ff-only` merge were a
-rescue, the merge reporting 4 files changed, 450 insertions and 106 deletions. It sent no
-notification, the twelfth falling due on 2026-12-01, and repeated the 2026-10-12 check that the
-repository holds zero issues and zero pull requests, the forty-sixth date that check has been made
-and still no answer arriving through the repository by any route.
+`FINDINGS/2026-11-27-gap-three-eighteen-objects.md`, which records the second loose-object count ever
+read at a gap of 3 and the fact that it differs from the first: eighteen objects today against
+fourteen on 2026-11-22, both following from the share rule, because today's three commits `deedd80`,
+`afc4df7` and `9ef99c7` each added a file under `FINDINGS/` and modified `TEST-LOG.md` and
+`TEST-STATE.md` for six objects each, while 2026-11-22's three differed in shape and gave fourteen.
+All eighteen names on disk were matched to the three sets of six with no overlap and nothing over,
+the fifth verification of the rule by name rather than by total and the first at a gap of 3, and the
+reading is the second in which the share rule and the discarded six-per-commit rule agree, so it
+confirms the rule rather than separating the two — the separating readings remain 2026-11-21,
+2026-11-22 and 2026-11-23, and both agreements share the cause that every commit in the gap had the
+same six-object shape. The image held for a fourth firing, the pack read before unshallowing being
+`pack-2f686ef4…` at 20,592,486 bytes dated 2026-11-24 02:08:57, three days old and therefore settled
+by name and byte count alone under `FINDINGS/2026-11-25-pack-predates-firing.md`; the only
+provisioning write inside `.git` was the third line of `.git/logs/HEAD` at 1795745315 for 2026-11-27
+02:08:35, 259,178 seconds after the image's own clone, and the unshallow again wrote a pack of its
+own, `pack-e1b4c248…` at 811,021 bytes. The arrival shape was the image-behind one for the sixteenth
+time in twenty readings since 2026-11-08 and the third detached arrival running — `HEAD` at the
+remote tip `9ef99c7` with `main` and `origin/main` both stale at `31b7095`, clean `git status
+--short`, eighteen loose objects, three lines in `.git/logs/HEAD`, one pack, gap 3 — so the fetch,
+checkout and `--ff-only` merge were a rescue, the merge reporting 5 files changed, 592 insertions and
+105 deletions. It sent no notification, the twelfth falling due on 2026-12-01, and repeated the
+2026-10-12 check that the repository holds zero issues and zero pull requests, the forty-seventh date
+that check has been made and still no answer arriving through the repository by any route.
 
 ## What's in progress
 
-Shift 1B is still next and still local, deferred seventy-seven times over 2026-09-11 to 2026-11-26 —
-six firings that took a substitute cloud row and seventy-one that skipped. Its brief is three parts
+Shift 1B is still next and still local, deferred seventy-eight times over 2026-09-11 to 2026-11-27 —
+six firings that took a substitute cloud row and seventy-two that skipped. Its brief is three parts
 of work for the machine: rerun `polish` and `searchui` to sort timing from regression, two
 concurrent `--no-prepare` runs to prove the dynamic port fix, and record a second `bookrender`
 duration against the 420.3 seconds of 2026-09-10 — part 3, the structure suite's stale header,
@@ -71,16 +72,16 @@ mangled-path folder, to deleting the folder and quoting the target per
 2026-09-16 returned `polish` 114 of 114, `searchui` 96 of 96 and `bookrender` at 4.0 seconds on a
 different machine. Seven rows are outstanding and all seven are local — 1B, 3B, 4B, 5A, 5B, 6A, 7B
 — along with the flake half of 7A, so nothing in this workbook is cloud-capable any more and every
-firing after 2026-11-26 skips the same way until the local rows are run or week two is planned with
-cloud-capable rows in it. Week two is unplanned seventy-one days past the end of week one, and three
+firing after 2026-11-27 skips the same way until the local rows are run or week two is planned with
+cloud-capable rows in it. Week two is unplanned seventy-two days past the end of week one, and three
 of the four groups of questions below would change what a test asserts, so they are worth answering
-before it is planned. The timing gap held for the seventy-fifth shift running: `structure` 0.3
+before it is planned. The timing gap held for the seventy-sixth shift running: `structure` 0.3
 seconds against 10.1, `compilestore` 0.4 against 17.0, and `bookrender` 4.0 against 420.3.
 
 ## What's waiting on Jack
 
-Whether the daily cloud routine should keep firing, now that 2026-09-17 through 2026-11-26 have
-each appended a skip entry and, on seventeen dates out of seventy-one, eighteen findings files, which
+Whether the daily cloud routine should keep firing, now that 2026-09-17 through 2026-11-27 have
+each appended a skip entry and, on eighteen dates out of seventy-two, nineteen findings files, which
 is the only outcome available to it until week two is planned or the local rows are run; eleven
 notifications have carried this question, on 2026-09-21, 2026-09-22, 2026-09-29, 2026-10-06,
 2026-10-13, 2026-10-20, 2026-10-27, 2026-11-03, 2026-11-10, 2026-11-17 and 2026-11-24, all eleven
@@ -104,8 +105,8 @@ layout assertions at all, since three of them fail on any machine without Times 
 `TESTING-PLAN.md`'s font constraint says nothing may assert them, and whether
 `scripts/make-demo-project.mjs` should reject a relative target outright, a one-line main-process
 change that could carry a test beside it, raised in `FINDINGS/2026-11-06-mangled-path-folder.md`.
-Nothing new was added to this list on 2026-11-26, which is the twenty-first date running that nothing
-was: the only thing the firing learned is a second loose-object count at the same gap as 2026-11-21,
+Nothing new was added to this list on 2026-11-27, which is the twenty-second date running that nothing
+was: the only thing the firing learned is a second loose-object count at the same gap as 2026-11-22,
 which changes no test and needs no decision.
 
 ## What's been ruled out
@@ -124,8 +125,8 @@ by adding the previous firing's push count or by counting from the previous firi
 the gap is the commits pushed since the container image was taken and the image's date moves
 without notice — it was 0 on 2026-11-13, 1 on 2026-11-14, 2 on 2026-11-15, 3 on 2026-11-16, 4 on
 2026-11-17, 0 on both 2026-11-18 and 2026-11-19 when the image moved each time, 1, 2, 3 and 4 on
-2026-11-20 through 2026-11-23 as it held four times, 0 again on 2026-11-24 when it moved, and 1 and
-2 on 2026-11-25 and 2026-11-26 as it held twice, read with
+2026-11-20 through 2026-11-23 as it held four times, 0 again on 2026-11-24 when it moved, and 1, 2
+and 3 on 2026-11-25 through 2026-11-27 as it held three times, read with
 `git rev-list --count main..origin/main` after a fetch, per `FINDINGS/2026-11-15-image-held.md` and
 `FINDINGS/2026-11-19-image-moved-after-one-firing.md`; predicting when the image next moves is ruled
 out with it, the five dates 2026-11-08, 2026-11-13, 2026-11-18, 2026-11-19 and 2026-11-24 being
@@ -138,7 +139,7 @@ line in `.git/logs/refs/remotes/origin/main` is stamped at the pack's own second
 before that firing's only provisioning write, so the clone is the image build's and pack date is
 build time, in `FINDINGS/2026-11-25-pack-predates-firing.md`. Expecting a firing's own writes inside
 `.git` to reach the next one stays ruled out, every entry in all three files under `.git/logs` on
-every date from 2026-11-08 to 2026-11-26 having come from either the image's build or that firing's
+every date from 2026-11-08 to 2026-11-27 having come from either the image's build or that firing's
 own provisioning. Also ruled out is reading six objects per commit as the top-up rule, and with it
 reading the gap alone as the count: the objects are the closure of the commits pushed since the
 image was taken and a commit's share is whatever that commit touched, which is four for a commit
@@ -148,57 +149,64 @@ ten were read, predicted ahead of the count on 2026-11-22 at a gap of 3 where th
 against the 18 six-per-commit predicts, shown on 2026-11-23 to be independent of the gap by two
 readings at a gap of 4 that differ, 22 against 20, in
 `FINDINGS/2026-11-23-same-gap-different-count.md`, read at zero for the fourth time on 2026-11-24,
-read at six on 2026-11-25 against a gap of 1, and read at twelve on 2026-11-26 against a gap of 2,
-which both shows a second gap whose count is not fixed and is the one reading so far where the two
-rules agree, in `FINDINGS/2026-11-26-gap-two-twelve-objects.md`.
+read at six on 2026-11-25 against a gap of 1, read at twelve on 2026-11-26 against a gap of 2 and at
+eighteen on 2026-11-27 against a gap of 3, which puts three of the five gaps seen beyond the reach of
+the gap alone and gives the second of two readings where the two rules agree, in
+`FINDINGS/2026-11-26-gap-two-twelve-objects.md` and
+`FINDINGS/2026-11-27-gap-three-eighteen-objects.md`. Reading an agreement between the two rules as
+evidence for either is ruled out with that: both agreements fell on gaps whose commits were all of
+the same six-object shape, which is the case six-per-commit was built from, so only a gap holding
+commits of at least two shapes can separate them.
 
 ## What's next
 
 A cloud shift firing next has no row to take: it should confirm from `TEST-WORKBOOK.md` that 2A, 2B,
 3A, 4A, 6B and 7A's review half are still the only cloud-capable rows and still done, append a skip
-entry naming 1B, commit, push and stop, rather than improvise a row — that is the seventy-second such
-firing, and the seventy-one before it are in `TEST-LOG.md` under 2026-09-17 through 2026-11-26. The
+entry naming 1B, commit, push and stop, rather than improvise a row — that is the seventy-third such
+firing, and the seventy-two before it are in `TEST-LOG.md` under 2026-09-17 through 2026-11-27. The
 twelfth notification falls due on 2026-12-01, under the weekly condition the 2026-09-23 entry set,
 and it carries the routine question alone; a firing on any other date sends nothing unless something
 changes in the repository from outside the routine, and a findings file, a confirmation or a reading
 of its own container that the firing takes itself is its own output and does not meet that condition,
-which is the reasoning 2026-11-06 through 2026-11-26 all recorded. On arrival it should run
+which is the reasoning 2026-11-06 through 2026-11-27 all recorded. On arrival it should run
 `git rev-parse --abbrev-ref HEAD` and `git status --short` before anything else and expect a clean
 tree, but it should read the arrival shape rather than assume one: two shapes recur and one mechanism
 explains both, now tested at gaps of 0, 1, 2, 3 and 4 — provisioning tops the working tree up to the
 remote tip and leaves the branch refs at the image's commit, so `HEAD` arrives detached at the tip
 with `main` stale when the image is behind, as on 2026-11-08 through 2026-11-12 at `57dcd3f`, on
 2026-11-14 through 2026-11-17 at `4245f99`, on 2026-11-20 through 2026-11-23 at `a2f1d46` and on
-2026-11-25 and 2026-11-26 at `31b7095`, and attached with a gap of 0, zero loose objects and two
+2026-11-25 through 2026-11-27 at `31b7095`, and attached with a gap of 0, zero loose objects and two
 lines in `.git/logs/HEAD` when the image is already current, as on 2026-11-13, 2026-11-18, 2026-11-19
 and 2026-11-24 at `31b7095`; it should read several refs with `git show-ref`, or one `git rev-parse`
 call per revision, rather than pass `HEAD main origin/main` to a single `git rev-parse --short`,
 which takes exactly one revision and fails with `fatal: Needed a single revision` while printing
 nothing, on git 2.43.0 and regardless of whether `HEAD` is detached, tested both ways on 2026-11-23.
 The sequence `git fetch origin main`, `git checkout main`, `git merge --ff-only origin/main` is
-correct under both and was a rescue on 2026-11-26 as on 2026-11-20 through 2026-11-25, the fetch
+correct under both and was a rescue on 2026-11-27 as on 2026-11-20 through 2026-11-26, the fetch
 first being what makes the checkout's revert to the image's commit harmless; the gap is read with
 `git rev-list --count main..origin/main` after the fetch rather than predicted, and once the gap and
 each commit's path list are known the loose-object count follows from the share rule, which
-`FINDINGS/2026-11-23-same-gap-different-count.md` and `FINDINGS/2026-11-26-gap-two-twelve-objects.md`
-show is not replaceable by the gap at a gap of 4 or of 2. Whether the image has moved is read from
-the pack's name, byte count and date together and read before unshallowing, since the unshallow
-writes a pack of its own — on 2026-11-26 `pack-a4e78262…` at 809,498 bytes — and the current image's
-signature is `pack-2f686ef4…` at 20,592,486 bytes dated 2026-11-24 02:08:57, now three firings old;
-a pack whose name and byte count match that signature means the image held and one that differs means
-it moved, with no further check needed, a pack date being a build time per
-`FINDINGS/2026-11-25-pack-predates-firing.md`. It should still expect the cloud section's
-`git pull --rebase origin main` to refuse while its own writes are unstaged, the working order being
-add, commit, rebase, push, as the 2026-11-11 through 2026-11-26 log entries all record, and before
-any comparison to a commit older than fifty back, `da85a6b` and `3e416c5` included, it should run
-`git rev-parse --is-shallow-repository` and, if true, `git fetch --unshallow origin main`, which
-touches nothing on the remote and was needed again on 2026-11-26. On the development machine the
-queue is 1B first, then 3B, 4B, 5A, 5B, 6A, 7B and 7A's flake half, and row 4B's brief is unchanged —
-PDF under Electron with the same assertions via outline entries, compile index written last, and the
-font-resolution check made able to fail, for which 2026-09-16 is the demonstration, having reported
-`Times New Roman` as resolved on a machine where `fc-match` returns `LiberationSerif-Regular.ttf` —
-while any cloud shift that does get a row should follow `TEST-ROUTINE.md`'s five pre-flight steps, of
-which `git checkout package-lock.json` after install and `node -e "require('electron')"` were both
-needed again on 2026-09-16, and `npm run build`, which takes about a second, is what unlocks
-`search`, `rank` and `lexicon`; it will find `xvfb-run` at `/usr/bin/xvfb-run`, Node v22.23.5 on the
-fifth image, and `node_modules/`, `out/` and `test-results/` all absent, as on 2026-11-26.
+`FINDINGS/2026-11-23-same-gap-different-count.md`,
+`FINDINGS/2026-11-26-gap-two-twelve-objects.md` and
+`FINDINGS/2026-11-27-gap-three-eighteen-objects.md` show is not replaceable by the gap at a gap of 4,
+of 2 or of 3. Whether the image has moved is read from the pack's name, byte count and date together
+and read before unshallowing, since the unshallow writes a pack of its own — on 2026-11-27
+`pack-e1b4c248…` at 811,021 bytes — and the current image's signature is `pack-2f686ef4…` at
+20,592,486 bytes dated 2026-11-24 02:08:57, now four firings old; a pack whose name and byte count
+match that signature means the image held and one that differs means it moved, with no further check
+needed, a pack date being a build time per `FINDINGS/2026-11-25-pack-predates-firing.md`. It should
+still expect the cloud section's `git pull --rebase origin main` to refuse while its own writes are
+unstaged, the working order being add, commit, rebase, push, as the 2026-11-11 through 2026-11-27 log
+entries all record, and before any comparison to a commit older than fifty back, `da85a6b` and
+`3e416c5` included, it should run `git rev-parse --is-shallow-repository` and, if true,
+`git fetch --unshallow origin main`, which touches nothing on the remote and was needed again on
+2026-11-27. On the development machine the queue is 1B first, then 3B, 4B, 5A, 5B, 6A, 7B and 7A's
+flake half, and row 4B's brief is unchanged — PDF under Electron with the same assertions via outline
+entries, compile index written last, and the font-resolution check made able to fail, for which
+2026-09-16 is the demonstration, having reported `Times New Roman` as resolved on a machine where
+`fc-match` returns `LiberationSerif-Regular.ttf` — while any cloud shift that does get a row should
+follow `TEST-ROUTINE.md`'s five pre-flight steps, of which `git checkout package-lock.json` after
+install and `node -e "require('electron')"` were both needed again on 2026-09-16, and `npm run
+build`, which takes about a second, is what unlocks `search`, `rank` and `lexicon`; it will find
+`xvfb-run` at `/usr/bin/xvfb-run`, Node v22.23.5 on the fifth image, and `node_modules/`, `out/` and
+`test-results/` all absent, as on 2026-11-27.
