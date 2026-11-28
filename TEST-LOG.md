@@ -4388,3 +4388,92 @@ No notification was sent. The eleventh went on 2026-11-24 and the twelfth falls 
 under the weekly condition the 2026-09-23 entry set, and the one thing this firing learned is a
 reading of its own container, which the 2026-11-06 entry established does not meet the send-anyway
 condition on its own. Nothing reached the repository from outside the routine.
+
+## 2026-11-28 — cloud shift, skipped
+
+This firing took no row, the seventy-third running to skip. `TEST-STATE.md` named shift 1B, which
+`TEST-SHIFT.md`'s "Which shifts can run where" lists as local, so the cloud section's selection rule
+sent the firing to the earliest cloud-capable row not yet done, and there is none: `TEST-WORKBOOK.md`
+still marks all six — 2A, 2B, 3A, 4A, 6B and 7A's review half, done 2026-09-11 through 2026-09-16 —
+as done, and its table is unchanged, confirmed by an empty `git diff --stat da85a6b HEAD --
+TEST-WORKBOOK.md`. The checkout was read only apart from this entry, `TEST-STATE.md`, one findings
+file and the commit: no install, no build, no suite run. `src/` and `tests/` are also unchanged since
+`da85a6b` of 2026-09-16, confirmed by an empty `git diff --stat da85a6b HEAD -- src tests` run after
+`git fetch --unshallow origin main`; after unshallowing the history is 108 commits from the root,
+with `da85a6b` 74 back and `3e416c5` 93 back.
+
+The one thing read that was not already known is a third loose-object count at a gap of 4, and it
+differs from both earlier ones. `.git/objects` held twenty-four loose objects at arrival, counted
+before the gap was read, against the 22 of 2026-11-17 and the 20 of 2026-11-23 at the same gap. This
+is the first gap read three times and the three counts are three different numbers, so no reading of
+the gap alone could have produced all three; `FINDINGS/2026-11-23-same-gap-different-count.md` showed
+that by a pair and this makes it a triple. All three counts follow from the share rule of
+`FINDINGS/2026-11-17-image-fifth-firing.md`: today's four commits, `deedd80` of 2026-11-24, `afc4df7`
+of 2026-11-25, `9ef99c7` of 2026-11-26 and `b562a0d` of 2026-11-27, each added a file under
+`FINDINGS/` and modified `TEST-LOG.md` and `TEST-STATE.md`, which is six objects each — commit, root
+tree, `FINDINGS/` tree and three blobs — while the 2026-11-17 range held one commit without a
+findings file and the 2026-11-23 range held two. All twenty-four names on disk were matched to the
+four sets of six, with no overlap in any of the six pairs and nothing left over, and
+`git rev-list --objects 31b7095..b562a0d` returned the same twenty-four. That is the sixth
+verification of the rule by name rather than by total and the first at a gap of 4.
+
+Twenty-four is also the ceiling a gap of 4 can reach under the rule, so the three readings now span
+its full range at this gap, 16 to 24. Setting the three side by side gives the rule a closed form for
+the two commit shapes the routine actually produces: with `n` the gap and `k` the number of commits
+in it that added a findings file, `objects = 4n + 2k`, since a commit touching only `TEST-LOG.md` and
+`TEST-STATE.md` costs four and one adding a findings file costs six. That fits all nine counts
+recorded to date — 2026-11-17, 2026-11-21 through 2026-11-28 — and it is a restatement of the share
+rule rather than a new rule, worth no more confidence than the rule it restates and holding only
+while every commit in the range touches that same set of paths. The discarded six-per-commit rule is
+the special case `k = n`, which is why the two agree today as they did on 2026-11-26 and 2026-11-27:
+the third agreement by the count the 2026-11-27 entry keeps, the third in a row, and again on a range
+whose commits were all of one shape, which is the case six-per-commit was built from and therefore
+cannot test. The separating readings remain 2026-11-21, 2026-11-22 and 2026-11-23. The detail is in
+`FINDINGS/2026-11-28-gap-four-third-count.md`.
+
+The container image held for a fifth firing. The pack read before unshallowing is the fifth image's
+`pack-2f686ef4…` at 20,592,486 bytes, unchanged in name and byte count, dated 2026-11-24 02:08:57 and
+now four days old; under `FINDINGS/2026-11-25-pack-predates-firing.md` that date is a build time, so
+the match alone settles that the image did not move and no further check was needed. The fifth
+signature has now served five firings, matching the 2026-11-08 and 2026-11-13 images at five against
+the 2026-11-18 image's one, and the four intervals between image moves are still five, five, one and
+five days, so predicting the next move stays ruled out. `.git/logs/HEAD` held three lines, the first
+two stamped 1795486137 and 1795486138 from the image's own depth-50 clone and the third stamped
+1795831699 for 2026-11-28 02:08:19, this firing's only provisioning write, moving `HEAD` from
+`31b7095` to `b562a0d` — 345,562 seconds after the clone, four days less thirty-eight seconds, and
+one day more than the 259,178 seconds read on 2026-11-27 against the same clone. All twenty-four
+loose objects carry that same second as their mtime. `.git/logs/refs/heads/main` and
+`.git/logs/refs/remotes/origin/main` each held one line, both from the clone, so nothing the
+2026-11-27 firing wrote inside `.git` survived into this one and that expectation stays ruled out on
+every date from 2026-11-08 to 2026-11-28. The unshallow again wrote a pack of its own,
+`pack-c169157e…` at 812,543 bytes dated 2026-11-28 02:09:32, which is why the image's pack is read
+before unshallowing and not after; it is 1,522 bytes larger than the 811,021 of 2026-11-27 over the
+one commit between them, which is smaller than earlier per-commit deltas and is not read as a cost.
+
+The arrival shape was the image-behind one, the seventeenth such reading in twenty-one since
+2026-11-08 against four gap-0 ones, and the fourth detached arrival running. `git rev-parse
+--abbrev-ref HEAD` read `HEAD`, `git show-ref` put `main` and `origin/main` both at `31b7095` while
+`HEAD` stood at the remote tip `b562a0d`, and `git status --short` was clean. `git rev-list --count
+main..origin/main` read 4 after the fetch, and the sequence `git fetch origin main`, `git checkout
+main`, `git merge --ff-only origin/main` was a rescue rather than a no-op: the checkout reverted the
+working tree to `31b7095` and the merge fast-forwarded it back to `b562a0d`, reporting 6 files
+changed, 757 insertions and 108 deletions. That is the twelfth reading of the top-up mechanism of
+`FINDINGS/2026-11-14-provisioning-top-up.md`, still seen only at gaps of 0, 1, 2, 3 and 4.
+
+Nothing in `TEST-STATE.md` needed correcting, and no earlier entry needed a correction this time.
+`FINDINGS/` now holds twenty-seven files, the twenty-seventh being this firing's. Node is v22.23.5,
+`xvfb-run` is at `/usr/bin/xvfb-run`, and `node_modules/`, `out/` and `test-results/` are all absent.
+
+The repository-channel check of 2026-10-12 was repeated: zero issues, open or closed, and zero pull
+requests, open, closed or merged. That is the forty-eighth date it has been made, and no answer to
+anything under "What's waiting on Jack" has arrived through the repository on any of them. Nothing
+has reached this repository from outside the routine in seventy-three days, the last shift to run a
+suite was 7A on 2026-09-16, and shift 1B has now been deferred seventy-nine times — six firings
+taking a substitute cloud row and seventy-three skipping. The timing gap is untouched and held for
+the seventy-seventh shift running: `structure` 0.3 seconds against 10.1, `compilestore` 0.4 against
+17.0, and `bookrender` 4.0 against 420.3.
+
+No notification was sent. The eleventh went on 2026-11-24 and the twelfth falls due on 2026-12-01
+under the weekly condition the 2026-09-23 entry set, and the one thing this firing learned is a
+reading of its own container, which the 2026-11-06 entry established does not meet the send-anyway
+condition on its own. Nothing reached the repository from outside the routine.
